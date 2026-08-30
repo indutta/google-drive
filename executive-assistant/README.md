@@ -36,23 +36,29 @@ routine replies — on demand and on a scheduled weekday-morning Routine.
   any of it gets written back to is `executive-assistant/tasks.md` in
   this private repo.
 
-## The scheduled Routine
+## The scheduled Routine — not yet live
 
-Set up via Claude's Routines (`create_trigger`), cron `45 1 * * 1-5` UTC
-= **7:15 AM IST, Monday–Friday** (Datre's plant timezone, Asia/Kolkata —
-change this if Indranil is usually elsewhere). It spawns a fresh session
-each morning with Gmail, Google Calendar, and Google Drive access, which:
+I tried to set this up via Claude's Routines (`create_trigger`), cron
+`45 1 * * 1-5` UTC = **7:15 AM IST, Monday–Friday** (Datre's plant
+timezone, Asia/Kolkata). It was rejected: this organization's Routines
+can't be granted MCP connector access (Gmail/Calendar/Drive) through
+that API path — a session it spawns would wake up with no way to read
+your inbox or calendar, which defeats the point. I deleted the trigger
+rather than leave a silently-broken automation running.
 
-1. Clones this repo and checks out the branch this was built on
-   (`claude/executive-assistant-agent` — switch the Routine's prompt to
-   the default branch once this is merged).
-2. Follows `.claude/skills/executive-assistant/SKILL.md`.
-3. Commits any `tasks.md` updates back to the repo.
-4. Sends you a push + email notification with the briefing.
+**To get the automatic morning run working**, create the Routine from
+the **claude.ai Routines UI** instead (Settings → Routines, or wherever
+your client surfaces them) — that surface can attach connectors that
+this API call couldn't. Point it at this session or a new one, prompt:
+*"Follow `.claude/skills/executive-assistant/SKILL.md` in
+indutta/google-drive and post the briefing,"* schedule `45 1 * * 1-5`
+(UTC) or your client's local-time equivalent of 7:15 AM IST weekdays,
+and grant it Gmail + Google Calendar + Google Drive.
 
-To change the time, pause it, or delete it, ask Claude to update or
-delete the Routine (`list_triggers` / `update_trigger` / `delete_trigger`
-— the trigger ID was returned when it was created).
+**Until then, run it on demand** — ask in any session on this repo
+("run my morning briefing", "what's in my inbox") or invoke
+`/executive-assistant`. That path already works end-to-end: it's how
+`executive-assistant/tasks.md` got seeded below.
 
 ## First run
 
