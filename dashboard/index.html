@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Datre OS — Daily Business Dashboard</title>
+<style>
+  :root{
+    color-scheme: light;
+    --page:        #f9f9f7;
+    --surface:     #fcfcfb;
+    --surface-2:   #f2f1ee;
+    --text-primary:#0b0b0b;
+    --text-secondary:#52514e;
+    --text-muted:  #898781;
+    --grid:        #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --border-strong:rgba(11,11,11,0.18);
+    --series-1:    #2a78d6;
+    --series-2:    #eb6834;
+    --series-3:    #1baf7a;
+    --good:        #0ca30c;
+    --warning:     #fab219;
+    --serious:     #ec835a;
+    --critical:    #d03b3b;
+    --success-text:#006300;
+    --shadow: 0 20px 45px rgba(11,11,11,0.16), 0 2px 8px rgba(11,11,11,0.08);
+    --wallpaper-1: #dfe9f7;
+    --wallpaper-2: #eef1e9;
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --page:        #0d0d0d;
+    --surface:     #1a1a19;
+    --surface-2:   #232322;
+    --text-primary:#ffffff;
+    --text-secondary:#c3c2b7;
+    --text-muted:  #898781;
+    --grid:        #2c2c2a;
+    --baseline:    #383835;
+    --border:      rgba(255,255,255,0.10);
+    --border-strong:rgba(255,255,255,0.18);
+    --series-1:    #3987e5;
+    --series-2:    #d95926;
+    --series-3:    #199e70;
+    --good:        #0ca30c;
+    --warning:     #fab219;
+    --serious:     #ec835a;
+    --critical:    #e66767;
+    --success-text:#0ca30c;
+    --shadow: 0 20px 45px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.35);
+    --wallpaper-1: #17202b;
+    --wallpaper-2: #171b16;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --page:        #0d0d0d;
+      --surface:     #1a1a19;
+      --surface-2:   #232322;
+      --text-primary:#ffffff;
+      --text-secondary:#c3c2b7;
+      --text-muted:  #898781;
+      --grid:        #2c2c2a;
+      --baseline:    #383835;
+      --border:      rgba(255,255,255,0.10);
+      --border-strong:rgba(255,255,255,0.18);
+      --series-1:    #3987e5;
+      --series-2:    #d95926;
+      --series-3:    #199e70;
+      --critical:    #e66767;
+      --success-text:#0ca30c;
+      --shadow: 0 20px 45px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.35);
+      --wallpaper-1: #17202b;
+      --wallpaper-2: #171b16;
+    }
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    overflow:hidden;
+  }
+  #desktop-root{
+    position:relative;
+    width:100vw; height:100vh;
+    display:flex; flex-direction:column;
+  }
+
+  /* ---------- Menu bar ---------- */
+  #menubar{
+    height:34px; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px;
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom:1px solid var(--border);
+    font-size:13px;
+    position:relative; z-index:5000;
+  }
+  #menubar .left, #menubar .right{ display:flex; align-items:center; gap:14px; }
+  #menubar .brand{ display:flex; align-items:center; gap:7px; font-weight:600; }
+  #menubar .brand-dot{ width:9px; height:9px; border-radius:50%; background:var(--series-1); flex:0 0 auto; }
+  #menubar .active-app{ color:var(--text-secondary); }
+  #menubar button.icon-btn{
+    border:none; background:transparent; color:var(--text-secondary);
+    cursor:pointer; font-size:13px; padding:4px 8px; border-radius:6px;
+    font-family:inherit;
+  }
+  #menubar button.icon-btn:hover{ background:var(--surface-2); color:var(--text-primary); }
+  #clock{ color:var(--text-secondary); font-variant-numeric:tabular-nums; min-width:150px; text-align:right; }
+
+  /* ---------- Desktop surface ---------- */
+  #desktop{
+    position:relative;
+    flex:1 1 auto;
+    overflow:hidden;
+    background:
+      radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(160deg, var(--wallpaper-1), var(--wallpaper-2));
+  }
+
+  #desktop-icons{
+    position:absolute; top:18px; left:18px;
+    display:grid; grid-template-columns:repeat(1, 84px);
+    gap:6px; z-index:10;
+  }
+  .desktop-icon{
+    width:84px; background:transparent; border:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:8px 4px; border-radius:10px; color:var(--text-primary);
+    font-family:inherit; font-size:11.5px; text-align:center; line-height:1.25;
+  }
+  .desktop-icon:hover{ background: rgba(255,255,255,0.14); }
+  .desktop-icon .glyph{
+    width:42px; height:42px; border-radius:11px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: var(--shadow);
+  }
+  .desktop-icon .glyph svg{ width:22px; height:22px; }
+  .desktop-icon span{
+    text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  }
+
+  /* ---------- Windows ---------- */
+  .win{
+    position:absolute;
+    width:560px; min-width:340px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 100px);
+    background: var(--surface);
+    border-radius:12px;
+    border:1px solid var(--border);
+    box-shadow: var(--shadow);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  .win[hidden]{ display:none !important; }
+  .win .titlebar{
+    flex:0 0 auto;
+    height:38px; display:flex; align-items:center; gap:10px;
+    padding:0 12px; cursor:grab;
+    background: var(--surface-2);
+    border-bottom:1px solid var(--border);
+    user-select:none;
+  }
+  .win .titlebar:active{ cursor:grabbing; }
+  .traffic{ display:flex; gap:7px; flex:0 0 auto; }
+  .traffic button{
+    width:11px; height:11px; border-radius:50%; border:none; cursor:pointer;
+    padding:0; position:relative;
+  }
+  .traffic .close{ background:#ec6a5e; }
+  .traffic .min{ background:#f4bf4f; }
+  .win .wtitle{
+    font-size:12.5px; font-weight:600; color:var(--text-secondary);
+    flex:1 1 auto; text-align:center; margin-right:26px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .win .wbody{
+    flex:1 1 auto; overflow:auto; padding:16px 18px 20px;
+  }
+  .win.focused{ box-shadow: 0 24px 55px rgba(11,11,11,0.28), 0 2px 8px rgba(11,11,11,0.14); }
+
+  h1,h2,h3,h4{ margin:0 0 4px; font-weight:600; }
+  .section{ margin-bottom:20px; }
+  .section:last-child{ margin-bottom:0; }
+  .section-title{
+    font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--text-muted); margin-bottom:10px; font-weight:600;
+  }
+  p{ margin:0 0 8px; color:var(--text-secondary); font-size:13px; line-height:1.5; }
+  .muted{ color:var(--text-muted); }
+  .snapshot-badge{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11px; color:var(--text-muted);
+    background:var(--surface-2); border:1px solid var(--border);
+    padding:4px 9px; border-radius:999px; margin-bottom:14px;
+  }
+
+  /* ---------- Stat tiles ---------- */
+  .tiles{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; }
+  .tile{
+    background:var(--surface-2); border:1px solid var(--border);
+    border-radius:10px; padding:11px 12px;
+  }
+  .tile .tlabel{ font-size:11px; color:var(--text-muted); margin-bottom:6px; }
+  .tile .tvalue{ font-size:20px; font-weight:650; color:var(--text-primary); }
+  .tile .tdelta{ font-size:11.5px; margin-top:4px; font-weight:600; display:flex; align-items:center; gap:4px; }
+  .tile .tdelta.up{ color:var(--success-text); }
+  .tile .tdelta.down{ color:var(--critical); }
+  .tile .tsub{ font-size:11px; color:var(--text-muted); margin-top:3px; }
+
+  /* ---------- Alerts ---------- */
+  .alert{
+    display:flex; gap:10px; padding:10px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .alert:last-child{ border-bottom:none; }
+  .alert .dot{ width:9px; height:9px; border-radius:50%; margin-top:5px; flex:0 0 auto; }
+  .alert .dot.critical{ background:var(--critical); }
+  .alert .dot.serious{ background:var(--serious); }
+  .alert .dot.warning{ background:var(--warning); }
+  .alert .dot.good{ background:var(--good); }
+  .alert .atext{ font-size:13px; color:var(--text-primary); line-height:1.45; }
+  .alert .atag{
+    display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.04em; margin-right:6px; padding:1px 6px; border-radius:4px;
+  }
+  .alert .atag.critical{ color:#fff; background:var(--critical); }
+  .alert .atag.serious{ color:#fff; background:var(--serious); }
+  .alert .atag.warning{ color:#3a2c02; background:var(--warning); }
+  .alert .atag.good{ color:#fff; background:var(--good); }
+
+  /* ---------- Badges / chips ---------- */
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{
+    font-size:11.5px; padding:5px 10px; border-radius:999px;
+    background:var(--surface-2); border:1px solid var(--border); color:var(--text-secondary);
+  }
+  .flag{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;
+    margin-left:8px; vertical-align:middle;
+  }
+  .flag.warning{ background:rgba(250,178,25,0.16); color:#8a5c00; }
+  :root[data-theme="dark"] .flag.warning{ color:var(--warning); }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .flag.warning{ color:var(--warning); } }
+  .flag.critical{ background:rgba(208,59,59,0.14); color:var(--critical); }
+
+  /* ---------- Charts ---------- */
+  .chart-card{ margin-bottom:6px; }
+  .chart-card .chead{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+  .chart-card .ctitle{ font-size:12.5px; font-weight:600; color:var(--text-primary); }
+  svg.chart{ overflow:visible; display:block; }
+  .bar-rect{ cursor:pointer; }
+  .bar-val{ font-size:11px; font-weight:600; fill:var(--text-primary); font-variant-numeric:tabular-nums; }
+  .bar-lbl{ font-size:11px; fill:var(--text-secondary); }
+  .line-path{ fill:none; stroke:var(--series-1); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .area-fill{ fill:var(--series-1); opacity:0.10; }
+  .dot-pt{ fill:var(--surface); stroke:var(--series-1); stroke-width:2; cursor:pointer; }
+  .axis-line{ stroke:var(--baseline); stroke-width:1; }
+  .grid-line{ stroke:var(--grid); stroke-width:1; }
+
+  /* meter */
+  .meter{ margin:6px 0 2px; }
+  .meter .mtrack{ height:10px; border-radius:6px; background:var(--surface-2); border:1px solid var(--border); position:relative; overflow:hidden; }
+  .meter .mfill{ height:100%; border-radius:6px; background:var(--series-1); }
+  .meter .mref{ position:absolute; top:-3px; width:2px; height:16px; background:var(--text-muted); }
+  .meter .mlabels{ display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:5px; }
+
+  /* stepper */
+  .stepper{ display:flex; align-items:center; gap:0; margin:10px 0; }
+  .step{ display:flex; flex-direction:column; align-items:center; gap:5px; flex:0 0 auto; width:88px; }
+  .step .sval{ font-size:17px; font-weight:700; color:var(--series-1); }
+  .step .slbl{ font-size:10.5px; color:var(--text-muted); text-align:center; }
+  .step-line{ flex:1 1 auto; height:2px; background:linear-gradient(90deg, var(--series-1), var(--series-1)); opacity:.35; margin-top:-16px; }
+
+  /* legend */
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; }
+  .legend .litem{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-secondary); }
+  .legend .lswatch{ width:9px; height:9px; border-radius:2px; }
+
+  /* task list */
+  .task{ display:flex; align-items:flex-start; gap:9px; padding:8px 0; border-bottom:1px solid var(--border); }
+  .task:last-child{ border-bottom:none; }
+  .task input{ margin-top:3px; }
+  .task .ttext{ font-size:13px; color:var(--text-primary); line-height:1.4; }
+  .task .tmeta{ font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+  /* customer list */
+  .cust-row{ display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12.5px; }
+  .cust-row:last-child{ border-bottom:none; }
+  .cust-row .cname{ color:var(--text-primary); font-weight:600; }
+  .cust-row .cmeta{ color:var(--text-muted); font-size:11px; }
+
+  /* ---------- Tooltip ---------- */
+  #viz-tooltip{
+    position:fixed; z-index:9999; pointer-events:none;
+    background:var(--text-primary); color:var(--surface);
+    font-size:11.5px; padding:6px 9px; border-radius:6px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.25);
+    opacity:0; transform:translate(-50%,-130%); transition:opacity .08s ease;
+    white-space:nowrap;
+  }
+  #viz-tooltip.show{ opacity:1; }
+
+  /* ---------- Taskbar ---------- */
+  #taskbar{
+    flex:0 0 auto; height:52px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    backdrop-filter: blur(14px);
+    border-top:1px solid var(--border);
+    position:relative; z-index:5000;
+  }
+  .tb-item{
+    display:flex; align-items:center; gap:7px;
+    background:transparent; border:1px solid transparent; cursor:pointer;
+    padding:6px 10px; border-radius:9px; color:var(--text-primary);
+    font-family:inherit; font-size:12px;
+  }
+  .tb-item .tb-dot{ width:16px; height:16px; border-radius:5px; flex:0 0 auto; }
+  .tb-item.active{ background:var(--surface-2); border-color:var(--border); }
+  .tb-item .tb-live{ width:5px; height:5px; border-radius:50%; background:var(--series-1); display:none; }
+  .tb-item.open .tb-live{ display:block; }
+
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border-strong); border-radius:6px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  @media (max-width: 760px){
+    #desktop-icons{ display:none; }
+    #menubar .active-app, #data-asof{ display:none; }
+    #clock{ min-width:0; }
+    .win{
+      position:relative !important;
+      width:100% !important; max-width:100% !important;
+      left:0 !important; top:0 !important; margin-bottom:14px;
+      max-height:none;
+    }
+    #desktop{ overflow:auto; padding:14px 10px 20px; }
+    #windows-scroll{ display:flex; flex-direction:column; }
+    #taskbar{
+      justify-content:flex-start; overflow-x:auto; padding:0 10px;
+      -webkit-overflow-scrolling:touch;
+    }
+    .tb-item{ flex:0 0 auto; }
+    .tb-item span:last-child{ display:none; }
+  }
+</style>
+</head>
+<body>
+<div id="desktop-root">
+
+  <div id="menubar">
+    <div class="left">
+      <div class="brand"><span class="brand-dot"></span>Datre OS</div>
+      <span class="active-app" id="active-app-label">Daily Briefing</span>
+    </div>
+    <div class="right">
+      <span id="data-asof" class="muted"></span>
+      <button class="icon-btn" id="theme-toggle" title="Toggle theme">◐ Theme</button>
+      <span id="clock"></span>
+    </div>
+  </div>
+
+  <div id="desktop">
+    <div id="desktop-icons"></div>
+    <div id="windows-scroll" style="position:absolute; inset:0;"></div>
+  </div>
+
+  <div id="taskbar"></div>
+</div>
+
+<div id="viz-tooltip"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   DATA
+   Snapshot compiled from Datre Corporation's FY25-26 investor
+   pitch deck and CEO article. Static/illustrative — wire a
+   real feed (accounting export, ERP, CRM) in place of DATA
+   below to make this dashboard live.
+   ========================================================= */
+const DATA = {
+  company: "Datre Corporation Limited",
+  tagline: "Engineering Essence, Manufacturing Personified",
+  plant: "Falta Industrial Growth Centre, South 24 Parganas, West Bengal",
+  asOf: "Snapshot: FY25-26 close & Q1 FY26-27",
+  kpis: {
+    revenueFY2526: 25.9,
+    revenueGrowthYoY: 26,
+    netProfitFY2526: 1.82,
+    netWorthFY25: -1.54,
+    netWorthFY22: -5.94,
+    utilizationNow: 81,
+    utilizationBaseline: 55,
+    rejectionNow: 10.1,
+    rejectionLow: 2.6,
+    q1Fy2627: 4.84,
+    q1Fy2526: 8.39,
+    q1YoY: -42,
+    installedCapacity: 7000,
+    outputLow: 1000,
+    outputHigh: 1300,
+    meltingLow: 100,
+    meltingHigh: 130,
+    employees: 100,
+    supplyPartners: 140,
+    activeCustomers: 22,
+    tier1Share: 90
+  },
+  netProfitTrend: [
+    { label:"FY23", value:1.47 },
+    { label:"FY24", value:1.45 },
+    { label:"FY25", value:1.38 },
+    { label:"FY25-26", value:1.82 }
+  ],
+  revenueCompare: [
+    { label:"FY21 (trough)", value:8.5 },
+    { label:"FY25-26 (record)", value:25.9 }
+  ],
+  netWorthCompare: [
+    { label:"FY22", value:-5.94 },
+    { label:"FY25", value:-1.54 }
+  ],
+  utilizationCompare: [
+    { label:"2018", value:55 },
+    { label:"Aug 2025", value:81 }
+  ],
+  rejectionCompare: [
+    { label:"FY22-23 (low)", value:2.6 },
+    { label:"Current (record high)", value:10.1 }
+  ],
+  tegaConcentration: [
+    { label:"FY22", value:14 },
+    { label:"Interim", value:53 },
+    { label:"FY26 (proj.)", value:76 }
+  ],
+  certifications: ["ISO 9001:2015", "RDSO Class 'A'", "ZED Gold"],
+  customers: [
+    { name:"Tega Industries", segment:"Mining & Minerals — sole supplier since 2005", tag:"Concentration risk" },
+    { name:"Escorts Railway Equipment Division", segment:"Railways — AAR-H / SCHAKU coupler castings", tag:"" },
+    { name:"BEML · Mahindra & Mahindra", segment:"HEMM & Construction — Komatsu-qualified", tag:"" },
+    { name:"Tata Metaliks · Electrosteel · Tata Steel BSL · SAIL IISCO", segment:"Steel plants (legacy) — declining share", tag:"Legacy / declining" }
+  ],
+  alerts: [
+    { level:"critical", tag:"Sales", text:"Q1 FY26-27 revenue down 42% YoY — ₹4.84 Cr vs ₹8.39 Cr a year ago. Investigate order pipeline and demand with the sales team." },
+    { level:"serious", tag:"Concentration", text:"Tega Industries + Escorts drive ~80% of contribution; Tega's own share is trending toward ~76% of contribution by FY26." },
+    { level:"warning", tag:"Quality", text:"Rejection/scrap rate has climbed for 4 consecutive periods to 10.1% — the worst on record. Schedule a root-cause review." },
+    { level:"good", tag:"FY25-26", text:"Closed the year at a record ₹25.9 Cr revenue (+26% YoY) and a record ₹1.82 Cr net profit — the fourth straight profitable year." }
+  ],
+  tasks: [
+    { text:"Review Q1 FY26-27 order pipeline with the sales team", meta:"Tied to: revenue alert · Today" },
+    { text:"Quality review meeting — rejection rate root-cause", meta:"Tied to: quality alert · This week" },
+    { text:"Customer diversification check-in — reduce Tega/Escorts share", meta:"Tied to: concentration alert · This week" },
+    { text:"Prepare FY25-26 record-year note for investors", meta:"Tied to: FY25-26 close · This week" }
+  ]
+};
+
+/* =========================================================
+   SMALL SVG CHART HELPERS
+   ========================================================= */
+const NS = "http://www.w3.org/2000/svg";
+function svg(tag, attrs){
+  const el = document.createElementNS(NS, tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+const tooltipEl = document.getElementById("viz-tooltip");
+function showTip(evt, text){
+  tooltipEl.textContent = text;
+  tooltipEl.style.left = evt.clientX + "px";
+  tooltipEl.style.top = evt.clientY + "px";
+  tooltipEl.classList.add("show");
+}
+function moveTip(evt){
+  tooltipEl.style.left = evt.clientX + "px";
+  tooltipEl.style.top = evt.clientY + "px";
+}
+function hideTip(){ tooltipEl.classList.remove("show"); }
+
+// Simple bar chart, handles negative values (zero baseline).
+function barChart(container, data, opts){
+  opts = opts || {};
+  const w = opts.width || 460, h = opts.height || 130;
+  const padL = 8, padR = 8, padTop = 20, padBottom = 22;
+  const plotW = w - padL - padR, plotH = h - padTop - padBottom;
+  const values = data.map(d => d.value);
+  const max = Math.max(0, ...values);
+  const min = Math.min(0, ...values);
+  const span = (max - min) || 1;
+  const zeroY = padTop + plotH * (max / span);
+  const bw = Math.min(64, plotW / data.length * 0.5);
+  const gap = plotW / data.length;
+
+  const s = svg("svg", { class:"chart", viewBox:`0 0 ${w} ${h}`, width:"100%", height:h });
+  s.appendChild(svg("line", { class:"axis-line", x1:padL, x2:w-padR, y1:zeroY, y2:zeroY }));
+
+  data.forEach((d, i) => {
+    const cx = padL + gap * i + gap / 2;
+    const barH = Math.abs(d.value) / span * plotH;
+    const y = d.value >= 0 ? zeroY - barH : zeroY;
+    const rect = svg("rect", {
+      class:"bar-rect", x: cx - bw/2, y: y, width: bw, height: Math.max(barH,2),
+      rx:4, fill: opts.color || "var(--series-1)"
+    });
+    rect.addEventListener("mouseenter", e => showTip(e, `${d.label}: ${opts.fmt ? opts.fmt(d.value) : d.value}`));
+    rect.addEventListener("mousemove", moveTip);
+    rect.addEventListener("mouseleave", hideTip);
+    s.appendChild(rect);
+
+    const valLabel = svg("text", {
+      class:"bar-val", x: cx, y: d.value >= 0 ? (y - 6) : (y + barH + 14),
+      "text-anchor":"middle"
+    });
+    valLabel.textContent = opts.fmt ? opts.fmt(d.value) : d.value;
+    s.appendChild(valLabel);
+
+    const lbl = svg("text", { class:"bar-lbl", x: cx, y: h - 4, "text-anchor":"middle" });
+    lbl.textContent = d.label;
+    s.appendChild(lbl);
+  });
+
+  container.appendChild(s);
+}
+
+// Simple multi-point line chart with soft area fill and hover dots.
+function lineChart(container, data, opts){
+  opts = opts || {};
+  const w = opts.width || 460, h = opts.height || 140;
+  const padL = 8, padR = 8, padTop = 22, padBottom = 22;
+  const plotW = w - padL - padR, plotH = h - padTop - padBottom;
+  const values = data.map(d => d.value);
+  const max = Math.max(...values), min = Math.min(0, Math.min(...values));
+  const span = (max - min) || 1;
+  const stepX = data.length > 1 ? plotW / (data.length - 1) : 0;
+
+  function xy(i){
+    const x = padL + stepX * i;
+    const y = padTop + plotH - ((data[i].value - min) / span) * plotH;
+    return [x, y];
+  }
+
+  const s = svg("svg", { class:"chart", viewBox:`0 0 ${w} ${h}`, width:"100%", height:h });
+
+  // gridlines
+  for(let g=0; g<=2; g++){
+    const gy = padTop + plotH * (g/2);
+    s.appendChild(svg("line", { class:"grid-line", x1:padL, x2:w-padR, y1:gy, y2:gy }));
+  }
+
+  let d = "";
+  let area = "";
+  data.forEach((pt,i) => {
+    const [x,y] = xy(i);
+    d += (i===0 ? "M" : "L") + x + " " + y + " ";
+  });
+  const [x0,y0] = xy(0);
+  const [xn] = xy(data.length-1);
+  const baseY = padTop + plotH;
+  area = `M${x0} ${baseY} L` + data.map((_,i)=>{ const [x,y]=xy(i); return `${x} ${y}`; }).join(" L") + ` L${xn} ${baseY} Z`;
+
+  s.appendChild(svg("path", { class:"area-fill", d: area }));
+  s.appendChild(svg("path", { class:"line-path", d: d.trim() }));
+
+  data.forEach((pt,i) => {
+    const [x,y] = xy(i);
+    const dot = svg("circle", { class:"dot-pt", cx:x, cy:y, r:4 });
+    dot.addEventListener("mouseenter", e => showTip(e, `${pt.label}: ${opts.fmt ? opts.fmt(pt.value) : pt.value}`));
+    dot.addEventListener("mousemove", moveTip);
+    dot.addEventListener("mouseleave", hideTip);
+    s.appendChild(dot);
+
+    const lbl = svg("text", { class:"bar-lbl", x, y: h-4, "text-anchor": i===0?"start":(i===data.length-1?"end":"middle") });
+    lbl.textContent = pt.label;
+    s.appendChild(lbl);
+  });
+
+  // direct label on last point
+  const last = data[data.length-1];
+  const [lx,ly] = xy(data.length-1);
+  const lastLbl = svg("text", { class:"bar-val", x:lx, y:ly-10, "text-anchor":"end" });
+  lastLbl.textContent = opts.fmt ? opts.fmt(last.value) : last.value;
+  s.appendChild(lastLbl);
+
+  container.appendChild(s);
+}
+
+function meter(container, value, max, refValue, refLabel, valueLabel){
+  const wrap = document.createElement("div");
+  wrap.className = "meter";
+  const track = document.createElement("div");
+  track.className = "mtrack";
+  const fill = document.createElement("div");
+  fill.className = "mfill";
+  fill.style.width = Math.min(100, (value/max*100)) + "%";
+  track.appendChild(fill);
+  if(refValue != null){
+    const ref = document.createElement("div");
+    ref.className = "mref";
+    ref.style.left = Math.min(100, (refValue/max*100)) + "%";
+    ref.title = refLabel + ": " + refValue + "%";
+    track.appendChild(ref);
+  }
+  wrap.appendChild(track);
+  const labels = document.createElement("div");
+  labels.className = "mlabels";
+  labels.innerHTML = `<span>${refLabel ? refLabel+": "+refValue+"%" : ""}</span><span>${valueLabel}</span>`;
+  wrap.appendChild(labels);
+  container.appendChild(wrap);
+}
+
+function stepper(container, steps, fmt){
+  const wrap = document.createElement("div");
+  wrap.className = "stepper";
+  steps.forEach((s, i) => {
+    const step = document.createElement("div");
+    step.className = "step";
+    step.innerHTML = `<div class="sval">${fmt ? fmt(s.value) : s.value}</div><div class="slbl">${s.label}</div>`;
+    wrap.appendChild(step);
+    if(i < steps.length - 1){
+      const line = document.createElement("div");
+      line.className = "step-line";
+      wrap.appendChild(line);
+    }
+  });
+  container.appendChild(wrap);
+}
+
+/* =========================================================
+   WINDOW CONTENT BUILDERS
+   ========================================================= */
+function el(html){
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  return t.content.firstChild;
+}
+function fmtCr(v){ return (v<0?"-₹":"₹") + Math.abs(v).toFixed(2) + " Cr"; }
+function fmtPct(v){ return (v>0?"+":"") + v + "%"; }
+
+function buildBriefing(body){
+  body.innerHTML = "";
+  body.appendChild(el(`
+    <div class="section">
+      <span class="snapshot-badge">● ${DATA.asOf}</span>
+      <h2>Good morning, Indranil.</h2>
+      <p>Here's where ${DATA.company} stands today across production, sales, and quality.</p>
+    </div>
+  `));
+
+  const tiles = el(`<div class="section"><div class="section-title">Headline numbers</div><div class="tiles"></div></div>`);
+  const tilesGrid = tiles.querySelector(".tiles");
+  const tileData = [
+    { label:"FY25-26 revenue", value: fmtCr(DATA.kpis.revenueFY2526), delta: fmtPct(DATA.kpis.revenueGrowthYoY)+" YoY", up:true, sub:"Record year" },
+    { label:"FY25-26 net profit", value: fmtCr(DATA.kpis.netProfitFY2526), delta:"Record", up:true, sub:"4th straight profitable year" },
+    { label:"Plant utilization", value: DATA.kpis.utilizationNow+"%", delta:"vs "+DATA.kpis.utilizationBaseline+"% in 2018", up:true, sub:"Aug 2025" },
+    { label:"Q1 FY26-27 sales", value: fmtCr(DATA.kpis.q1Fy2627), delta: fmtPct(DATA.kpis.q1YoY)+" YoY", up:false, sub:"vs "+fmtCr(DATA.kpis.q1Fy2526)+" a year ago" }
+  ];
+  tileData.forEach(t => {
+    tilesGrid.appendChild(el(`
+      <div class="tile">
+        <div class="tlabel">${t.label}</div>
+        <div class="tvalue">${t.value}</div>
+        <div class="tdelta ${t.up?'up':'down'}">${t.up?'▲':'▼'} ${t.delta}</div>
+        <div class="tsub">${t.sub}</div>
+      </div>
+    `));
+  });
+  body.appendChild(tiles);
+
+  const alertsSec = el(`<div class="section"><div class="section-title">Today's alerts</div><div id="brief-alerts"></div></div>`);
+  body.appendChild(alertsSec);
+  renderAlerts(alertsSec.querySelector("#brief-alerts"));
+
+  const tasksSec = el(`<div class="section"><div class="section-title">Action items</div><div id="brief-tasks"></div></div>`);
+  body.appendChild(tasksSec);
+  renderTasks(tasksSec.querySelector("#brief-tasks"));
+}
+
+function renderAlerts(container){
+  DATA.alerts.forEach(a => {
+    container.appendChild(el(`
+      <div class="alert">
+        <span class="dot ${a.level}"></span>
+        <div class="atext"><span class="atag ${a.level}">${a.tag}</span>${a.text}</div>
+      </div>
+    `));
+  });
+}
+
+function renderTasks(container){
+  DATA.tasks.forEach(t => {
+    container.appendChild(el(`
+      <div class="task">
+        <input type="checkbox" />
+        <div>
+          <div class="ttext">${t.text}</div>
+          <div class="tmeta">${t.meta}</div>
+        </div>
+      </div>
+    `));
+  });
+}
+
+function buildProduction(body){
+  body.innerHTML = "";
+  body.appendChild(el(`<div class="section"><div class="section-title">Plant utilization</div></div>`));
+  const meterWrap = el(`<div class="section"></div>`);
+  meter(meterWrap, DATA.kpis.utilizationNow, 100, DATA.kpis.utilizationBaseline, "2018", DATA.kpis.utilizationNow+"% today");
+  body.appendChild(meterWrap);
+
+  const tiles = el(`<div class="section"><div class="tiles"></div></div>`);
+  const grid = tiles.querySelector(".tiles");
+  [
+    { label:"Installed capacity", value: DATA.kpis.installedCapacity.toLocaleString()+" MT/yr", sub:"Valve-era rating" },
+    { label:"Current output", value: DATA.kpis.outputLow.toLocaleString()+"–"+DATA.kpis.outputHigh.toLocaleString()+" MT/yr", sub:"Actual run-rate" },
+    { label:"Melting throughput", value: DATA.kpis.meltingLow+"–"+DATA.kpis.meltingHigh+" T/mo", sub:"" }
+  ].forEach(t => grid.appendChild(el(`
+    <div class="tile"><div class="tlabel">${t.label}</div><div class="tvalue">${t.value}</div><div class="tsub">${t.sub}</div></div>
+  `)));
+  body.appendChild(tiles);
+
+  const chartSec = el(`<div class="section chart-card"><div class="chead"><span class="ctitle">Utilization, then vs. now</span></div><div id="util-chart"></div></div>`);
+  body.appendChild(chartSec);
+  barChart(chartSec.querySelector("#util-chart"), DATA.utilizationCompare, { fmt:v=>v+"%" });
+
+  body.appendChild(el(`<div class="section"><p class="muted">Same 1990s-era plant — utilization climbing on aging-asset productivity, not new capex.</p></div>`));
+}
+
+function buildFinancials(body){
+  body.innerHTML = "";
+  const rev = el(`<div class="section chart-card"><div class="chead"><span class="ctitle">Revenue — 5-year turnaround</span></div><div id="rev-chart"></div></div>`);
+  body.appendChild(rev);
+  barChart(rev.querySelector("#rev-chart"), DATA.revenueCompare, { fmt: fmtCr });
+
+  const profit = el(`<div class="section chart-card"><div class="chead"><span class="ctitle">Net profit, FY23–FY25-26</span></div><div id="profit-chart"></div></div>`);
+  body.appendChild(profit);
+  lineChart(profit.querySelector("#profit-chart"), DATA.netProfitTrend, { fmt: fmtCr });
+
+  const nw = el(`<div class="section chart-card"><div class="chead"><span class="ctitle">Net worth — narrowing toward positive</span></div><div id="nw-chart"></div></div>`);
+  body.appendChild(nw);
+  barChart(nw.querySelector("#nw-chart"), DATA.netWorthCompare, { fmt: fmtCr, color:"var(--series-1)" });
+
+  const q1 = el(`<div class="section"><div class="section-title">Latest reported quarter</div><div class="tiles"></div></div>`);
+  const grid = q1.querySelector(".tiles");
+  grid.appendChild(el(`
+    <div class="tile">
+      <div class="tlabel">Q1 FY26-27 sales</div>
+      <div class="tvalue">${fmtCr(DATA.kpis.q1Fy2627)}</div>
+      <div class="tdelta down">▼ ${fmtPct(DATA.kpis.q1YoY)} YoY</div>
+      <div class="tsub">vs ${fmtCr(DATA.kpis.q1Fy2526)} in Q1 FY25-26</div>
+    </div>
+  `));
+  body.appendChild(q1);
+}
+
+function buildCustomers(body){
+  body.innerHTML = "";
+  const tiles = el(`<div class="section"><div class="tiles"></div></div>`);
+  const grid = tiles.querySelector(".tiles");
+  [
+    { label:"Top-2 customer share", value:"~80%", sub:"Tega + Escorts of contribution" },
+    { label:"Active accounts", value: DATA.kpis.activeCustomers+"+", sub:"Customers on the books" },
+    { label:"Supply partners", value: DATA.kpis.supplyPartners+"+", sub:"" },
+    { label:"Tier-1 / MNC mix", value: "~"+DATA.kpis.tier1Share+"%", sub:"Of active accounts" }
+  ].forEach(t => grid.appendChild(el(`
+    <div class="tile"><div class="tlabel">${t.label}</div><div class="tvalue">${t.value}</div><div class="tsub">${t.sub}</div></div>
+  `)));
+  body.appendChild(tiles);
+
+  const stepSec = el(`<div class="section"><div class="section-title">Tega Industries — share of contribution <span class="flag serious">Rising</span></div><div id="tega-step"></div></div>`);
+  body.appendChild(stepSec);
+  stepper(stepSec.querySelector("#tega-step"), DATA.tegaConcentration, v=>v+"%");
+  body.appendChild(el(`<p class="muted">Single-customer concentration is the main structural risk flagged in the FY25-26 pitch materials.</p>`));
+
+  const custSec = el(`<div class="section"><div class="section-title">Customer segments</div><div id="cust-list"></div></div>`);
+  body.appendChild(custSec);
+  const list = custSec.querySelector("#cust-list");
+  DATA.customers.forEach(c => {
+    list.appendChild(el(`
+      <div class="cust-row">
+        <div><div class="cname">${c.name}</div><div class="cmeta">${c.segment}</div></div>
+        ${c.tag ? `<span class="chip">${c.tag}</span>` : ""}
+      </div>
+    `));
+  });
+}
+
+function buildQuality(body){
+  body.innerHTML = "";
+  const chartSec = el(`<div class="section chart-card"><div class="chead"><span class="ctitle">Rejection / scrap rate <span class="flag warning">Record high</span></span></div><div id="rej-chart"></div></div>`);
+  body.appendChild(chartSec);
+  barChart(chartSec.querySelector("#rej-chart"), DATA.rejectionCompare, { fmt:v=>v+"%" });
+  body.appendChild(el(`<p class="muted">Up for 4 consecutive periods — the worst on record, against an FY22-23 low of 2.6%.</p>`));
+
+  const certSec = el(`<div class="section"><div class="section-title">Certifications</div><div class="chips"></div></div>`);
+  const chips = certSec.querySelector(".chips");
+  DATA.certifications.forEach(c => chips.appendChild(el(`<span class="chip">${c}</span>`)));
+  body.appendChild(certSec);
+}
+
+function buildAlerts(body){
+  body.innerHTML = "";
+  body.appendChild(el(`<div class="section"><div class="section-title">All alerts</div><div id="alerts-full"></div></div>`));
+  renderAlerts(body.querySelector("#alerts-full"));
+}
+
+function buildTasks(body){
+  body.innerHTML = "";
+  body.appendChild(el(`<div class="section"><div class="section-title">Today &amp; this week</div><div id="tasks-full"></div></div>`));
+  renderTasks(body.querySelector("#tasks-full"));
+}
+
+/* =========================================================
+   APP / WINDOW REGISTRY
+   ========================================================= */
+const APPS = [
+  { id:"briefing",   title:"Daily Briefing",     color:"var(--series-1)", build:buildBriefing,   x:130, y:24,  w:600, openByDefault:true,
+    icon:`<circle cx="12" cy="12" r="5"/><g stroke="currentColor" stroke-width="1.6"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/></g>` },
+  { id:"production", title:"Production Monitor", color:"var(--series-1)", build:buildProduction, x:650, y:24,  w:420,
+    icon:`<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>` },
+  { id:"financials", title:"Sales & Financials", color:"var(--series-1)", build:buildFinancials,  x:650, y:250, w:420,
+    icon:`<path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/>` },
+  { id:"customers",  title:"Customer Portfolio", color:"var(--series-2)", build:buildCustomers,   x:160, y:400, w:460,
+    icon:`<circle cx="8" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M13 20c0-2.5 1.8-4.6 4-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>` },
+  { id:"quality",    title:"Quality Control",    color:"var(--warning)",  build:buildQuality,     x:180, y:120, w:420,
+    icon:`<path d="M12 2l7 3v6c0 5-3.2 8.5-7 10-3.8-1.5-7-5-7-10V5l7-3z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>` },
+  { id:"alerts",     title:"Alerts",             color:"var(--critical)", build:buildAlerts,      x:200, y:160, w:420,
+    icon:`<path d="M12 3c-1 0-1.8.8-1.8 1.8v.6C7.6 6.2 6 8.6 6 11.5V15l-2 2.5V18h16v-.5L18 15v-3.5c0-2.9-1.6-5.3-4.2-6.1v-.6C13.8 3.8 13 3 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.5 20a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="2"/>` },
+  { id:"tasks",      title:"Calendar & Tasks",   color:"var(--series-3)", build:buildTasks,       x:220, y:200, w:420,
+    icon:`<rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/><line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>` }
+];
+
+/* =========================================================
+   WINDOW MANAGER
+   ========================================================= */
+const winScroll = document.getElementById("windows-scroll");
+const iconsHost = document.getElementById("desktop-icons");
+const taskbarHost = document.getElementById("taskbar");
+const activeAppLabel = document.getElementById("active-app-label");
+let zTop = 100;
+const winEls = {};
+const tbEls = {};
+
+function bringToFront(id){
+  zTop += 1;
+  winEls[id].style.zIndex = zTop;
+  Object.values(winEls).forEach(w => w.classList.remove("focused"));
+  winEls[id].classList.add("focused");
+  const app = APPS.find(a => a.id === id);
+  activeAppLabel.textContent = app.title;
+  Object.values(tbEls).forEach(t => t.classList.remove("active"));
+  tbEls[id].classList.add("active");
+}
+
+function openWindow(id){
+  const w = winEls[id];
+  w.hidden = false;
+  tbEls[id].classList.add("open");
+  bringToFront(id);
+}
+
+function closeWindow(id){
+  winEls[id].hidden = true;
+  tbEls[id].classList.remove("open", "active");
+}
+
+function toggleWindow(id){
+  if(winEls[id].hidden) openWindow(id);
+  else bringToFront(id);
+}
+
+function makeDraggable(win, handle){
+  let dragging = false, startX, startY, origX, origY;
+  handle.addEventListener("mousedown", e => {
+    if(e.target.closest("button")) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    const rect = win.getBoundingClientRect();
+    const parentRect = win.parentElement.getBoundingClientRect();
+    origX = rect.left - parentRect.left;
+    origY = rect.top - parentRect.top;
+    bringToFront(win.dataset.id);
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove", e => {
+    if(!dragging) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    win.style.left = Math.max(0, origX + dx) + "px";
+    win.style.top = Math.max(0, origY + dy) + "px";
+  });
+  window.addEventListener("mouseup", () => { dragging = false; });
+}
+
+APPS.forEach(app => {
+  // window shell
+  const win = el(`
+    <div class="win" id="win-${app.id}" data-id="${app.id}" hidden style="left:${app.x}px; top:${app.y}px; width:${app.w}px;">
+      <div class="titlebar">
+        <div class="traffic">
+          <button class="close" title="Close"></button>
+          <button class="min" title="Minimize"></button>
+        </div>
+        <div class="wtitle">${app.title}</div>
+      </div>
+      <div class="wbody"></div>
+    </div>
+  `);
+  winScroll.appendChild(win);
+  winEls[app.id] = win;
+  win.querySelector(".close").addEventListener("click", () => closeWindow(app.id));
+  win.querySelector(".min").addEventListener("click", () => closeWindow(app.id));
+  win.addEventListener("mousedown", () => bringToFront(app.id));
+  makeDraggable(win, win.querySelector(".titlebar"));
+  app.build(win.querySelector(".wbody"));
+
+  // desktop icon
+  const icon = el(`
+    <button class="desktop-icon" data-id="${app.id}">
+      <span class="glyph" style="background:${app.color}; color:#fff;">
+        <svg viewBox="0 0 24 24">${app.icon}</svg>
+      </span>
+      <span>${app.title}</span>
+    </button>
+  `);
+  icon.addEventListener("click", () => toggleWindow(app.id));
+  iconsHost.appendChild(icon);
+
+  // taskbar item
+  const tb = el(`
+    <button class="tb-item" data-id="${app.id}">
+      <span class="tb-dot" style="background:${app.color};"></span>
+      <span class="tb-live"></span>
+      <span>${app.title}</span>
+    </button>
+  `);
+  tb.addEventListener("click", () => toggleWindow(app.id));
+  taskbarHost.appendChild(tb);
+  tbEls[app.id] = tb;
+});
+
+APPS.filter(a => a.openByDefault).forEach(a => openWindow(a.id));
+
+/* =========================================================
+   MENU BAR — clock, theme, snapshot label
+   ========================================================= */
+document.getElementById("data-asof").textContent = DATA.asOf;
+
+function tickClock(){
+  const now = new Date();
+  document.getElementById("clock").textContent = now.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" }) +
+    "  " + now.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" });
+}
+tickClock();
+setInterval(tickClock, 15000);
+
+const themeBtn = document.getElementById("theme-toggle");
+function applyTheme(t){
+  if(t) document.documentElement.setAttribute("data-theme", t);
+  else document.documentElement.removeAttribute("data-theme");
+}
+let savedTheme = null;
+try { savedTheme = localStorage.getItem("datre-os-theme"); } catch(e){}
+if(savedTheme) applyTheme(savedTheme);
+themeBtn.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme") ||
+    (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = current === "dark" ? "light" : "dark";
+  applyTheme(next);
+  try { localStorage.setItem("datre-os-theme", next); } catch(e){}
+});
+
+})();
+</script>
+</body>
+</html>
