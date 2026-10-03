@@ -37,4 +37,4 @@ and no installation. Open `index.html` in Chrome on a phone or PC.
 - Open items from the PM checklist summary (26-Sep-2026): Roll Over seal leak, Reclamation Tower air leak,
   Shot Blast impellers, EOT 2 MT LT motor rewinding
 
-Technician names in Setup are placeholders. Replace them with the real team.
+Team (Setup tab): Pallab Haldar (Maintenance Manager); technicians Sambhu Naskar, Sayak Kanji, Pijush Bera, Palash Ghosal, Sagar Halder, Biswajit; Monotosh Roy (DGM – Operations), Tamal Mithia (QC), Anwesha (Executive Secretary / Purchase) and Indranil Dutta (CEO) with no job card. Set each technician's trade (Mechanical / Electrical) in Setup.
