@@ -57,3 +57,10 @@ The link stays the same, and phones pick up the change the next time they open i
 | Google Apps Script link (above) | Yes, Google Sheet | Google account (Workspace or Gmail) |
 | Claude artifact link | Yes, live | claude.ai access shared by the owner |
 | `index.html` file copied to the phone | No, this phone only | Nothing. Open with Chrome via the Files app |
+
+## QR poster for the shop floor
+
+Open [`qr-poster.html`](qr-poster.html) in Chrome on a PC, paste the `/exec` link
+and click **Download poster** (or **Print poster**). It makes an A4 poster with a
+large QR code and first-time steps in English and Bengali. The QR code is made
+inside the page; the link is not sent anywhere.
