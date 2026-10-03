@@ -20,7 +20,10 @@ and no installation. Open `index.html` in Chrome on a phone or PC.
 
 ## Where the data lives
 
-- **Shared (recommended):** the published Claude artifact link. Everyone it is
+- **Android phones (recommended for the shop floor):** deploy as a Google Apps Script
+  web app backed by a Google Sheet. See [ANDROID-SETUP.md](ANDROID-SETUP.md).
+  Works offline and syncs when the phone reconnects.
+- **Claude artifact:** the published Claude artifact link. Everyone it is
   shared with (Contributor access) works on the same live records.
 - **Standalone (`index.html`):** records are saved in that browser only. Use
   *Setup → Export backup* weekly and *Import backup* to move data between devices.
