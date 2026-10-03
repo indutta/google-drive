@@ -36,7 +36,7 @@ canvas{width:100%;max-width:620px;height:auto;display:block;margin:0 auto;border
   <h1>QR poster for the shop floor</h1>
   <p class="msg" style="margin:0 0 12px">Paste the Maintenance Desk web-app link. The QR code is made on this page; the link is not sent anywhere.</p>
   <form class="panel" id="f">
-   <label>App link (Apps Script web app URL)<input id="url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+   <label>App link (Claude artifact link or Google /exec link)<input id="url" type="url" inputmode="url" placeholder="https://claude.ai/artifact/…" autocomplete="off"></label>
    <label>Help contact on poster<input id="help" type="text" value="Pallab Haldar · Maintenance Manager"></label>
    <span class="msg" id="m">Waiting for the link. The preview shows where the QR code will go.</span>
    <button class="btn pri" type="button" id="dl" disabled>Download poster (PNG, A4)</button>
@@ -1302,6 +1302,7 @@ const BN='"Noto Sans Bengali",sans-serif',DS='"Barlow Condensed","Arial Narrow",
 const $=s=>document.querySelector(s);
 const inFrame=!!(window.claude&&window.claude.use);
 let qr=null;
+function isClaude(){return /claude\.ai\/(code\/)?artifact\//.test($('#url').value)}
 function okUrl(u){try{const p=new URL(u);return p.protocol==='https:'}catch(e){return false}}
 function makeQR(u){const q=new QRMOD.QRCode(-1,QRMOD.EC.M);q.addData(u);q.make();return q}
 function drawQR(ctx,q,x0,y0,size){const n=q.getModuleCount(),qz=4,cell=size/(n+qz*2);ctx.fillStyle=PAPER;ctx.fillRect(x0,y0,size,size);ctx.fillStyle='#000';
@@ -1329,7 +1330,10 @@ function draw(){
   x.fillStyle=MUT;x.font='500 40px '+BN;x.fillText('ফোনের ক্যামেরা দিয়ে স্ক্যান করুন',W/2,qy+qs+178);
   // steps (first-time setup, real order)
   x.textAlign='left';
-  const steps=[['Scan the QR code. If it opens inside WhatsApp, tap Open in Chrome.','QR কোড স্ক্যান করুন। অন্য অ্যাপে খুললে "Open in Chrome" চাপুন।'],
+  const steps=isClaude()?[['Install the Claude app (Play Store). Sign in with the email given access.','Play Store থেকে Claude অ্যাপ ইনস্টল করে নিজের ইমেল দিয়ে সাইন ইন করুন।'],
+               ['Scan the QR code. It opens the Maintenance Desk in the Claude app.','QR কোড স্ক্যান করুন — Claude অ্যাপে মেইনটেন্যান্স ডেস্ক খুলবে।'],
+               ['Pick YOUR NAME at the top right. Done.','উপরে ডানদিকে নিজের নাম বেছে নিন।']]
+              :[['Scan the QR code. If it opens inside WhatsApp, tap Open in Chrome.','QR কোড স্ক্যান করুন। অন্য অ্যাপে খুললে "Open in Chrome" চাপুন।'],
                ['In Chrome tap ⋮ (top right) → Add to Home screen → Add.','Chrome-এ ⋮ চাপুন → Add to Home screen → Add।'],
                ['Open the new icon and pick YOUR NAME at the top right.','নতুন আইকন খুলে উপরে ডানদিকে নিজের নাম বেছে নিন।']];
   let y=qy+qs+265;x.fillStyle=INK;x.font='700 46px '+DS;x.fillText('FIRST TIME ON A NEW PHONE',110,y);y+=30;
@@ -1350,7 +1354,7 @@ function shortUrl(u){try{const p=new URL(u);const s=p.host+p.pathname;return s.l
 function update(){const u=$('#url').value.trim();const m=$('#m');
   if(!u){qr=null;m.className='msg';m.textContent='Waiting for the link. The preview shows where the QR code will go.'}
   else if(!okUrl(u)){qr=null;m.className='msg err';m.textContent='That does not look like a full https:// link. Copy the Web app URL from Apps Script → Deploy.'}
-  else{try{qr=makeQR(u);m.className='msg ok';m.textContent=(/script\.google\.com\/macros\/s\/.+\/exec/.test(u)?'QR code ready.':'QR code ready. Note: Apps Script app links normally end in /exec.')}catch(e){qr=null;m.className='msg err';m.textContent='Link is too long for a QR code.'}}
+  else{try{qr=makeQR(u);m.className='msg ok';m.textContent=isClaude()?'QR code ready (Claude link). Users need a claude.ai account with Contributor access.':/script\.google\.com\/macros\/s\/.+\/exec/.test(u)?'QR code ready (Google link).':'QR code ready.'}catch(e){qr=null;m.className='msg err';m.textContent='Link is too long for a QR code.'}}
   $('#dl').disabled=$('#dlq').disabled=!qr;$('#pr').hidden=inFrame||!qr;draw();try{localStorage.setItem('dmd-qr-url',u);localStorage.setItem('dmd-qr-help',$('#help').value)}catch(e){}}
 async function save(canvas,name){const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
   if(inFrame){try{const d=await window.claude.use('downloads');if(d){await d.save({filename:name,data:blob});return}}catch(e){if(e&&e.code==='declined')return;$('#m').textContent='Download not available here. Long-press the preview image to save it.';return}}
@@ -1360,7 +1364,7 @@ $('#dlq').onclick=()=>{const k=document.createElement('canvas');k.width=k.height
 $('#pr').onclick=()=>window.print();
 $('#url').addEventListener('input',update);$('#help').addEventListener('input',update);
 $('#f').addEventListener('submit',e=>e.preventDefault());
-try{const u=localStorage.getItem('dmd-qr-url');if(u)$('#url').value=u;const h=localStorage.getItem('dmd-qr-help');if(h)$('#help').value=h}catch(e){}
+$('#url').value='https://claude.ai/artifact/RKYnYVS4smYefE71dCaLv8';try{const u=localStorage.getItem('dmd-qr-url');if(u)$('#url').value=u;const h=localStorage.getItem('dmd-qr-help');if(h)$('#help').value=h}catch(e){}
 update();
 if(document.fonts){Promise.all(['700 150px "Barlow Condensed"','600 40px "IBM Plex Sans"','500 40px "Noto Sans Bengali"','700 40px "Noto Sans Bengali"'].map(f=>document.fonts.load(f,f.includes('Bengali')?'মেশিন':'A').catch(()=>{}))).then(draw);document.fonts.ready.then(draw)}
 </script>
