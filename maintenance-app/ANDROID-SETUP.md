@@ -44,6 +44,32 @@ are sent automatically when the phone reconnects.
   report refresh** to keep them updated automatically. Download as Excel from
   File → Download.
 
+## Live stock (Stock tab)
+
+The first time the app opens, it copies the stores list (454 items, 02-Oct-26)
+into a **Stock** tab. From then on the Stock tab is the live stock for every phone.
+
+**Every issue / receipt (stores, during the shift).** In the app: Spares → tap
+the quantity → enter **Issued** or **Received** (or a physical count), the
+machine and the issue-slip / GRN no. → Save. The Stock tab updates straight away,
+every phone sees it within a minute, and a line is added to **Stock Moves**
+(time, item, qty, machine, ref, person). Low-stock alerts update by themselves.
+This needs network at that moment; the app says so if a save fails.
+
+**Daily or weekly, from Tally.** In Tally open *Stock Summary* for the Main Godown
+(closing quantity, rate, value), export to Excel, then:
+1. In the Google Sheet use **Maintenance Desk → Create Tally Import tab** (first time only).
+2. Paste the exported rows into **Tally Import** from row 2: Particulars, Quantity, Rate, Value.
+3. Use **Maintenance Desk → Import Tally stock summary**.
+
+The Stock tab is rebuilt from Tally. Group headings and the total row are skipped,
+and each item keeps its group. Issues entered in the app after the Tally export
+date are replaced by the Tally figure, so run the import right after the stores
+entries are posted in Tally.
+
+You can also correct a quantity by typing directly in the Stock tab; phones pick
+up the change within a minute.
+
 ## Updating the app later
 
 Paste the new `Index.html` into the Apps Script editor, then

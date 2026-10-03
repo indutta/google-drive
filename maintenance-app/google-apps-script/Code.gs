@@ -17,6 +17,8 @@ function doGet() {
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Maintenance Desk')
     .addItem('Refresh report tabs', 'buildReports')
+    .addItem('Import Tally stock summary', 'importTally')
+    .addItem('Create Tally Import tab', 'tallySheet_')
     .addItem('Turn on hourly report refresh', 'installTrigger')
     .addToUi();
 }
@@ -132,4 +134,132 @@ function installTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'buildReports') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('buildReports').timeBased().everyHours(1).create();
   SpreadsheetApp.getUi().alert('Report tabs will refresh every hour.');
+}
+
+/* ======================= LIVE STOCK ======================= */
+const STOCK_SHEET = 'Stock';
+const MOVES_SHEET = 'Stock Moves';
+const TALLY_SHEET = 'Tally Import';
+const STOCK_HEADER = ['Item', 'Qty', 'Unit', 'Rate', 'Group', 'Updated', 'Updated by'];
+
+function stockSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(STOCK_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(STOCK_SHEET);
+    sh.getRange(1, 1, 1, STOCK_HEADER.length).setValues([STOCK_HEADER]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function movesSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(MOVES_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(MOVES_SHEET);
+    sh.appendRow(['Time', 'Item', 'Issued', 'Received', 'Set to', 'Balance', 'Unit', 'Machine', 'Ref', 'By (app)', 'Account']);
+    sh.getRange(1, 1, 1, 11).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function tallySheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(TALLY_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(TALLY_SHEET);
+    sh.getRange(1, 1, 1, 4).setValues([['Particulars', 'Quantity', 'Rate', 'Value']]).setFontWeight('bold');
+    sh.getRange(1, 6).setValue('Paste the Tally Stock Summary (Item, Closing Qty, Rate, Value) from row 2, then Maintenance Desk → Import Tally stock summary');
+  }
+  return sh;
+}
+const stockVer_ = function () { return Number(PropertiesService.getScriptProperties().getProperty('STOCK_VER') || 0); };
+const bumpStock_ = function () { const v = Date.now(); PropertiesService.getScriptProperties().setProperty('STOCK_VER', String(v)); return v; };
+
+/** Hand edits on the Stock tab also count as a stock change. */
+function onEdit(e) {
+  if (e && e.range && e.range.getSheet().getName() === STOCK_SHEET) bumpStock_();
+}
+
+/** Stock rows, or {same:true} when nothing changed since `ver`. */
+function getStock(ver) {
+  const v = stockVer_();
+  if (ver && v && Number(ver) === v) return { ver: v, same: true };
+  const sh = stockSheet_();
+  const last = sh.getLastRow();
+  const rows = last < 2 ? [] : sh.getRange(2, 1, last - 1, 5).getValues()
+    .filter(function (r) { return String(r[0]).trim(); })
+    .map(function (r) { return [String(r[0]).trim(), Number(r[1]) || 0, String(r[2] || ''), Number(r[3]) || 0, String(r[4] || 'General')]; });
+  return { ver: v || Date.now(), rows: rows };
+}
+
+/** First run: fill an empty Stock tab with the list built into the app. */
+function initStock(rows) {
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = stockSheet_();
+    if (sh.getLastRow() >= 2) return { skipped: true };
+    const now = new Date();
+    const data = rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], now, 'Stores list 02-Oct-26']; });
+    if (data.length) sh.getRange(2, 1, data.length, 7).setValues(data);
+    bumpStock_();
+    return { ok: true, n: data.length };
+  } finally { lock.releaseLock(); }
+}
+
+/** Issue / receipt / physical count from the app. m = {name, delta, set, unit, machine, ref, by} */
+function adjustStock(m) {
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = stockSheet_();
+    const name = String(m.name).trim();
+    const last = sh.getLastRow();
+    const names = last >= 2 ? sh.getRange(2, 1, last - 1, 1).getValues() : [];
+    let row = 0;
+    for (let i = 0; i < names.length; i++) if (String(names[i][0]).trim().toUpperCase() === name.toUpperCase()) { row = i + 2; break; }
+    if (!row) { row = sh.getLastRow() + 1; sh.getRange(row, 1, 1, 5).setValues([[name, 0, m.unit || 'NOS', 0, 'General']]); }
+    const cur = Number(sh.getRange(row, 2).getValue()) || 0;
+    const unit = String(sh.getRange(row, 3).getValue() || m.unit || '');
+    const q = (m.set !== null && m.set !== undefined && m.set !== '') ? Number(m.set) : cur + Number(m.delta || 0);
+    if (q < 0) throw new Error('stock would go below zero (balance ' + cur + ')');
+    const account = Session.getActiveUser().getEmail() || '';
+    sh.getRange(row, 2).setValue(q);
+    sh.getRange(row, 6, 1, 2).setValues([[new Date(), m.by || account]]);
+    const d = Number(m.delta || 0);
+    movesSheet_().appendRow([new Date(), name, d < 0 ? -d : '', d > 0 ? d : '', (m.set !== null && m.set !== undefined && m.set !== '') ? q : '', q, unit, m.machine || '', m.ref || '', m.by || '', account]);
+    return { name: String(sh.getRange(row, 1).getValue()), q: q, unit: unit, ver: bumpStock_() };
+  } finally { lock.releaseLock(); }
+}
+
+/** Rebuild the Stock tab from a Tally Stock Summary pasted into the "Tally Import" tab. */
+function importTally() {
+  const ui = SpreadsheetApp.getUi();
+  const src = tallySheet_();
+  const last = src.getLastRow();
+  if (last < 2) { ui.alert('Paste the Tally Stock Summary into the "' + TALLY_SHEET + '" tab first (from row 2).'); return; }
+  const sh = stockSheet_();
+  const old = {};
+  if (sh.getLastRow() >= 2) sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues().forEach(function (r) { old[String(r[0]).trim().toUpperCase()] = r; });
+  const out = []; const now = new Date();
+  src.getRange(2, 1, last - 1, 4).getValues().forEach(function (r) {
+    const name = String(r[0]).trim();
+    if (!name || /^(grand )?total/i.test(name)) return;
+    let qty = r[1], unit = '';
+    if (typeof qty === 'string') {
+      const mm = qty.replace(/,/g, '').match(/^\s*(-?[\d.]+)\s*([A-Za-z]+)?/);
+      if (!mm) return; qty = Number(mm[1]); unit = mm[2] || '';
+    }
+    if (qty === '' || isNaN(Number(qty))) return; // group heading rows have no quantity
+    const prev = old[name.toUpperCase()];
+    const rate = Number(String(r[2]).replace(/[^\d.]/g, '')) || (prev ? Number(prev[3]) : 0);
+    out.push([name, Number(qty), unit || (prev ? prev[2] : 'NOS'), rate, prev ? prev[4] : 'General', now, 'Tally import']);
+  });
+  if (!out.length) { ui.alert('No stock rows found. Columns must be: Particulars, Quantity, Rate, Value.'); return; }
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    if (sh.getLastRow() >= 2) sh.getRange(2, 1, sh.getLastRow() - 1, 7).clearContent();
+    sh.getRange(2, 1, out.length, 7).setValues(out);
+    bumpStock_();
+  } finally { lock.releaseLock(); }
+  ui.alert('Stock updated from Tally: ' + out.length + ' items. Phones pick it up within a minute.');
 }
