@@ -381,13 +381,14 @@ function lsLoad(){if(!hasLS)return;try{const j=JSON.parse(localStorage.getItem(L
 function lsSave(){if(!hasLS||MODE==='shared')return;try{localStorage.setItem(LSKEY,JSON.stringify(S))}catch(e){toast('Could not save on this device — storage is full or blocked')}}
 function pref(k,v){if(!hasLS)return v===undefined?null:undefined;try{if(v===undefined)return localStorage.getItem('dmd-'+k);localStorage.setItem('dmd-'+k,v)}catch(e){return null}}
 async function put(c,id,obj){
-  if(READONLY){toast('You have view-only access');return}
+  if(MODE==='blocked'||READONLY){noWrite();return}
   obj.updatedAt=Date.now();obj.updatedBy=me();S[c][id]=obj;render();
   if(DB){try{await DB.collection(c).doc(id).set(obj)}catch(e){if(e&&e.code==='invalid_argument'){READONLY=true;toast('You have view-only access to the shared data')}else toast('Not saved to shared store ('+(e&&e.code||'error')+'). Check connection and retry.')}}
   else{lsSave();if(MODE==='sheet')gasQueue(c,id,obj)}
 }
+function noWrite(){toast(MODE==='blocked'?'Not saved — sign in to Claude with access to this app':'Not saved — you have view-only access')}
 async function del(c,id){
-  if(READONLY){toast('You have view-only access');return}
+  if(MODE==='blocked'||READONLY){noWrite();return}
   delete S[c][id];render();
   if(DB){try{await DB.collection(c).doc(id).delete()}catch(e){toast('Delete failed ('+(e&&e.code||'error')+')')}}else{lsSave();if(MODE==='sheet')gasQueue(c,id,null)}
 }
@@ -413,7 +414,8 @@ async function gasPull(){
   }catch(e){gasErr='offline';renderSync();return null}
 }
 function renderSync(){const el=$('#sync');if(!el)return;
-  if(MODE==='shared')el.textContent=READONLY?'Shared · view only':'Shared · live for the team';
+  if(MODE==='blocked')el.textContent='View only · not saving';
+  else if(MODE==='shared')el.textContent=READONLY?'Shared · view only':'Shared · live for the team';
   else if(MODE==='sheet')el.textContent=gasErr?('Offline · '+gasPending.length+' to send'):gasPending.length?('Sending '+gasPending.length+'…'):('Google Sheet · synced '+(gasLast?pad(new Date(gasLast).getHours())+':'+pad(new Date(gasLast).getMinutes()):''));
   else el.textContent='Saved on this device';}
 const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -545,7 +547,9 @@ function doRender(){
   renderSync();
   const fn={home:vHome,machines:vMachines,bd:vBD,job:vJob,pm:vPM,spares:vSpares,src:vSrc,dt:vDT,report:vReport,setup:vSetup}[TAB];
   const main=$('#main');const keep=document.activeElement&&main.contains(document.activeElement)&&document.activeElement.id;const val=keep&&document.activeElement.value;
-  ALIDX.length=0;main.innerHTML='<div class="pane">'+fn()+'</div>';
+  ALIDX.length=0;
+  const warn=(MODE==='blocked'||READONLY)?`<div class="advice" style="border-left-color:var(--crit);background:var(--crit-soft)"><b>View only — your entries will NOT be saved.</b><br><span class="small">${MODE==='blocked'?'This app needs a signed-in Claude account that has been given access.':'Your account can view but not edit.'} Ask the maintenance manager for access, or use the team's Google app link.</span></div>`:'';
+  main.innerHTML='<div class="pane">'+warn+fn()+'</div>';
   bind[TAB]&&bind[TAB]();
   if(keep){const el=document.getElementById(keep);if(el){el.focus();if(val!=null&&el.value!==val)el.value=val;try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
 }
@@ -1105,7 +1109,7 @@ setInterval(()=>{if(!$('#sheet'))render()},60000);
 if(inFrame){
   (async()=>{
     let db=null;try{db=await window.claude.use('db')}catch(e){}
-    if(!db){if(!Object.keys(S.breakdowns).length)seedLocal();render();return}
+    if(!db){MODE='blocked';COLLS.forEach(c=>S[c]={});render();return}
     DB=db;MODE='shared';COLLS.forEach(c=>S[c]={});render();
     try{const u=await window.claude.use('user');if(u){const w=await u.can('data.write');if(w===false)READONLY=true}}catch(e){}
     COLLS.forEach(c=>{
