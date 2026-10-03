@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Datre Maintenance Desk</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: plant control-room desk. Sticky header + scrollable tab strip, one working pane per tab, bottom sheet for forms. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunk:#e3e8ed; --ink:#16202b; --muted:#5b6878; --line:#d3dae2;
+  --accent:#c4501a; --accent-ink:#ffffff; --accent-soft:#f7e4d9;
+  --ok:#2f7d4f; --ok-soft:#dcefe3; --warn:#9a6512; --warn-soft:#f6ead2; --crit:#b8322a; --crit-soft:#f7dcd9; --info:#2b5f9e; --info-soft:#dde8f5;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151c; --surface:#18212b; --sunk:#111922; --ink:#e6ebf0; --muted:#93a1b0; --line:#2b3745;
+  --accent:#e2783c; --accent-ink:#1a0f08; --accent-soft:#3a2416;
+  --ok:#57b981; --ok-soft:#173527; --warn:#dcab4c; --warn-soft:#3a2f17; --crit:#ec6e62; --crit-soft:#3d1c1a; --info:#6aa7e6; --info-soft:#172c42; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151c; --surface:#18212b; --sunk:#111922; --ink:#e6ebf0; --muted:#93a1b0; --line:#2b3745;
+  --accent:#e2783c; --accent-ink:#1a0f08; --accent-soft:#3a2416;
+  --ok:#57b981; --ok-soft:#173527; --warn:#dcab4c; --warn-soft:#3a2f17; --crit:#ec6e62; --crit-soft:#3d1c1a; --info:#6aa7e6; --info-soft:#172c42; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h2{font-size:1.55rem}h3{font-size:1.2rem}
+.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}.small{font-size:.83rem}
+.lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--ink);color:var(--bg)}
+.top-in{display:flex;align-items:center;gap:12px;padding:10px 16px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.05;min-width:0}
+.brand b{font-family:var(--f-display);font-size:1.45rem;letter-spacing:.02em}
+.brand span{font-size:.75rem;opacity:.75}
+.top-right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip-sync{font-size:.72rem;padding:3px 8px;border-radius:99px;border:1px solid currentColor;opacity:.85;white-space:nowrap}
+.me{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:5px 8px;max-width:170px}
+.me option{color:#16202b}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 10px;scrollbar-width:none;background:var(--ink)}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{background:none;border:0;color:var(--bg);opacity:.7;padding:10px 12px 11px;font-weight:600;font-size:.9rem;white-space:nowrap;cursor:pointer;border-bottom:3px solid transparent;position:relative}
+nav.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--accent)}
+nav.tabs .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--crit);color:#fff;font-size:.7rem;line-height:18px;text-align:center}
+
+main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
+.pane{display:grid;gap:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;min-width:0}
+.panel>h3{margin-bottom:10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px;cursor:pointer;text-align:left}
+.kpi .v{font-family:var(--f-display);font-size:2.1rem;line-height:1}
+.kpi.crit .v{color:var(--crit)}.kpi.warn .v{color:var(--warn)}.kpi.ok .v{color:var(--ok)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:600;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{background:var(--crit);border-color:var(--crit);color:#fff}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:34px;padding:4px 10px;font-size:.85rem}
+.btn:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--info);outline-offset:2px}
+.big-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.big-actions .btn{min-height:58px;font-size:1rem}
+
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:99px;font-size:.75rem;font-weight:600;white-space:nowrap;background:var(--sunk);color:var(--muted)}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.p-ok{background:var(--ok-soft);color:var(--ok)}.p-warn{background:var(--warn-soft);color:var(--warn)}.p-crit{background:var(--crit-soft);color:var(--crit)}.p-info{background:var(--info-soft);color:var(--info)}.p-acc{background:var(--accent-soft);color:var(--accent)}
+
+.list{display:grid;gap:8px}
+.item{display:grid;grid-template-columns:5px 1fr auto;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px 10px 0;align-items:center;min-width:0}
+.item .stripe{align-self:stretch;border-radius:0 3px 3px 0;background:var(--line)}
+.item.s-crit .stripe{background:var(--crit)}.item.s-warn .stripe{background:var(--warn)}.item.s-ok .stripe{background:var(--ok)}.item.s-info .stripe{background:var(--info)}
+.item .body{min-width:0}
+.item .t{font-weight:600}
+.item .d{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.item.acked{opacity:.55}
+.empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--r)}
+
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:10px}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:8px;cursor:pointer;text-align:left;border-top:4px solid var(--line)}
+.mcard.st-Running{border-top-color:var(--ok)}.mcard.st-Watch{border-top-color:var(--warn)}.mcard.st-Breakdown{border-top-color:var(--crit)}.mcard.st-UnderPM{border-top-color:var(--info)}.mcard.st-Idle{border-top-color:var(--muted)}
+.mcard .nm{font-family:var(--f-display);font-size:1.25rem;line-height:1.1}
+.hbar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.hbar i{display:block;height:100%}
+.hrow{display:grid;grid-template-columns:34px 1fr 30px;gap:6px;align-items:center;font-size:.75rem;color:var(--muted)}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:var(--surface);padding:8px 12px;cursor:pointer;font-weight:600;font-size:.85rem;min-height:40px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+label.f{display:grid;gap:4px;font-size:.85rem;font-weight:600}
+input[type=text],input[type=number],input[type=date],input[type=datetime-local],input[type=search],select,textarea{width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+textarea{min-height:70px;resize:vertical}
+.form{display:grid;gap:12px}
+.form .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.advice{border:1px solid var(--line);border-left:5px solid var(--accent);background:var(--accent-soft);border-radius:8px;padding:10px 12px}
+
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--sunk);position:sticky;top:0;white-space:nowrap}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.heat td.c{text-align:center;font-family:var(--f-mono);cursor:pointer;min-width:52px}
+.pmgrid td,.pmgrid th{padding:0;text-align:center;min-width:26px;height:28px;font-size:.7rem}
+.pmgrid td.mn,.pmgrid th.mn{text-align:left;padding:4px 8px;min-width:150px;position:sticky;left:0;background:var(--surface);z-index:1}
+.pmgrid th.mn{background:var(--sunk)}
+.pc{display:block;margin:2px;border-radius:4px;line-height:24px;font-weight:600}
+.pc.W{background:var(--info-soft);color:var(--info)}.pc.M{background:var(--accent-soft);color:var(--accent)}.pc.D{color:var(--muted)}
+.pc.done{background:var(--ok-soft);color:var(--ok)}.pc.nok{background:var(--crit-soft);color:var(--crit)}.pc.miss{outline:2px solid var(--crit);outline-offset:-2px}
+.pmgrid th.today{color:var(--accent)}
+.pmgrid th.sun,.pmgrid td.sun{background:var(--sunk)}
+
+.jc-m{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.jc-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;background:var(--sunk);flex-wrap:wrap}
+.jc-t{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding:10px 12px;border-top:1px solid var(--line);align-items:center}
+.jc-t .q{min-width:0}
+.jc-t .fq{font-size:.7rem;font-weight:700;border-radius:4px;padding:1px 6px;margin-right:6px;background:var(--sunk);color:var(--muted)}
+.jc-t .fq.W{background:var(--info-soft);color:var(--info)}.jc-t .fq.M{background:var(--accent-soft);color:var(--accent)}
+.tick{display:inline-flex;gap:4px}
+.tick button{min-width:52px;min-height:40px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:.78rem;cursor:pointer}
+.tick button.on.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.tick button.on.nok{background:var(--crit);border-color:var(--crit);color:#fff}
+.tick button.on.na{background:var(--muted);border-color:var(--muted);color:var(--bg)}
+.jc-t .rem{grid-column:1/-1}
+.progress{height:10px;background:var(--sunk);border-radius:5px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--ok)}
+
+.stepper{display:flex;gap:4px;flex-wrap:wrap}
+.stepper button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 10px;font-size:.75rem;font-weight:600;cursor:pointer;color:var(--muted);min-height:32px}
+.stepper button.past{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.stepper button.cur{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.sheet-bg{position:fixed;inset:0;background:rgba(10,15,20,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:min(720px,100%);max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom,0px))}
+@media(min-width:760px){.sheet-bg{align-items:center}.sheet{border-radius:16px}}
+.sheet-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;position:sticky;top:-16px;background:var(--bg);padding:6px 0;z-index:2}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:9px;z-index:80;font-weight:600;max-width:90vw}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--crit);color:#fff;border:0;border-radius:99px;padding:14px 20px;font-weight:700;font-size:1rem;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer}
+svg text{fill:var(--muted);font-family:var(--f-body)}
+pre.report{white-space:pre-wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;font:13px/1.5 var(--f-mono);margin:0;overflow-wrap:anywhere}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}to{transform:none;opacity:1}}}
+@media print{header.top,.fab,.noprint{display:none!important}body{background:#fff}}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><b>DATRE MAINTENANCE DESK</b><span>Falta Foundry · FIGC Sector III</span></div>
+    <div class="top-right">
+      <span class="chip-sync" id="sync">Saved on this device</span>
+      <select class="me" id="me" aria-label="Who is using the app"></select>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+</header>
+<main id="main"></main>
+<button class="fab noprint" id="fab" type="button">+ Report breakdown</button>
+
+<script>
+/* ======================= REFERENCE DATA (from Datre maintenance files) ======================= */
+// Equipment health & predictive drivers: Datre_Predictive_Maintenance_Mech_Elect_Dashboard.xlsx (Aug-2026)
+// PM checklist items: Datre_PM_Checklist_Critical_Equipment.xlsx (Ref DCL/MAINT/ID/25-26)
+// Stores stock: MNT ITEMS.pdf (Main Godown closing balance 1-Apr-26 to 2-Oct-26)
+const MACHINES=[
+ {id:'RO',n:'Roll Over',a:'Moulding',dt:36.2,bd:4.0,spend:156114,
+  M:{risk:'CRITICAL',h:19,drv:'Hydraulic leakage / trunnion / drive',act:'Seal-kit & hydraulic leakage inspection; trunnion/drive check'},
+  E:{risk:'MEDIUM',h:68,drv:'Proximity sensor / solenoid wiring',act:'Quarterly sensor, selector switch & JB wiring inspection'}},
+ {id:'MX',n:'Mixer Machine',a:'Moulding',dt:67.2,bd:22.7,spend:255091,
+  M:{risk:'CRITICAL',h:16,drv:'Blade/liner wear; shaft bearing; catalyst pump',act:'Inspect blades, bearing 22214E1K, clutch'},
+  E:{risk:'CRITICAL',h:23,drv:'Motor high current / PLC-UPS / sensors',act:'Weekly motor ampere logging; PLC/UPS panel check'}},
+ {id:'SB',n:'Shot Blasting',a:'Fettling',dt:41.4,bd:12.5,spend:142668,
+  M:{risk:'CRITICAL',h:24,drv:'Impeller/blade/hanger wear; plummer block',act:'Restore impellers; hanger and SN-513 bearing inspection'},
+  E:{risk:'HIGH',h:47,drv:'MCCB / OLR / limit switches',act:'Replace failed MCCB; monthly panel & limit switch checks'}},
+ {id:'SO',n:'Shake Out',a:'Moulding',dt:43.7,bd:7.5,spend:74988,
+  M:{risk:'HIGH',h:33,drv:'Propulsor blockage / hose / mesh / hydraulic pump',act:'Repair mesh/grate; inspect NRV, bellows and pusher motor'},
+  E:{risk:'LOW',h:75,drv:'Contactor / motor insulation',act:'6-month motor insulation/bearing check; contactor check'}},
+ {id:'ML',n:'Moulding Line (MLD conveyor)',a:'Moulding',dt:null,spend:130202,
+  M:{risk:'CRITICAL',h:17,drv:'Structural/hydraulic failure spike',act:'Root-cause review of Aug/Nov event; inspect guides and hydraulics'},
+  E:{risk:'WATCH',h:null,drv:'Conveyor cascade-trip risk',act:'Check cascade-trip fault history; proximity switches at transfer points'}},
+ {id:'CS',n:'Closing Station',a:'Moulding',dt:null,spend:29163,
+  M:{risk:'HIGH',h:38,drv:'Hydraulic cylinder / clamping bush / valve',act:'Inspect seals, Atos valve, clamps and centering monthly'},
+  E:{risk:'LOW',h:72,drv:'Sensors / controls; 11 kW power-pack motor',act:'Check sensors, wiring and control response'}},
+ {id:'RT',n:'Reclamation Tower',a:'Moulding',dt:null,spend:98923,
+  M:{risk:'HIGH',h:47,drv:'Screen clogging / butterfly valve / air leakage',act:'Resolve air leakage; inspect screen, seals and pneumatic valve'},
+  E:{risk:'OK',h:null,drv:'Conveyor/screw drive motors',act:'Monthly megger; calibrate differential pressure sensor'}},
+ {id:'IFB',n:'Induction Furnace-B',a:'Melting',dt:null,spend:447184,
+  M:{risk:'WATCH',h:null,drv:'Tilting mechanism / crucible wear',act:'Weekly tilt mechanism, monthly crucible wear pattern'},
+  E:{risk:'CRITICAL',h:8,drv:'Coil insulation / busbar / cooling / lining hot spots',act:'Immediate coil insulation, busbar and cooling-water inspection'}},
+ {id:'IFC',n:'Induction Furnace-C',a:'Melting',dt:null,spend:148649,
+  M:{risk:'WATCH',h:null,drv:'Tilting mechanism / crucible wear',act:'Weekly tilt mechanism, monthly crucible wear pattern'},
+  E:{risk:'HIGH',h:40,drv:'Electrical power / coil / cooling system',act:'Monthly condition monitoring; cooling and electrical connection checks'}},
+ {id:'PB',n:'Pouring Bay',a:'Melting',dt:null,spend:230249,
+  M:{risk:'HIGH',h:33,drv:'Ladle tilting / seals / lip plates',act:'Monthly pouring mechanism and seal inspection'},E:null},
+ {id:'E5',n:'EOT Crane 5 MT',a:'Melting',dt:13.1,bd:5.3,spend:91791,
+  M:{risk:'HIGH',h:46,drv:'LT brake / CT wheel / rope / coupling',act:'Quarterly CT wheel, 6-month brake/coupling, monthly rope'},
+  E:{risk:'CRITICAL',h:28,drv:'Electromagnet / carbon brush / fuse / cable',act:'Monthly electromagnet, cable, brush and fuse checks'}},
+ {id:'E75',n:'EOT Crane 7.5 MT',a:'Fettling',dt:24.0,bd:4.3,spend:80702,
+  M:{risk:'HIGH',h:34,drv:'LT wheel bearing 22216E / coupling 108Z',act:'Bi-annual bearing check; coupling spring and rope inspection'},
+  E:{risk:'MEDIUM',h:58,drv:'Contactors / fuses / limit switches',act:'Quarterly contactor, fuse and limit switch inspection'}},
+ {id:'E2',n:'EOT Crane 2 MT',a:'Fettling',dt:8.5,bd:3.5,spend:67093,
+  M:{risk:'HIGH',h:32,drv:'Plummer block / rope / brake',act:'Restore LT drive support; monthly rope and 6-month brake check'},
+  E:{risk:'CRITICAL',h:16,drv:'LT drive motor absent / rewinding',act:'Issue rewind job; log running current after restoration'}},
+ {id:'GM',n:'Gouging Machine',a:'Fettling',dt:null,spend:null,
+  M:{risk:'OK',h:null,drv:'Torch / nozzle / carriage wear',act:'Weekly nozzle wear; monthly carriage & regulator check'},
+  E:{risk:'WATCH',h:null,drv:'Thyristor cycle degradation (30-day window)',act:'Monitor thyristor temperature & trip count; earthing continuity'}},
+ {id:'MPI',n:'MPI Machine',a:'Quality',dt:null,spend:null,
+  M:{risk:'OK',h:null,drv:'Clamping mechanism / bench alignment',act:'Monthly clamp & bench level check'},
+  E:{risk:'OK',h:null,drv:'UV lamp / magnetising coil',act:'Monthly coil megger; calibrate current output'}},
+ {id:'HT10',n:'HT Furnace 10 MT',a:'Heat Treatment',dt:null,spend:93355,
+  M:{risk:'OK',h:null,drv:'Door seal / bogie / refractory',act:'Monthly door & bogie lubrication'},
+  E:{risk:'CRITICAL',h:26,drv:'Thermocouple drift / thyristor / heating elements',act:'Thermocouple accuracy + SCR/thyristor heat inspection'}},
+ {id:'HT5N',n:'HT Furnace 5 MT (New)',a:'Heat Treatment',dt:null,spend:51623,M:null,
+  E:{risk:'HIGH',h:37,drv:'Heating element / coil issues',act:'Weekly element/terminal; monthly coil and fuse inspection'}},
+ {id:'HT5O',n:'HT Furnace 5 MT (Old)',a:'Heat Treatment',dt:null,spend:20427,M:null,
+  E:{risk:'HIGH',h:40,drv:'Coil / element ageing',act:'Inspect element supports, coil bushings and panel cooling'}},
+ {id:'WQ',n:'Water Quenching Set Up',a:'Heat Treatment',dt:null,spend:31176,
+  M:{risk:'HIGH',h:46,drv:'Pump / piping / agitation',act:'Inspect pump, pipe leakage and agitation system after spike'},E:null},
+ {id:'CP',n:'Compressor GA37/75',a:'Utilities',dt:null,spend:104601,
+  M:{risk:'MEDIUM',h:55,drv:'Oil separator / filters / bearing',act:'Monthly filters/oil separator; bearing temperature check'},
+  E:{risk:'HIGH',h:47,drv:'Elektronikon controller / motor',act:'Controller alarms + motor bearing/current monitoring'}},
+ {id:'TR',n:'Transformer',a:'Utilities',dt:null,spend:21420,M:null,
+  E:{risk:'MEDIUM',h:60,drv:'Oil level / silica gel / cooling',act:'Weekly oil/silica gel; monthly fan and connection inspection'}},
+ {id:'CT',n:'Cooling Towers',a:'Utilities',dt:null,spend:0,
+  M:{risk:'MEDIUM',h:68,drv:'Scaling / belts / bearings / fan blades',act:'Monthly descaling, belt tension, bearing grease and fan check'},E:null},
+ {id:'BC',n:'Bobcat',a:'Mobile',dt:null,spend:null,
+  M:{risk:'OK',h:null,drv:'Hydraulic hose / pivot wear / tyres',act:'Daily hydraulic oil & tyres; weekly greasing'},
+  E:{risk:'OK',h:null,drv:'Battery / alternator / harness',act:'Weekly harness & charging check'}}
+];
+const MBY=Object.fromEntries(MACHINES.map(m=>[m.id,m]));
+// Machines flagged in the PM checklist summary (26-Sep-2026)
+const WATCH_DEFAULT={IFB:'Thermal management — 30-day window',IFC:'Thermal management — 30-day window',GM:'Thyristor cycle degradation — 30-day window',SO:'Grate wear degradation — 30-day window',ML:'Conveyor cascade risk — 30-day window'};
+
+// PM checklist tasks [D, W, M] per discipline
+const ck=(d,w,m)=>({D:d,W:w,M:m});
+const PM_SRC={
+ 'Roll Over':{M:ck(['Hydraulic oil level visual check','Check for oil leakage at seal/hose joints','Check rollover arm movement — no abnormal noise'],['Grease all bearing points','Check hydraulic hose condition for wear/cracks','Tighten loose fasteners on frame'],['Inspect hydraulic cylinder for external damage','Check limit switches alignment','Verify roller bearing clearance']),
+   E:ck(['Check motor running current vs rated','Check control panel indicator lamps'],['Check limit switch electrical contacts','Inspect cable glands for damage'],['Megger test motor insulation resistance','Check contactor and overload relay settings'])},
+ 'Reclamation Tower':{M:ck(['Visual check for sand/air leakage at joints','Check bag filter differential pressure'],['Inspect ductwork and flange gaskets','Clean sand spillage around base','Check screw conveyor for abnormal noise'],['Inspect bag filter elements for damage','Check tower structural fasteners','Lubricate all conveyor bearings']),
+   E:ck(['Check motor running current — conveyor/screw drive'],['Inspect control panel for loose terminals','Check sensor/proximity switch function'],['Megger test all motors','Calibrate differential pressure sensor'])},
+ 'Shot Blasting':{M:ck(['Check impeller units for abnormal vibration/noise (log status of units 2 & 3)','Visual check of blast chamber liners for wear','Check rubber curtain condition at entry/exit'],['Inspect impeller blades for wear (operational unit)','Check control cage clearance','Grease impeller bearing housing'],['Full inspection of impeller assembly — all 3 units','Check shot recovery screw conveyor','Inspect abrasive separator for wear']),
+   E:ck(['Check impeller motor current (operational unit)','Check control panel for fault indications'],['Inspect impeller motor current draw trend — flag deviation','Check door interlock switches'],['Megger test impeller motors (all 3 units)','Inspect VFD/starter panel for overheating'])},
+ 'Induction Furnace':{M:ck(['Check DM water flow rate to coil (≥8 LPM per circuit)','Visual check of coil for hot spots/discolouration','Check refractory lining condition'],['Inspect furnace tilting mechanism','Check cooling water hose connections','Verify panel cooling fan operation'],['Inspect furnace body insulation','Check crucible wear pattern','Inspect hydraulic tilt cylinder seals']),
+   E:ck(['Check GLD (ground leak detector) — no fault condition','Check power supply panel meters (kW, kVAR, frequency)'],['Inspect capacitor bank connections','Check cooling water flow interlock function'],['Thermal scan of power panel and busbars','Test GLD trip function','Inspect coil-to-earth insulation'])},
+ 'EOT Crane':{M:ck(['Visual check of wire rope for damage/kinks','Check hook block and safety latch','Test limit switches before lift'],['Grease wire rope and sheaves','Check plummer block bearing for play/noise','Inspect brake lining wear'],['Full inspection of gearbox oil level/condition','Check girder alignment and rail wear','Inspect all bolted joints on structure']),
+   E:ck(['Check hoist motor for abnormal heating/noise','Test emergency stop and pendant controls'],['Inspect festoon/trailing cable condition','Check collector rail/current collector contacts'],['Megger test hoist and travel motors','Check brake solenoid coil function','Inspect control panel terminals for tightness'])},
+ 'Bobcat':{M:ck(['Check hydraulic oil level','Check tyre condition and pressure','Inspect bucket/attachment for cracks'],['Grease all pivot points','Check hydraulic hose condition','Inspect track/undercarriage wear (if tracked)'],['Hydraulic oil condition check (sample if due)','Inspect engine mounts','Check hydraulic filter condition']),
+   E:ck(['Check battery terminal condition','Check dashboard warning indicators'],['Inspect wiring harness for chafing','Check alternator charging output'],['Check starter motor condition','Test all safety interlock switches'])},
+ 'Gouging Machine':{M:ck(['Check gouging torch/electrode condition','Inspect air/gas hose for leaks'],['Check torch nozzle wear','Inspect cable and hose connections'],['Full mechanical inspection of carriage/rail mechanism','Check gas regulator calibration']),
+   E:ck(['Check control panel indicator lamps'],['Inspect power cable for insulation damage'],['Check earthing continuity','Inspect control transformer condition'])},
+ 'Shake Out':{M:ck(['Check grate condition for wear (degradation flagged — monitor closely)','Visual check of vibration motor mounting'],['Inspect spring isolators for cracks','Check deck plate wear','Grease vibration motor bearings'],['Full grate wear assessment — plan replacement if needed','Check structural frame welds','Inspect dust hood seal condition']),
+   E:ck(['Check vibration motor current draw'],['Inspect motor terminal box for moisture/dust ingress'],['Megger test vibration motor','Check earth strap continuity on motor isolators'])},
+ 'MLD Line':{M:ck(['Visual check of conveyor belt/chain alignment','Check for abnormal noise at drive/idler pulleys'],['Grease conveyor bearings and chain','Check belt/chain tension','Inspect cascade risk points — guarding and load transfer'],['Full inspection of drive motor coupling','Check pulley/sprocket wear','Inspect safety guarding at all pinch points']),
+   E:ck(['Check drive motor current vs rated'],['Inspect motor terminal connections','Check proximity/limit switch function at transfer points'],['Megger test drive motors','Review control panel cascade-trip fault history'])},
+ 'MPI Machine':{M:ck(['Check magnetic yoke condition','Inspect UV lamp housing (visual)'],['Check demagnetiser function','Clean bench and magnetic particle bath'],['Inspect mechanical clamping mechanism','Check bench alignment/levelling']),
+   E:ck(['Check UV lamp function','Check control panel display'],['Inspect demagnetiser coil connections'],['Megger test magnetising coil','Calibrate current output setting'])},
+ 'Compressor':{M:ck(['Check oil level sight glass','Check air pressure gauge reading','Drain condensate from receiver tank'],['Check air filter for clogging','Inspect belt tension/condition','Check for unusual vibration/noise'],['Change/clean air filter as per schedule','Inspect safety valve function','Check inter-cooler for leaks']),
+   E:ck(['Check motor running current','Verify thermocouple/temperature readout'],['Inspect starter panel for loose connections','Check pressure switch calibration'],['Megger test motor insulation','Thermal scan of starter panel','Verify thermocouple accuracy against reference'])},
+ // Added from PM_Action_Log & predictive dashboard for equipment not on the critical checklist
+ 'Mixer':{M:ck(['Check mixture blades for wear / loose bolts','Check catalyst pump & resin line for leakage','Listen for abnormal noise at shaft bearing'],['Measure blade thickness — replace below 30% of original','Grease shaft bearings 22214E1K (DE + NDE)','Check clutch and coupling'],['Inspect liner wear','Check gearbox oil level','Tighten mixer frame fasteners']),
+   E:ck(['Log main motor current — investigate sustained rise over baseline','Check PLC / UPS panel healthy indication'],['Inspect level/proximity sensors','Check panel cooling fan and filter'],['Megger main motor','Thermal scan of MCC and terminals'])},
+ 'HT10':{M:ck([],['Check door seal and refractory condition'],['Lubricate door and bogie mechanism']),
+   E:ck(['Compare thermocouple reading with controller (drift > ±10 °C = act)','Check heating element terminals for hot spots'],['Inspect thyristor/SCR heat sink and fan'],['Calibrate thermocouple against reference','Tighten panel and busbar connections','Megger heating circuit'])},
+ 'HT5':{E:ck(['Check element terminals for discolouration'],['Element and terminal inspection'],['Coil and fuse inspection','Inspect element supports, coil bushings and panel cooling'])},
+ 'Pouring':{M:ck(['Check ladle tilting gearbox for noise','Check lip plate condition'],['Inspect ladle seals'],['Full pouring mechanism inspection'])},
+ 'Transformer':{E:ck(['Record oil and winding temperature'],['Check oil level and silica gel colour (replace when pink)'],['Check cooling fan and cable connection tightness'])},
+ 'CoolingTower':{M:ck([],['Check belt tension and fan noise'],['Descale, grease bearings, check fan blades'])},
+ 'Closing':{M:ck(['Check hydraulic leakage at cylinder / Atos valve'],['Check clamping bush and centering'],['Inspect seals, valve and clamps']),
+   E:ck(['Check sensor response'],['Log 11 kW power-pack motor current'],['Inspect wiring and control response'])},
+ 'Quench':{M:ck(['Check pump running and pipe leakage'],['Check agitation system'],['Pump bearing check and strainer cleaning'])}
+};
+const PM_MAP={RO:'Roll Over',RT:'Reclamation Tower',SB:'Shot Blasting',IFB:'Induction Furnace',IFC:'Induction Furnace',E5:'EOT Crane',E75:'EOT Crane',E2:'EOT Crane',BC:'Bobcat',GM:'Gouging Machine',SO:'Shake Out',ML:'MLD Line',MPI:'MPI Machine',CP:'Compressor',MX:'Mixer',HT10:'HT10',HT5N:'HT5',HT5O:'HT5',PB:'Pouring',TR:'Transformer',CT:'CoolingTower',CS:'Closing',WQ:'Quench'};
+
+// Predictive action library: symptom -> recommended action, urgency, spare to check
+const P=(s,a,u,sp)=>({s,a,u,sp});
+const GEN={
+ M:[P('Abnormal vibration or noise','Check foundation bolts, coupling alignment and bearing condition; take vibration reading and compare with last month','HIGH'),
+    P('Bearing temperature above 70 °C','Stop at next safe window, re-grease, check for play; replace bearing if noise persists','HIGH'),
+    P('Oil or grease leakage','Locate source, tighten joint or replace seal; log top-up quantity','MEDIUM'),
+    P('Loose fasteners / cracked weld','Tighten to torque, mark with paint; raise welding job if crack found','MEDIUM')],
+ E:[P('Motor current above normal','Log current on all 3 phases; check load, bearings and voltage imbalance; megger if rise > 10%','HIGH'),
+    P('Insulation resistance low (< 1 MΩ)','Dry out motor / clean terminal box; if still low, send for rewinding','CRITICAL'),
+    P('Hot spot on panel / terminal','Isolate, tighten or replace lug/terminal; thermal scan after restart','HIGH'),
+    P('Repeated tripping (MCCB / OLR)','Check OLR setting vs nameplate, contactor tips, cable joints; replace failed device','HIGH')]
+};
+const PRED={
+ RO:{M:[P('Hydraulic oil top-up above 20 L per month','Seal investigation — replace cylinder seal kit CK-40/18; check hoses','CRITICAL','Seal Kit CK-40/18'),
+        P('Rollover arm slow / jerky','Check pump pressure, relief valve and oil level; inspect trunnion bearing','HIGH','Hydraulic Oil-68'),
+        P('Noise at trunnion or drive','Check trunnion bush/bearing play and drive coupling','HIGH')],
+     E:[P('Proximity sensor not detecting','Clean & re-align sensor; check JB wiring and selector switch','MEDIUM'),
+        P('Solenoid valve not actuating','Check coil voltage and resistance; replace coil if open','HIGH')]},
+ MX:{M:[P('Blade thickness below 30% of original','Replace mixture blades (cast, full-face hard-faced) — monthly cycle','HIGH','Mixture blade hard-faced'),
+        P('Noise / heat at shaft bearing','Check bearing 22214E1K DE/NDE; replace on 4-monthly cycle','CRITICAL','Bearing 22214E1K'),
+        P('Catalyst / resin pump not delivering','Clean pump & line, check pump coupling and NRV','HIGH'),
+        P('Clutch slipping','Inspect clutch lining and coupling','HIGH')],
+     E:[P('Main motor current sustained above baseline','Weekly ampere log; check blade drag, bearing and voltage','CRITICAL'),
+        P('PLC / UPS fault or reset','Check UPS battery backup and PLC I/O; save fault code','HIGH')]},
+ SB:{M:[P('Impeller vibration / shot leakage','Inspect impeller blades and control cage; restore idle impellers','CRITICAL','Plummer block SN-513 + 22211EK'),
+        P('Hanger bent or rotation noisy','Hanger and SN-513 plummer block bearing inspection','HIGH','Plummer block SN-513 + 22211EK'),
+        P('Liners worn through','Replace chamber liners at next shutdown','MEDIUM')],
+     E:[P('MCCB / OLR tripping','Replace failed MCCB; check OLR setting and motor current','HIGH'),
+        P('Door interlock / limit switch fault','Check limit switch contacts and wiring; never bypass interlock','HIGH')]},
+ SO:{M:[P('Propulsor line blocked','Clear line; inspect NRV, bellows and flexible hose','HIGH','Flexible metallic hose 150×600'),
+        P('Grate / mesh broken','Repair mesh/grate; plan replacement','HIGH'),
+        P('Spring isolator cracked','Replace isolator set; check deck plate','MEDIUM')],
+     E:[P('Vibration motor current high','Check motor bearing and mounting; megger motor','MEDIUM')]},
+ ML:{M:[P('Conveyor misalignment / chain jump','Align, tension, check sprocket wear','HIGH'),P('Hydraulic leakage on line','Inspect guides and hydraulics; review Aug/Nov failure root cause','CRITICAL')],
+     E:[P('Cascade trip at transfer point','Check proximity/limit switch at transfer and interlock logic','HIGH')]},
+ CS:{M:[P('Clamp not holding / cylinder leaking','Inspect seals, Atos valve and clamping bush','HIGH'),P('Mould centering off','Check centering pins and guides','MEDIUM')],
+     E:[P('Power-pack motor heating','Log current; check rewound 11 kW motor and cooling','HIGH')]},
+ RT:{M:[P('Air leakage at joints / valves','Repair air leakage; inspect butterfly valve and pneumatic valve','HIGH'),P('Screen clogging','Clean screen, check mesh and seals','MEDIUM')],
+     E:[P('Differential pressure sensor erratic','Calibrate sensor; check tubing','MEDIUM')]},
+ IFB:{E:[P('GLD alarm / earth leakage','Stop melt, inspect coil-to-earth insulation and lining','CRITICAL','GLD wire'),
+         P('Coil discolouration / hot spot','Check DM water flow (≥8 LPM per circuit) and coil insulation','CRITICAL'),
+         P('Busbar / panel joint heating','Thermal scan, tighten busbar joints','HIGH')],
+      M:[P('Low cooling water flow','Check pump, strainer and hose connections','CRITICAL'),P('Lining thinning / hot spot on shell','Plan relining; reduce power','CRITICAL')]},
+ IFC:{E:[P('Cooling or electrical connection alarm','Monthly condition monitoring; check cooling and connections','HIGH'),P('Coil discolouration','Check DM water flow and coil insulation','CRITICAL')],
+      M:[P('Tilt cylinder leak','Replace tilt cylinder seals','HIGH')]},
+ PB:{M:[P('Ladle tilting stiff / noisy','Inspect tilt gearbox, seals and lip plates','HIGH')]},
+ E5:{M:[P('Wire rope broken strands / kinks','Stop crane; replace rope if > 10% broken wires in one lay','CRITICAL'),P('LT brake not holding','Adjust/replace brake lining; check coupling','CRITICAL'),P('CT wheel noise / bearing temp > 70 °C','Inspect CT wheel and bearing','HIGH')],
+     E:[P('Electromagnet weak / intermittent','Check magnet coil, cable and rectifier','CRITICAL'),P('Carbon brush sparking','Replace brushes, clean collector rail','HIGH')]},
+ E75:{M:[P('LT wheel bearing noise / play','Replace bearing 22216E','HIGH','Bearing 22216E'),P('Coupling spring worn','Replace resilient coupling spring','MEDIUM')],
+      E:[P('Contactor chattering','Replace contactor tips/coil; check control voltage','MEDIUM')]},
+ E2:{E:[P('LT travel not working','LT drive motor rewinding job; log current after restoration','CRITICAL')],
+     M:[P('LT drive support loose','Restore plummer block & coupling','HIGH')]},
+ HT10:{E:[P('Thermocouple drift above ±10 °C','Replace / recalibrate Type-K thermocouple','HIGH','Thermocouple wire Type-K'),P('Thyristor heating / discolouration','Inspect SCR heat sink, fan and snubber','CRITICAL','Thyristor SKKT330/16E')]},
+ HT5N:{E:[P('Element terminal hot / burnt','Replace element terminal and lugs','HIGH')]},
+ HT5O:{E:[P('Element sagging / support broken','Replace element supports and coil bushing','HIGH')]},
+ WQ:{M:[P('Pump not delivering / leaking','Check pump seal, impeller and suction strainer','HIGH')]},
+ CP:{M:[P('Oil carry-over / high oil consumption','Replace oil separator kit 2901056602','HIGH','Oil separator kit'),P('High discharge temperature','Clean cooler, check oil level and filter','HIGH')],
+     E:[P('Elektronikon alarm / shutdown','Read alarm code; check sensor and controller','HIGH','Elektronikon controller')]},
+ TR:{E:[P('Silica gel turned pink','Replace silica gel in breather','MEDIUM','Silica gel'),P('Oil below level mark','Top up transformer oil; check for leak','HIGH'),P('Abnormal temperature','Check cooling fans and loading','HIGH')]},
+ CT:{M:[P('Poor cooling / scaling','Descale fill, check fan blades and belt tension','MEDIUM')]},
+ GM:{E:[P('Thyristor overheating / frequent trips','Check cooling fan, heat sink and earthing','HIGH')]},
+ BC:{M:[P('Hydraulic hose leaking','Replace hose; check hydraulic oil level','HIGH')]}
+};
+
+// Critical spares (min stock) from the predictive dashboard; stock matched to stores list by pattern
+const CRIT=[
+ {k:'gld',pr:'IMMEDIATE',d:'E',m:'IFB',n:'GLD wire',spec:'Inductotherm spec',min:1,u:'Set',cost:5000,lead:7,re:/\bGLD\b/},
+ {k:'ck40',pr:'IMMEDIATE',d:'M',m:'RO',n:'Seal Kit CK-40/18',spec:'OSCAR DRG OE/2469',min:1,u:'Set',cost:9440,lead:7,re:/CK-?40/},
+ {k:'sn513',pr:'IMMEDIATE',d:'M',m:'SB',n:'Plummer block SN-513 + 22211EK',spec:'FAG',min:3,u:'Set',cost:16350,lead:5,re:/SN 513/},
+ {k:'oil68',pr:'HIGH',d:'M',m:'RO',n:'Hydraulic Oil-68',spec:'Grade 68',min:720,u:'Ltr',cost:86400,lead:3,re:/^OIL-68$/},
+ {k:'blade',pr:'HIGH',d:'M',m:'MX',n:'Mixture blade hard-faced',spec:'Cast, full-face hard-faced',min:57,u:'Nos',cost:99750,lead:7,re:/BLADE CASTED/},
+ {k:'b22214',pr:'HIGH',d:'M',m:'MX',n:'Bearing 22214E1K',spec:'DE + NDE',min:6,u:'Nos',cost:18942,lead:5,re:/22214/},
+ {k:'hose150',pr:'HIGH',d:'M',m:'SO',n:'Flexible metallic hose 150×600',spec:'Flange type',min:3,u:'Nos',cost:29880,lead:10,re:/METALLIC HOSE|FLEXIBLE.*150/},
+ {k:'b22216',pr:'HIGH',d:'M',m:'E75',n:'Bearing 22216E',spec:'Double roller',min:6,u:'Nos',cost:21528,lead:7,re:/22216/},
+ {k:'skkt',pr:'HIGH',d:'E',m:'HT10',n:'Thyristor SKKT330/16E',spec:'Semikron',min:2,u:'Nos',cost:16000,lead:21,re:/SKKT|THYRISTOR/},
+ {k:'tcwire',pr:'HIGH',d:'E',m:'HT10',n:'Thermocouple wire Type-K',spec:'30 m per replacement',min:30,u:'Mtr',cost:1260,lead:5,re:/THERMOCOUPLE WIRE|COMPENSAT/},
+ {k:'elek',pr:'HIGH',d:'E',m:'CP',n:'Elektronikon controller',spec:'Atlas Copco 1900520002',min:1,u:'Nos',cost:69208,lead:30,re:/ELEKTRONIKON|1900520002/},
+ {k:'sepkit',pr:'HIGH',d:'M',m:'CP',n:'Oil separator kit',spec:'Atlas Copco 2901056602',min:1,u:'Set',cost:14180,lead:14,re:/2901056602|SEPARATOR/},
+ {k:'silica',pr:'ROUTINE',d:'E',m:'TR',n:'Silica gel',spec:'Breather',min:5,u:'Kg',cost:2500,lead:5,re:/SILICA/}
+];
+// FY 2025-26 plant maintenance consumption (₹), Apr-25..Mar-26
+const CONS_FY26=[178771,309048,234649,237300,195192,298968,276283,263000,180264,406572,332221,200911];
+const SPARES=[["FOUNDRY STORES & SPARES (OLD)",119.0,"NOS",183.72,"General"],["ACRYLIC PLASTIC SHEET",4.0,"NOS",200.0,"General"],["AMMETER-0-30 AMP",8.0,"NOS",35.0,"Electrical"],["BEARING-1210 EKTN",2.0,"NOS",102.5,"Bearings"],["BEARING-1211 K",2.0,"NOS",96.73,"Bearings"],["BEARING-21312",3.0,"NOS",275.0,"Bearings"],["BEARING-2211 K",2.0,"NOS",116.99,"Bearings"],["BEARING-30308",2.0,"NOS",42.02,"Bearings"],["BEARING-30309",3.0,"NOS",67.9,"Bearings"],["BEARING-51118 Z",1.0,"NOS",173.38,"Bearings"],["BEARING-7212",4.0,"NOS",488.18,"Bearings"],["BEARING-UCP204 NTN",6.0,"NOS",36.1,"Bearings"],["CI NON RETURN VALVE-3\"",2.0,"NOS",955.17,"Hydraulic & pneumatic"],["CI NON RETURN VALVE-4\"",2.0,"NOS",1239.31,"Hydraulic & pneumatic"],["REGULATOR",1.0,"NOS",418.09,"Hydraulic & pneumatic"],["FIXED CONTACT-200 AMP",12.0,"NOS",32.76,"General"],["GI SHORT PIECE-4\"X4\"",6.0,"NOS",9.77,"General"],["GATE VALVE-100MM",2.0,"NOS",1803.43,"Hydraulic & pneumatic"],["MOVING CONTACT-CH200",9.0,"NOS",32.76,"General"],["SEAL FOR NON RETURN VALVE",2.0,"NOS",327.6,"Hydraulic & pneumatic"],["SPARE COIL FOR CONTACTOR-415 V SPARE PART FINGER FOR 33KV CIRCUIT BREAKER",8.0,"NOS",272.33,"Electrical"],["BEARING-51120",3.0,"NOS",180.5,"Bearings"],["TRANSFORMER-150 VA",1.0,"NOS",457.5,"Electrical"],["VALVOLA DHU-06191 (IMPORTED)",2.0,"NOS",1133.82,"Hydraulic & pneumatic"],["V BELT-A-85",2.0,"NOS",21.63,"Belts & drives"],["V BELT-A-93",1.0,"NOS",29.14,"Belts & drives"],["V BELT-B-105",1.0,"NOS",40.56,"Belts & drives"],["V BELT-B-122",2.0,"NOS",53.31,"Belts & drives"],["V BELT-B-123",1.0,"NOS",54.37,"Belts & drives"],["V BELT-B-160",3.0,"NOS",55.14,"Belts & drives"],["V BELT-B-166",5.0,"NOS",69.62,"Belts & drives"],["V BELT-B-38",1.0,"NOS",9.55,"Belts & drives"],["V BELT-B-54",1.0,"NOS",14.0,"Belts & drives"],["V BELT-B-94",8.0,"NOS",35.41,"Belts & drives"],["V BELT-C-105",6.0,"NOS",51.35,"Belts & drives"],["V BELT-C-53",1.0,"NOS",31.71,"Belts & drives"],["MACHINE SHOP STORES & SPARES (OLD)",1.0,"LOT",27098.06,"General"],["ARMATURE-1604010626ARMATURE-1604010626-4\" ANGLE GRINDER (BOSC",7.0,"NOS",459.58,"Power tools"],["GRINDING M/C-513948-2 (MAKITA)",4.0,"NOS",627.2,"Power tools"],["ARMATURE-728432",12.0,"NOS",2564.0,"Power tools"],["ARMATURE ASSY FOR M9513B 4\" ANGLE M/C MAK ITA",4.0,"NOS",762.71,"Power tools"],["ARMATURE FOR 4\" ANGLE GRINDER-KPT",4.0,"NOS",300.7,"Power tools"],["ARMATURE FOR 6MM DIE GRINDER",4.0,"NOS",728.5,"Power tools"],["ARMATURE FOR PENCIL GRINDER-KPT",4.0,"NOS",750.2,"Power tools"],["BEARING-6001 2RS",16.0,"NOS",111.0,"Bearings"],["BEARING-607",15.0,"NOS",75.0,"Bearings"],["BEARING-608 ZS",17.0,"NOS",71.0,"Bearings"],["BEARING-6200 ZZ",27.0,"NOS",97.0,"Bearings"],["BEARING-6201 ZZ",23.0,"NOS",92.0,"Bearings"],["BEARING-6202 ZZ",54.0,"NOS",96.0,"Bearings"],["BEARING-629 ID-9MM,OD-26MM",5.0,"NOS",76.0,"Bearings"],["CARBON BRUSH-131602",13.0,"PAIRS",129.75,"Electrical"],["CARBON BRUSH CB-325-194074-2 (MAKITA-GD 0601)",20.0,"NOS",59.32,"Power tools"],["CARBON BRUSH FOR 4\" ANGLE GRINDER-1607014145-BOSCH",11.0,"NOS",104.9,"Power tools"],["CARBON BRUSH FOR 4\" ANGLE GRINDER-KPT",9.0,"NOS",86.8,"Power tools"],["CARBON BRUSH FOR 4\" PENCIL GRINDER-KPT",18.0,"NOS",79.05,"Power tools"],["CARBON BRUSH HOLDER",11.0,"NOS",213.9,"Electrical"],["CAP-KPT",8.0,"NOS",49.39,"Power tools"],["CARBON BRUSH HOLDER FOR 4\" ANGLE GRINDER-KPT",3.0,"NOS",63.86,"Power tools"],["COUPLING-324639-8 (MAKITA-GD 0601)",16.0,"NOS",124.8,"Power tools"],["COUPLING FOR 6MM DIE GRINDER",10.0,"NOS",55.18,"Power tools"],["FIELD CASE-727729",4.0,"NOS",3044.2,"Power tools"],["FIELD COIL-230-240V-621724-1 (MAKITA-GD0600) PENCIL",5.0,"NOS",904.0,"Power tools"],["GRINDING M/C",10.0,"NOS",1860.0,"General"],["FIELD COIL FOR 4\" ANGLE GRINDER - BOSCH",7.0,"NOS",320.41,"Power tools"],["FIELD COIL FOR 4\" ANGLE GRINDER-KPT",5.0,"NOS",248.0,"Power tools"],["FIELD COIL-M9509B-MAKITA",12.0,"NOS",926.17,"Power tools"],["FIELD FOR ANGLE GRINDER-100MM (MAKITA) 628378-5",5.0,"NOS",677.6,"Power tools"],["FIELD SCREW FOR KPT-5X70MM FRONT COVER FOR 4\" ANGLE GRINDER-KPT",5.0,"NOS",99.2,"Power tools"],["GEAR & PINION FOR 4\" ANGLE GRINDER (BOSCH)",9.0,"NOS",750.0,"Power tools"],["GEAR & PINION FOR 4\" ANGLE GRINDER-KPT",6.0,"SET",328.6,"Power tools"],["GEAR & PINION FOR KPT P57-91-727723",9.0,"SET",1230.0,"Power tools"],["HANDLE-Z9995830 CP 4123 (CHIPPING M/C)",7.0,"NOS",3359.62,"General"],["NUT FOR SPINDLE-KPT LOWER END PLATE 3050N FOR PENCIL M/C",3.0,"NOS",957.0,"Power tools"],["GRINDING M/C LOWER END PLATE FOR PNEUMATIC PENCIL M/C",3.0,"NOS",331.0,"Power tools"],["OUTER CLAMP-KPT-901534",19.0,"NOS",98.8,"Power tools"],["BLADE FOR PNEUMATIC PENCIL M/C",30.0,"NOS",25.0,"Power tools"],["SPINDLE-324638-0 (MAKITA-GD 0600)",5.0,"NOS",216.0,"Power tools"],["SPINDLE-326828-1 FOR 4\" ANGLE GRINDER-MAKITA",7.0,"NOS",86.4,"Power tools"],["SPINDLE-729712/742220 KPT",8.0,"NOS",586.23,"Power tools"],["SPINDLE FOR 4\" ANGLE GRINDER-KPT",6.0,"NOS",114.7,"Power tools"],["SPINDLE FOR PENCIL GRINDER-KPT",3.0,"NOS",399.9,"Power tools"],["GEAR-10 221475-2 MAKITA 4\" ANGLE GR.",5.0,"NOS",68.0,"Power tools"],["GEAR-221476-0-MAKITA 4\" ANGLE GRINDER",7.0,"NOS",149.6,"Power tools"],["SWITCH BUTTON FOR 6MM DIE GRINDER",5.0,"NOS",16.74,"Power tools"],["SWITCH DPX-2110-R-651947-7 (MAKITA-GD 0601)",8.0,"NOS",35.0,"Power tools"],["SWITCH FOR 4\" ANGLE GRINDER-KPT",3.0,"NOS",86.8,"Power tools"],["SWITCH FOR 4\"ANGLE GR. MACHINE (BOSCH)",7.0,"NOS",68.73,"Power tools"],["SWITCH FOR 6MM DIE GRINDER",15.0,"NOS",110.82,"Power tools"],["SWITCH FOR KPT",7.0,"NOS",360.04,"Power tools"],["HANDLE FOR KPT",5.0,"NOS",313.1,"Power tools"],["SWITCH HOLDER FOR 4\" ANGLE GRINDER-KPT",6.0,"NOS",26.04,"Power tools"],["SWITCH LEVER-418728-0 (MAKITA-GD0601)",5.0,"NOS",15.2,"Power tools"],["SWITCH STYKER FOR PENCIL M/C (MAKITA) THROTTLE HOUSING 3050N FOR PENCIL M/C THROTTLE SLEEVES 3050N FOR PENCIL M/C",6.0,"NOS",523.63,"Power tools"],["CARBON BRUSH CB-204 (MAKITA-GA7020) A.C.CARBON BRUSH CB-204 (MAKITA- GS 6000)-131957-7 AC DRIVE-55KW(VFD)-ATV340D45N4E FOR WATER QUENCHING ACF VESSEL A.C.I. MODULE-FMOD006252 AC SURGE PROTECTOR / LIGHTNING PROTECTION DEVICE ADAPTER-1/2\" X 1/2\"",1.0,"NOS",310.0,"Power tools"],["AIR CONDITIONER M/C- 2TON CAPACITY",1.0,"NOS",45330.5,"General"],["AIR DISTRIBUTOR FOR 4\" ANGLE GRINDER (BOSCH)",10.0,"NOS",52.2,"Power tools"],["FILTER-1837008067",1.0,"NOS",26484.0,"Hydraulic & pneumatic"],["ELEMENT-1613950300",1.0,"NOS",4680.0,"Furnace & HT"],["SOCKET-300 SQ MM ALUMINIUM RIVIT-6X25MM",145.0,"NOS",4.0,"Electrical"],["ROPE",1.0,"ROLL",1600.0,"Belts & drives"],["PAD VELCRO BAFFLE PLATE - 727724 (KPT) BAKELITE BASE & TOP-63A",1.0,"NOS",200.0,"Power tools"],["FUSE BASE & GRIPS-32 AMP",12.0,"NOS",155.0,"Electrical"],["CONTACTOR-CE 15DN3-110V AC",1.0,"NOS",1262.0,"Electrical"],["CONTACTOR-CE 16 AMP",3.0,"NOS",1400.0,"Electrical"],["BEARING-1315K",2.0,"NOS",7991.94,"Bearings"],["BEARING-21310",1.0,"NOS",3425.0,"Bearings"],["BEARING-2214",2.0,"NOS",4596.5,"Bearings"],["BEARING-22209 E1 (FAG)",6.0,"NOS",2782.33,"Bearings"],["BEARING-22210 E1",3.0,"NOS",1601.97,"Bearings"],["BEARING-22210 E1 K",4.0,"NOS",2451.0,"Bearings"],["BEARING-22211 E1K",2.0,"NOS",2150.0,"Bearings"],["BEARING-22212 E1 (FAG)",2.0,"NOS",2700.0,"Bearings"],["BEARING-22213 E1AKM",1.0,"NOS",3042.0,"Bearings"],["BEARING-22214E1K",5.0,"NOS",3286.0,"Bearings"],["BEARING-22215 EK C3",3.0,"NOS",3349.66,"Bearings"],["BEARING-22216 E",1.0,"NOS",3734.0,"Bearings"],["BEARING-22220 EK",2.0,"NOS",4209.45,"Bearings"],["BEARING-22222 EK",1.0,"NOS",6334.93,"Bearings"],["BEARING-22309 E1",6.0,"NOS",3030.33,"Bearings"],["BEARING-30205",4.0,"NOS",454.51,"Bearings"],["BEARING-30307",2.0,"NOS",1041.63,"Bearings"],["BEARING-320/22X",2.0,"NOS",500.0,"Bearings"],["BEARING-3211",1.0,"NOS",4995.0,"Bearings"],["BEARING-3214",1.0,"NOS",8200.0,"Bearings"],["BEARING-3309 2RS",1.0,"NOS",3480.93,"Bearings"],["BEARING-51118",2.0,"NOS",325.0,"Bearings"],["BEARING - 51305",2.0,"NOS",944.0,"Bearings"],["BEARING-6001 ZZ",8.0,"NOS",94.0,"Bearings"],["BEARING-6003 ZZ",3.0,"NOS",151.0,"Bearings"],["BEARING-6004 ZZ",4.0,"NOS",130.0,"Bearings"],["BEARING-6007 ZZ",2.0,"NOS",246.0,"Bearings"],["BEARING-6008ZZ",2.0,"NOS",330.0,"Bearings"],["BEARING-6009 ZZ",2.0,"NOS",343.0,"Bearings"],["BEARING-6010 ZZ",2.0,"NOS",454.0,"Bearings"],["BEARING-6203 ZZ",6.0,"NOS",165.0,"Bearings"],["BEARING-6204 ZZ",10.0,"NOS",166.0,"Bearings"],["BEARING-6206 ZZ",1.0,"NOS",289.0,"Bearings"],["BEARING-6207 ZZ",6.0,"NOS",345.67,"Bearings"],["BEARING-6208 ZZ",2.0,"NOS",374.0,"Bearings"],["BEARING-6210 ZZ",2.0,"NOS",454.0,"Bearings"],["BEARING-6211 ZZ",4.0,"NOS",332.87,"Bearings"],["BEARING-6212 ZZ",6.0,"NOS",688.0,"Bearings"],["BEARING-6213",1.0,"NOS",800.0,"Bearings"],["BEARING-6214 ZZ",4.0,"NOS",836.62,"Bearings"],["BEARING-626-2RS",6.0,"NOS",73.0,"Bearings"],["BEARING-626S ZZ",2.0,"NOS",62.0,"Bearings"],["BEARING-6300 ZZ",5.0,"NOS",44.01,"Bearings"],["BEARING-6301 2RS",4.0,"NOS",97.55,"Bearings"],["BEARING-6302 ZZ",3.0,"NOS",160.0,"Bearings"],["BEARING-6303 ZZ",7.0,"NOS",107.25,"Bearings"],["BEARING-6304 ZZ",5.0,"NOS",178.0,"Bearings"],["BEARING-6305 ZZ C3",17.0,"NOS",205.0,"Bearings"],["BEARING-6306 ZZ",2.0,"NOS",309.0,"Bearings"],["BEARING-6307 C3",1.0,"NOS",360.0,"Bearings"],["BEARING-6308 ZZ C3",1.0,"NOS",508.0,"Bearings"],["BEARING-6310 SKF",1.0,"NOS",621.0,"Bearings"],["BEARING-6312",2.0,"NOS",1284.0,"Bearings"],["BEARING-6312 ZZ C3",1.0,"NOS",1780.0,"Bearings"],["BEARING-6314 ZZ",2.0,"NOS",1391.49,"Bearings"],["BEARING-6316 ZZ",2.0,"NOS",3839.46,"Bearings"],["BEARING-67010",2.0,"NOS",425.0,"Bearings"],["BEARING-6707 2RS",2.0,"NOS",997.56,"Bearings"],["BEARING-6900 ZZ",20.0,"NOS",180.0,"Bearings"],["BEARING-696 ZZ",33.0,"NOS",66.7,"Bearings"],["BEARING-85/26-IKO (JAPAN)",1.0,"NOS",4200.0,"Bearings"],["BEARING SLEEVE-H314",5.0,"NOS",977.0,"Bearings"],["BEARING-UC206",1.0,"NOS",625.0,"Bearings"],["BEARING UC-215",2.0,"NOS",3076.0,"Bearings"],["BEARING-UCP 205",2.0,"NOS",120.0,"Bearings"],["BEARING-UKP 208 WITH BLOCK & SOCKET",2.0,"SET",1200.0,"Bearings"],["BELT DRIVE - 7286547 / 7363920 FOR BOBCAT",2.0,"NOS",4427.12,"Bobcat"],["BELT DRIVER- 6667322 FOR BOBCAT BENZENE (FURNACE) ########## 485.00 485.00 BEVELED EDGE CHISEL 25MM BEVELED EDGS CHISEL 32MM BEVELED EDGS CHISEL 38MM B GROOVE PULLY-12\" (3 GROOVE)",2.0,"NOS",697.09,"Bobcat"],["B GROOVE (V PULLEY)-4\" B GROOVE (V PULLEY)-5\" B GROOVE (V PULLEY)-6\"",1.0,"NOS",900.0,"Belts & drives"],["BREATHER VALVE-1.5\"-TWO WAY BRUSH HOLDER-643760-7 (MAKITA-GD 0601)",3.0,"NOS",40.0,"Power tools"],["CABLE TROLLEY",2.0,"NOS",2200.0,"Electrical"],["CAPACITOR-1 MFD-FIMP000245-1500/2000V(INDUCTOTHERM)",1.0,"NOS",6990.0,"Furnace & HT"],["CAPACITOR-KVAR-25",2.0,"NOS",7600.0,"Electrical"],["CERAMIC FIBER BLANKET 96",2.0,"ROLL",1450.0,"Furnace & HT"],["CERAMIC HOLDER",12.0,"NOS",87.0,"Furnace & HT"],["TUBE",1.0,"NOS",800.0,"General"],["LOCK-5/8\"",20.0,"NOS",25.0,"General"],["BEARING WITH SEAL CHARGE RESIN FOR DEIONIZER MB-12",2.0,"PKT",620.0,"Bearings"],["CHILL BLOCK W/O P.TAB WITH PLATG-FZSE00005",1.0,"NOS",4526.0,"General"],["BALL VALVE-2\"",2.0,"NOS",2165.98,"Hydraulic & pneumatic"],["BUTTERFLY VALVE-6\" WITHOUT ACTUATOR",2.0,"NOS",13970.0,"Hydraulic & pneumatic"],["BUTTERFLY VALVE-6\"- WITHOUT ACTUATOR-TEMP 80 DEG",4.0,"NOS",10305.0,"Hydraulic & pneumatic"],["PIN WITH NUT",130.0,"NOS",45.0,"General"],["COLLET CONE-6MM-MAKITA-GD 0601-763665-6",5.0,"NOS",203.0,"Power tools"],["NUT-6MM-MAKITA-GD 0601",10.0,"NOS",78.0,"Power tools"],["CONTACTOR-3TF34-230V",2.0,"NOS",2700.0,"Electrical"],["CONTACTOR-3TF47-230V",3.0,"NOS",7098.83,"Electrical"],["CONTACTOR-3TF50-230V",1.0,"NOS",14990.0,"Electrical"],["KIT",8.0,"NOS",100.0,"General"],["CONTACTOR LCID-32-110V",4.0,"NOS",2420.6,"Electrical"],["PIN-110V",6.0,"NOS",359.0,"General"],["CONVERTER SCR147-2185 PE (INDUCTOTHERM)",1.0,"NOS",15581.0,"Furnace & HT"],["BEARING COVER",24.0,"NOS",60.0,"Bearings"],["CABLE-185SQMM X 3 CORE-XLPE-33KV/e",5.0,"MTR",2100.0,"Electrical"],["CABLE-1.5SQ MM X 2 CORE",100.0,"MTR",61.0,"Electrical"],["SOCKET-120 SQ MM",25.0,"NOS",97.07,"Electrical"],["SOCKET-4 SQ MM",20.0,"NOS",3.0,"Electrical"],["SOCKET-50 SQ.MM",28.0,"NOS",41.0,"Electrical"],["SOCKET-70 SQ MM",10.0,"NOS",54.0,"Electrical"],["SOCKET-95 SQ.MM",20.0,"NOS",69.0,"Electrical"],["SOCKET-2.5 SQ.MM",20.0,"NOS",2.0,"Electrical"],["WHEEL-200 MM DIA (FOR 5 TON CRANE)",1.0,"NOS",3500.0,"Belts & drives"],["WHEEL-200 MM DIA (FOR 7.5 TON CRANE)",4.0,"NOS",3600.0,"Belts & drives"],["CUPLOCK PASTE CURRENT COLLECTOR FOR EOT CRANE",12.0,"NOS",3000.0,"General"],["LINER FOR PNEUMATIC PENCIL M/C",3.0,"NOS",637.0,"Power tools"],["KIT -160 MM BORE-FFIT004748",3.0,"NOS",2327.0,"General"],["KIT -GI-CK-63/45 FOR CAR PUSHER",2.0,"SET",8960.0,"General"],["CHAIN DOL STARTER DOL STARTER FOR MAN COOLER FAN",1.0,"NOS",1260.0,"Belts & drives"],["COUPLING FOR PNEUMATIC PENCIL M/C DRIVER 1500A/36V 6KV SPD DRONE WITH DUAL CAMERA DRYING TUNNEL LINK ASSEMBLY",170.0,"SET",704.25,"Power tools"],["LOCK",27.0,"NOS",54.07,"General"],["THERMOCOUPLE-TYPE-K299057C48",3.0,"NOS",4200.0,"Furnace & HT"],["PUSH BOTTON",3.0,"NOS",55.0,"General"],["OIL-15W40 for Car",7.5,"LTR",250.0,"Lubricants"],["OIL-20W40",20.0,"LTR",250.0,"Lubricants"],["CABLE-95 SQ MM FIBROTHAL CEMENT FIBROTHAL CEMENT HARDENER FIBROTHAL HARDENER FIBROTHAL PANEL-867X785X90 MM",1.0,"NOS",97000.0,"Electrical"],["KIT",1.0,"NOS",46500.0,"General"],["FILTER BAG-3460X150MM (SHAKE-OUT)",1.0,"NOS",310.0,"Hydraulic & pneumatic"],["ELEMENT-HFE-10-10 (FILTER M/C)",2.0,"NOS",175.0,"Furnace & HT"],["ELEMENT-HFE-10-25 (FILTER M/C)",8.0,"NOS",175.0,"Furnace & HT"],["OIL PACKED-1837011949",1.0,"NOS",9368.0,"Lubricants"],["FLANGE TYPE",1.0,"NOS",10200.0,"General"],["GATE-5\"",1.0,"NOS",63000.0,"General"],["BELT FRP SHEET-1500MMX1500MMX10MM",1.0,"NOS",16680.0,"Belts & drives"],["TUBE-OD 22MM, ID 18MM",5.0,"MTR",640.0,"General"],["GEAR BOX FOR 4\" ANGLE GRINDER-KPT",6.0,"NOS",362.7,"Power tools"],["GEAR CASE-727413",13.0,"NOS",1622.23,"Belts & drives"],["GEAR CASE COVER-728435 KPT",5.0,"NOS",762.0,"Power tools"],["GEAR CASE FOR 6MM DIE GRINDER",3.0,"NOS",136.4,"Power tools"],["OIL-GRADE 320",21.0,"LTR",245.0,"Lubricants"],["FUSE-2 AMP",25.0,"NOS",3.25,"Electrical"],["GATE VALVE-2\"",1.0,"NOS",2550.0,"Hydraulic & pneumatic"],["GREASE GUN",12.0,"NOS",37.5,"Lubricants"],["WHEEL-180X13X31.75 AR60",2.0,"NOS",700.0,"Belts & drives"],["WHEEL-FINE-200X25X31.75-GC120-",2.0,"NOS",875.0,"Belts & drives"],["WHEEL-ROUGH-200X25X31.75-A24",1.0,"NOS",700.0,"Belts & drives"],["FUSE-100AMP",6.0,"NOS",320.0,"Electrical"],["FUSE-125AMP",4.0,"NOS",145.0,"Electrical"],["FUSE-16AMP",2.0,"NOS",35.0,"Electrical"],["FUSE-200 AMP",5.0,"NOS",435.0,"Electrical"],["FUSE-315 AMP",2.0,"NOS",750.0,"Electrical"],["FUSE-32A (TYPE TIA)",6.0,"NOS",93.22,"Electrical"],["FUSE-4 AMP",6.0,"NOS",37.29,"Electrical"],["FUSE-63 AMP",3.0,"NOS",95.0,"Electrical"],["FUSE-63A (TYPE TIA)",4.0,"NOS",144.07,"Electrical"],["FUSE-80 AMP",6.0,"NOS",385.0,"Electrical"],["FUSE-NS-2A",4.0,"NOS",45.0,"Electrical"],["FUSE-NS-4A",4.0,"NOS",45.0,"Electrical"],["WASHER-M10X50",44.0,"NOS",12.38,"General"],["NUT WITH WASHER-M16X70",175.0,"NOS",47.0,"General"],["DIODE-FIMP5021 (INDUCTION FURNACE)",1.0,"NOS",52320.0,"Furnace & HT"],["HIGH PERFORMA SCR147-3176-PE-FIMP005166-1/2T FURNAC HIGH PERFORMA SCR147-3176-PE-FIMP005166-3T FURNAC",3.0,"NOS",40134.67,"Furnace & HT"],["GREASE HIGH TENSILE BOLT,NUT & WASHER-M10X75 MM HIGH TENSILE BOLT,NUT & WASHER-M14X90 MM HIGH TENSILE BOLT,NUT & WASHER-M-16X100 MM HIGH TENSILE BOLT,NUT & WASHER-M16X75 MM HIGH TENSILE STUD,NUT & WASHER-M18X140 MM",4.0,"SET",140.0,"Lubricants"],["NUT HIGH VOLTAGE DETECTOR WITH TELESCOPIC ROD ASSEMBLY",1.0,"NOS",37780.0,"General"],["HOSE-6578808/6718954 (BOBCAT)",2.0,"NOS",1867.0,"Bobcat"],["HRC Fuse-1250 AMP",6.0,"NOS",5950.0,"General"],["FUSE-125 AMP",7.0,"NOS",470.31,"Electrical"],["FUSE-16 AMP (MAKE SIEMENS)",5.0,"NOS",245.0,"Electrical"],["FUSE-200 AMP",6.0,"NOS",357.0,"Electrical"],["FUSE--32 AMP",10.0,"NOS",280.0,"Electrical"],["FUSE-630 AMP (MAKE L & T)",1.0,"NOS",1368.08,"Electrical"],["FUSE-63 AMP",7.0,"NOS",355.0,"Electrical"],["FUSE-63 AMP (SIEMENSE)",2.0,"NOS",55.0,"Electrical"],["DRILL-21.5MM",2.0,"NOS",1395.0,"General"],["DRILL-35MM",2.0,"NOS",5408.04,"General"],["CYLINDER-160 MM BORE-FFIT004883",2.0,"NOS",68020.0,"Hydraulic & pneumatic"],["HOSE-3/4\"X25\"-FFIT4042",3.0,"NOS",1478.0,"Hydraulic & pneumatic"],["OIL-68",85.0,"LTR",162.0,"Lubricants"],["PUMP HYDROCHEM-502 FOR RAW WATER HYDROCHEM-602 FOR RAW WATER HYDROCHEM-605 FOR RAW WATER HYDROCHEM-606 FOR RAW WATER",35.0,"KGS",196.0,"General"],["SENSOR",1.0,"NOS",7512.0,"Electrical"],["PLUG-32AMP",17.0,"NOS",115.0,"Electrical"],["SOCKET-32AMP",19.0,"NOS",135.0,"Electrical"],["INDUSTRIAL WORK WEAR COVERALL BOILER SUIT INJECTION VALVE WITH INTEGRAL NON RETURN VALVE-PVC INNER COVER FOR 6MM DIE GRINDER",12.0,"NOS",130.2,"Power tools"],["SHAFT FOR 7.5TON CRANE INSERT CNMG 120408GM-XP7125 INSERT SNMG 120408GM-XP7125",6.0,"NOS",575.0,"Belts & drives"],["SHAFT FOR 7.5TON CRANE INTERMEDIATE RING FOR 4\" ANGLE GRINDER (BOSCH)",12.0,"NOS",61.77,"Power tools"],["PRESSURE TYPE ABC FIRE EXTINGUISHER",6.0,"NOS",1850.0,"General"],["SCREEN LED COB PLATE-50 WATT",20.0,"NOS",70.0,"Furnace & HT"],["LED DISPLAY BOARD LED DRIVER-1500 WATT",34.0,"NOS",120.0,"Electrical"],["LED DRIVER-50 WATT LED FLOOD CHIP-50 WATT LED FLOOD LIGHT-100 WATT LED FLOOD LIGHT-150 WATT LED FLOOD LIGHT-200 WATT LED FLOOD LIGHT-50 WATT LED LIGHT-12 WATT LED LIGHT-20 WATT LED LIGHT 50W CITIZENJAPAN 121602M CLUCKDL50/601210 LED LIGHT-7 WATT LED PLATE-100 WATT",2.0,"NOS",180.0,"Electrical"],["LED PLATE-150 WATT LED PLATE-200 WATT",2.0,"NOS",275.0,"Electrical"],["LOCK RING LOCKTITE-495 LOWER BLOCK FOR 2 TON INDEF HOIST LOWER VALVE CASE LID-D5061830",6.0,"NOS",667.88,"Hydraulic & pneumatic"],["WHEEL (FOR 2 TON CRANE)",1.0,"NOS",5400.0,"Belts & drives"],["BLADE-36\" MAN COOLAR FAN (PEDESTAL TYPE)-24\"",1.0,"NOS",16633.5,"General"],["MCB-10 AMP-1 POLE",15.0,"NOS",160.0,"Electrical"],["MCB-32 AMP-3 POLE",3.0,"NOS",847.46,"Electrical"],["MCB-63 AMP-3 POLE",1.0,"NOS",1173.73,"Electrical"],["MCCB-125 AMP-3 POLE",1.0,"NOS",3780.0,"Electrical"],["MCCB-DN2-250D-125 AMP- 4 POLE",1.0,"NOS",12831.0,"Electrical"],["MCCB-DN2-250D- 200 AMP- 4 POLE",1.0,"NOS",17004.0,"Electrical"],["CARD- PLC PROCESSOR-TSXMRPP224K",1.0,"NOS",30000.5,"General"],["WASHER-3/4: MICA WASHER(MEDIUM)",26.0,"NOS",28.0,"General"],["KIT-2901021800",1.0,"NOS",2780.0,"General"],["BLADE CASTED & FULL FACE HARD FACED",43.0,"NOS",1750.0,"General"],["MODULAR PLATE MODULE SOLUTION PANEL-33KV,1250A, 31.5KA",1.0,"NOS",597477.37,"Electrical"],["MOTOR HOUSING-457131-0 (MAKITA 4\" ANGLE)",5.0,"NOS",224.8,"Power tools"],["WHEEL-20X25X6MM (GRIT 60) MOV-FSCC3502-130 V (INDUCTION FURNACE) MPCB -100 AMP MPCB - 10-16 AMP MPCB-13-18 AMP MPCB-1.6-2.4 AMP MPCB - 16-25 AMP MPCB - 28-40 AMP MPCB-4-6.3 AMP MPCB-4-6 AMP-GV-2 MPCB-6-10 AMP",1.0,"NOS",2520.0,"Furnace & HT"],["MPCB-9 TO 14 AMP MPCB-GV-2-2.5 TO 4 AMP",1.0,"NOS",2100.0,"General"],["GREASE",7.0,"KGS",360.0,"Lubricants"],["MS JUBILEE CLAMP-1\"",11.0,"NOS",17.0,"Electrical"],["NIPPLE-1\"X6\"",3.0,"NOS",20.0,"Hydraulic & pneumatic"],["MS SOLID SQUARE BAR-40MM",56.0,"KGS",60.0,"General"],["UNION-25MM",10.0,"NOS",64.0,"Hydraulic & pneumatic"],["ELEMENT",16.0,"NOS",16.13,"General"],["BEARING-22279",22.0,"NOS",140.0,"Bearings"],["ELEMENT",11.0,"NOS",15.0,"General"],["BOLT",48.0,"NOS",13.5,"General"],["OIL RS ULTRA 20L",2.0,"NOS",26820.5,"Lubricants"],["SEAL-110X85X12 MM",6.0,"NOS",120.0,"Hydraulic & pneumatic"],["SEAL-120X85X12 MM",2.0,"NOS",292.37,"Hydraulic & pneumatic"],["SEAL-2 1/16X2X1/2\"",4.0,"NOS",40.0,"Hydraulic & pneumatic"],["SEAL-22X12X7 MM",4.0,"NOS",20.0,"Hydraulic & pneumatic"],["SEAL-30X42X7MM",2.0,"NOS",20.01,"Hydraulic & pneumatic"],["SEAL-35X28X4 MM",2.0,"NOS",250.0,"Hydraulic & pneumatic"],["SEAL-41X35X8 MM",4.0,"NOS",260.0,"Hydraulic & pneumatic"],["SEAL-42X28X6 MM",1.0,"NOS",260.0,"Hydraulic & pneumatic"],["SEAL-47X20X7 MM",5.0,"NOS",30.01,"Hydraulic & pneumatic"],["SEAL-47X35X7 MM",8.0,"NOS",24.01,"Hydraulic & pneumatic"],["SEAL-52X35X8 MM",6.0,"NOS",22.81,"Hydraulic & pneumatic"],["SEAL-60X45X8 MM",2.0,"NOS",25.0,"Hydraulic & pneumatic"],["SEAL-65X50X8 MM",2.0,"NOS",27.5,"Hydraulic & pneumatic"],["SEAL-68X50X8 MM",6.0,"NOS",33.02,"Hydraulic & pneumatic"],["SEAL-72X35X8 MM",6.0,"NOS",36.02,"Hydraulic & pneumatic"],["SEAL-72X55X8 MM",6.0,"NOS",34.0,"Hydraulic & pneumatic"],["SEAL-75X60X10 MM",6.0,"NOS",34.63,"Hydraulic & pneumatic"],["SEAL-90X72X10 MM",3.0,"NOS",40.0,"Hydraulic & pneumatic"],["RELAY-12.5-20A",2.0,"NOS",1191.0,"Electrical"],["RELAY-16-24A",1.0,"NOS",1182.86,"Electrical"],["RELAY-3.8-6 AMP",1.0,"NOS",675.0,"Electrical"],["RELAY-85-105 AMP",2.0,"NOS",3125.0,"Electrical"],["TEMPERATURE CONTROLER PAINT-GREEN PAINT-MAROON PAINT-SMOKE GREY PANEL COOLING FAN-8\"",1.0,"NOS",950.0,"Electrical"],["PANNEL COOLING FAN-4\"",2.0,"NOS",280.0,"General"],["GRINDING MACHINE (ELECTRIC) PERFORATED SHEET-2MTR X 1MTR X 6MM THICK",1.0,"NOS",33000.0,"General"],["SWITCH-6 AMP PID CONTROLLER",1.0,"NOS",9000.0,"Electrical"],["BEARING-UCP 209",1.0,"NOS",1488.0,"Bearings"],["PILLOW BLOCK-F 215 (NTN)",2.0,"NOS",1499.97,"General"],["PIPE-1613956600 FOR GA75 COMPRESSOR PISTON-B1519803",5.0,"NOS",848.25,"Hydraulic & pneumatic"],["PLUMMER BLOCK WITH BEARING-FL 206J",2.0,"NOS",987.0,"Bearings"],["PLUMMER BLOCK WITH BEARING-SN 213",2.0,"NOS",1345.0,"Bearings"],["PLUMMER BLOCK WITH BEARING-SN 513",1.0,"NOS",5450.0,"Bearings"],["PLUMMER BLOCK WITH BEARING-UCP 205",10.0,"NOS",788.0,"Bearings"],["PLUMMER BLOCK WITH BEARING-UCP 209 PNEUMATIC ANGLE TYPE VALVE-40MM-2/2 WAY FOR REC.TWR",1.0,"NOS",5720.0,"Bearings"],["PNEUMATIC BOOSTER VALVE-4\" PNEUMATIC DUST COLLECTION VALVE-40MM-2/2 WAY PNEUMATIC DUST COLLECTION VALVE-ASDA-25MM-TWO WAY",1.0,"NOS",1303.0,"Hydraulic & pneumatic"],["PIPE-10MM",25.0,"MTR",32.0,"Hydraulic & pneumatic"],["PIPE-12MM",10.67,"MTR",59.04,"Hydraulic & pneumatic"],["PIPE-6MM",10.0,"MTR",22.0,"Hydraulic & pneumatic"],["SENSOR FOR POWER MEASURMENT (INDUCTOTHERM)",1.0,"NOS",8385.0,"Furnace & HT"],["SENSOR UNIT-FMOD005013 (INDUCTOTHERM)",1.0,"NOS",8385.0,"Furnace & HT"],["POTENTIO METER",2.0,"NOS",1452.0,"General"],["POURING LINE ROLLER POURING LINE ROLLER WITH SPROCKET",11.0,"NOS",5100.0,"Belts & drives"],["POURING LINE ROLLER WITH SPROCKET FOR CAR1,2",9.0,"NOS",4200.0,"Belts & drives"],["PUSH BUTTON-GREEN",15.0,"NOS",30.0,"General"],["PUSH BUTTON-RED",16.0,"NOS",30.0,"General"],["PUSH FITTING-10X10MM",5.0,"NOS",28.0,"Hydraulic & pneumatic"],["PUSH FITTING-12X12MM",10.0,"NOS",32.0,"Hydraulic & pneumatic"],["PUSH FITTING-1/4\"X10MM (BSP THREAD)",31.0,"NOS",37.58,"Hydraulic & pneumatic"],["PUSH FITTING-1/4\"X12MM (BSP THREAD)",20.0,"NOS",35.0,"Hydraulic & pneumatic"],["PUSH FITTING-1/4\"X8MM (BSP THREAD)",35.0,"NOS",24.43,"Hydraulic & pneumatic"],["PUSH FITTING-8X8MM",8.0,"NOS",20.0,"Hydraulic & pneumatic"],["BALL VALVE-1/2\"-THREE WAY",1.0,"NOS",7394.0,"Hydraulic & pneumatic"],["RELAY WITH BASE-220V AC",4.0,"NOS",372.0,"Electrical"],["COUPLING-104 (TYPE Z)",2.0,"NOS",4655.0,"Belts & drives"],["COUPLING-111Z",1.0,"NOS",19500.0,"Belts & drives"],["PUMP RESISTOR 1W 5% RESISTOR 20K 50W 146-2007 FIMP000290 (INDUCTOTHERM)",3.0,"NOS",889.67,"Furnace & HT"],["RESISTOR-250W 4 OHM-146-3042-0-FIMP005016 (INDUCTOTHERM)",2.0,"NOS",4715.0,"Furnace & HT"],["SWITCH",16.0,"NOS",125.0,"Electrical"],["SWITCH-3000,230 VOLT AC RIVIT PACK RO ANTI SCALANT",10.0,"KGS",175.0,"Electrical"],["ELEMENT-AF4.5 MM-16.66KW-240V",1.0,"NOS",13718.0,"Furnace & HT"],["PUMP-1/2\"X1/2\" MODEL (RESIN PUMP)",3.0,"NOS",1600.0,"General"],["PUMP-1/4\"X1/4\" MODEL-FTX025",2.0,"NOS",3740.0,"General"],["ELEMENT-1613958500",1.0,"NOS",6746.5,"Furnace & HT"],["SPRING BELLOW-110",2.0,"NOS",14915.0,"General"],["BELT SAFETY HELMET (WHITE) SAFETY HELMET (YELLOW)",50.0,"NOS",120.0,"Belts & drives"],["SCR CLAMP ASSY 10000 LBS (CONVERTER)-FDEV000182",1.0,"NOS",10020.0,"Furnace & HT"],["SCR/DIODE CLAMP ASSY-10\" STUD 3000LBS FDEV000191",4.0,"NOS",8175.0,"Furnace & HT"],["SCR/DIODE CLAMP ASSY-8.25\" STUD 5000LBS FDEV000193",2.0,"NOS",8390.0,"Furnace & HT"],["SCR DUAL FIRING MODULE 77/100MM REV5 FMOD005763",1.0,"NOS",19436.0,"Furnace & HT"],["SCREW-1168-B-01 FOR MIXER M/C SCREW-1168-B-22 FOR MIXER M/C SCREW-17C660 FOR BOBCAT SCREW- 3974260 FOR BOBCAT SCREW-4X15",34.0,"NOS",3.1,"Bobcat"],["SCREW-4X16 SCREW-6715143 (BOBCAT)",4.0,"NOS",628.32,"Bobcat"],["SWITCH-4S46BO",3.0,"NOS",307.0,"Electrical"],["SWITCH-ONE WAY",9.0,"NOS",101.67,"Electrical"],["SWITCH-THREE WAY",5.0,"NOS",125.0,"Electrical"],["SWITCH-TWO WAY",11.0,"NOS",85.0,"Electrical"],["KIT WITH BUSH FOR GA75 COMPRESSOR SHIELD SNAKE REPELLENT POWDER SHIM FOR DNMG INSERT",5.0,"NOS",720.0,"Bearings"],["SHIM FOR SNMG INSERT",3.0,"NOS",475.0,"General"],["SHIM FOR WNMG INSERT SHOT FEED VALVE ASSEMBLY-TK29709200 FOR SHOT BLAST",2.0,"NOS",36830.0,"Hydraulic & pneumatic"],["HANDLE FOR 7\" ANGLE GRINDER MACHINE",4.0,"NOS",107.25,"Power tools"],["SILENCER-1/4\"",10.0,"NOS",210.0,"General"],["THERMOCOUPLE-TYPE-K",1.0,"NOS",2660.0,"Furnace & HT"],["SOLENOID VALVE-1/4\"",12.0,"NOS",6333.33,"Hydraulic & pneumatic"],["SOCKET-6 AMP SODIUM HYPOCHLORITE FOR RO PLANT",20.0,"LTR",75.0,"Electrical"],["PULLEY-4\"X4 SLOTS-C GROOVE",3.0,"NOS",680.0,"Belts & drives"],["PULLEY-9\"X3 SLOTS-B GROOVE",1.0,"NOS",900.0,"Belts & drives"],["COUPLING-L100 SPIDER FOR COUPLING SPIL SAND ROLLER 'Y' SHAPE FOR ROLLOVER SPIL SAND ROLLER STRIGHT FOR ROLLOVER",3.0,"NOS",657.0,"Belts & drives"],["SPROCKET-5/8\"X19 TEETH FOR 5T H/T F/C",2.0,"NOS",441.76,"Belts & drives"],["BALL VALVE-3/8\"",2.0,"NOS",280.0,"Hydraulic & pneumatic"],["ELECTRODE (GRADE-308)-3.15MM",1.0,"PKT",1060.0,"General"],["PIPE-3'X1/2\" SS JUBILEE CLAMP-1\"",17.0,"NOS",25.0,"Electrical"],["SS JUBILEE CLAMP-1 1/2\" SS JUBILEE CLAMP-1/2\"",21.0,"NOS",22.0,"Electrical"],["SS JUBILEE CLAMP-2\" SS JUBILEE CLAMP-3\"",15.0,"NOS",35.0,"Electrical"],["SS JUBILEE CLAMP-6\"",110.0,"NOS",67.95,"Electrical"],["SS JUBLIEE CLAMP-3/4''",31.0,"NOS",36.77,"Electrical"],["SS JUIBLEE CLAMP-1\"",1.0,"NOS",46.0,"Electrical"],["ROPE-16MM",55.0,"MTR",190.0,"Belts & drives"],["ROPE-6MM",200.0,"MTR",55.0,"Belts & drives"],["ROPE-8MM",45.0,"MTR",100.0,"Belts & drives"],["KIT-33 KV GRADE 3 CORE X 300 SQMM STRIP BAR STRUCTURAL BAR",82.0,"KGS",58.0,"General"],["BOLT 9mmX90mm (Copper) STUD ROD SS 310 STUD SS 310 STUD SS 310- 350MM",15.0,"NOS",70.0,"General"],["FUSE UNIT-125 AMP",2.0,"NOS",6332.25,"Electrical"],["FUSE UNIT - 630 AMP SWIVEL FLANGECLEVIS FOOT BRACKET SYNDANIO SHEET-100X100X15 MM",10.0,"NOS",550.0,"Electrical"],["OIL TDS METER (TOTAL DISSOLVED SOLIDS METER)",1.0,"NOS",1200.0,"Lubricants"],["CABLE-2 CORE TEFLON ROD-25MM DIA TEFLON ROD-35MM DIA",1.0,"NOS",650.0,"Electrical"],["TEFLON ROD-50MM DIA",2.0,"NOS",860.0,"General"],["GAUGE-0-100-1/2\" BSP",1.0,"NOS",335.58,"General"],["TEMPERATURE SANSOR-175F (80 C)",8.0,"NOS",346.8,"General"],["SENSOR-125DEG-0812001",20.0,"NOS",985.0,"Electrical"],["SWITCH-L6190B2022U001",7.0,"NOS",3082.84,"Electrical"],["TEMPURATURE CONTROLLER FOR HEAT TREATMENT FURNACE NO - 3 TERMINAL",12.0,"NOS",32.58,"Furnace & HT"],["TERMINAL CONNECTOR-16MM",20.0,"NOS",48.0,"Electrical"],["TERMINAL CONNECTOR-6MM",24.0,"NOS",20.0,"Electrical"],["BEARING-51206",13.0,"NOS",617.85,"Bearings"],["PIN-6716601 (BOBCAT",1.0,"NOS",2843.02,"Bobcat"],["TIMER-110V-800XA",2.0,"NOS",560.0,"Electrical"],["BELT",3.0,"NOS",404.17,"Belts & drives"],["PULLEY",3.0,"NOS",600.0,"Belts & drives"],["TIP HOLDER",5.0,"NOS",675.0,"General"],["TUBE-7257830 FOR CHIPPING HAMMER",9.0,"NOS",245.73,"General"],["TUBE FOR BOBCAT TV REMOTE TYRE FOR BOBCAT-10-16.5/10 PRHAXD (TUBELESS) TYRE PUNCTURE REPAIRE LIQUID TYRE PUNCTURE REPAIRE STICKER UNSLOTTED C-CHANEL UPPER VALVE CASE LID-D5062830",5.0,"NOS",667.87,"Bobcat"],["V BELT-A-28",2.0,"NOS",93.0,"Belts & drives"],["V BELT-A-71",2.0,"NOS",231.0,"Belts & drives"],["V BELT-A-72",1.0,"NOS",130.8,"Belts & drives"],["V BELT-B-127",1.0,"NOS",542.39,"Belts & drives"],["V-BELT-B-134",2.0,"NOS",670.0,"Belts & drives"],["V BELT-B-36",3.0,"NOS",180.0,"Belts & drives"],["V BELT-B-60",2.0,"NOS",300.0,"Belts & drives"],["V BELT-B-64",2.0,"NOS",175.0,"Belts & drives"],["V BELT-B-68",4.0,"NOS",340.0,"Belts & drives"],["V BELT-B-90",4.0,"NOS",441.0,"Belts & drives"],["V BELT-B-92",2.0,"NOS",415.0,"Belts & drives"],["V BELT-C-67",2.0,"NOS",420.0,"Belts & drives"],["V BELT-C-71",2.0,"NOS",453.0,"Belts & drives"],["V BELT-SPB-3350",1.0,"NOS",900.0,"Belts & drives"],["WASHER-742640 (BOBCAT) WASTE CLOTH WATER COOLED LEAD-24 NO-12 1/2 FT FOR 3 TON FURNACE",1.0,"NOS",37766.0,"Bobcat"],["HOSE (FORKLIFT) WATER QUALITY TESTER/PH METER W.C.LEAD 16 NO. 10FT (1/2 T FURNACE)",1.0,"NOS",16264.0,"Furnace & HT"],["ELECTRODE COBLARC MX-6.3 MM",6.0,"KGS",3116.0,"General"],["WHEEL FOR TROLLEY",6.0,"NOS",160.0,"Belts & drives"],["WELDING M/C",2.0,"NOS",1275.0,"General"],["WIRE MESH-2MTR X 2MTR FOR RECLAIMATION TOWER WOOD GUTKA W.W. GFL RESISTOR-12 OHM-300W",1.0,"NOS",1933.0,"Electrical"],["W.W. RESISTOR-10 K-250W-FRES005067 (INDUCTOTHERM)",3.0,"NOS",1820.0,"Furnace & HT"],["WW RESISTOR-10 OHM-250W",1.0,"NOS",1153.0,"General"],["CI-20MM",1.0,"NOS",330.0,"General"]];
+
+/* ======================= STORE (shared db when opened in Claude, else this device) ======================= */
+const COLLS=['breakdowns','sourcing','machines','stock','jobcards','dtmanual','acks','config'];
+const LSKEY='datre-maint-desk-v1';
+const S={};COLLS.forEach(c=>S[c]={});
+let DB=null, MODE='local', READONLY=false;
+const hasLS=(()=>{try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return true}catch(e){return false}})();
+function lsLoad(){if(!hasLS)return;try{const j=JSON.parse(localStorage.getItem(LSKEY)||'null');if(j)COLLS.forEach(c=>S[c]=j[c]||{})}catch(e){}}
+function lsSave(){if(!hasLS||MODE!=='local')return;try{localStorage.setItem(LSKEY,JSON.stringify(S))}catch(e){toast('Could not save on this device — storage is full or blocked')}}
+function pref(k,v){if(!hasLS)return v===undefined?null:undefined;try{if(v===undefined)return localStorage.getItem('dmd-'+k);localStorage.setItem('dmd-'+k,v)}catch(e){return null}}
+async function put(c,id,obj){
+  if(READONLY){toast('You have view-only access');return}
+  obj.updatedAt=Date.now();obj.updatedBy=me();S[c][id]=obj;render();
+  if(DB){try{await DB.collection(c).doc(id).set(obj)}catch(e){if(e&&e.code==='invalid_argument'){READONLY=true;toast('You have view-only access to the shared data')}else toast('Not saved to shared store ('+(e&&e.code||'error')+'). Check connection and retry.')}}
+  else lsSave();
+}
+async function del(c,id){
+  if(READONLY){toast('You have view-only access');return}
+  delete S[c][id];render();
+  if(DB){try{await DB.collection(c).doc(id).delete()}catch(e){toast('Delete failed ('+(e&&e.code||'error')+')')}}else lsSave();
+}
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+/* ======================= HELPERS ======================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const dstr=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const today=()=>dstr(new Date());
+const parseD=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fmtD=s=>{if(!s)return'—';const d=typeof s==='number'?new Date(s):parseD(String(s).slice(0,10));return pad(d.getDate())+'-'+MON[d.getMonth()]+'-'+String(d.getFullYear()).slice(2)};
+const fmtDT=t=>{if(!t)return'—';const d=new Date(t);return fmtD(t)+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+const hrs=h=>h==null?'—':(h<10?h.toFixed(1):Math.round(h).toString());
+const inr=v=>v==null?'—':'₹'+Math.round(v).toLocaleString('en-IN');
+const nowLocalInput=(t)=>{const d=t?new Date(t):new Date();return dstr(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes())};
+const fromInput=s=>s?new Date(s).getTime():null;
+function fyMonths(){const t=new Date();const y=t.getMonth()>=3?t.getFullYear():t.getFullYear()-1;const a=[];for(let i=0;i<12;i++){const d=new Date(y,3+i,1);a.push(d.getFullYear()+'-'+pad(d.getMonth()+1))}return a}
+const ymLabel=ym=>{const[y,m]=ym.split('-');return MON[+m-1]+'-'+y.slice(2)};
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+const riskCls=r=>({CRITICAL:'p-crit',HIGH:'p-warn',WATCH:'p-warn',MEDIUM:'p-info',LOW:'p-ok',OK:'p-ok'}[r]||'');
+const statusCls=s=>({Running:'p-ok',Watch:'p-warn',Breakdown:'p-crit','Under PM':'p-info',Idle:''}[s]||'');
+const hcol=h=>h==null?'var(--line)':h<30?'var(--crit)':h<50?'var(--warn)':h<70?'var(--info)':'var(--ok)';
+
+/* ======================= CONFIG ======================= */
+const DEFAULT_CFG={team:[
+  {id:'t1',n:'Pallab Haldar',role:'Maintenance Manager',d:'ALL'},
+  {id:'t2',n:'Mech Technician 1',role:'Technician',d:'M'},
+  {id:'t3',n:'Mech Technician 2',role:'Technician',d:'M'},
+  {id:'t4',n:'Elec Technician 1',role:'Technician',d:'E'},
+  {id:'t5',n:'Elec Technician 2',role:'Technician',d:'E'}],
+  shiftHrs:16, mailTo:'maintenancedatre@datre.com, monotosh.roy@datre.com, indranil.dutta@datre.com'};
+const cfg=()=>Object.assign({},DEFAULT_CFG,S.config.main||{});
+const team=()=>cfg().team;
+function me(){return pref('me')||team()[0].n}
+
+/* ======================= DERIVED STATE ======================= */
+const OPEN_ST=['Reported','Attending','Waiting for spares','Under trial'];
+const openBD=()=>Object.values(S.breakdowns).filter(b=>b.status!=='Closed').sort((a,b)=>b.start-a.start);
+function mStatus(id){
+  const bds=openBD().filter(b=>b.m===id);
+  if(bds.some(b=>b.stopped))return'Breakdown';
+  const rec=S.machines[id];
+  if(rec&&rec.status&&rec.status!=='Breakdown')return rec.status;
+  if(bds.length||WATCH_DEFAULT[id])return'Watch';
+  return'Running';
+}
+function mNote(id){const rec=S.machines[id];if(rec&&rec.note)return rec.note;return WATCH_DEFAULT[id]||''}
+// Downtime hours per machine per YYYY-MM from breakdowns (machine stopped) + manual entries
+function downtime(){
+  const out={};const add=(m,ym,h)=>{out[m]=out[m]||{};out[m][ym]=(out[m][ym]||0)+h};
+  Object.values(S.breakdowns).forEach(b=>{
+    if(!b.stopped||!b.start)return;let s=b.start;const e=b.end||Date.now();if(e<=s)return;
+    while(s<e){const d=new Date(s);const nx=new Date(d.getFullYear(),d.getMonth()+1,1).getTime();const seg=Math.min(e,nx);add(b.m,d.getFullYear()+'-'+pad(d.getMonth()+1),(seg-s)/36e5);s=seg}
+  });
+  Object.values(S.dtmanual).forEach(r=>{if(r.h)add(r.m,r.ym,+r.h)});
+  return out;
+}
+function workDays(ym){const[y,m]=ym.split('-').map(Number);const n=new Date(y,m,0).getDate();let c=0;for(let i=1;i<=n;i++)if(new Date(y,m-1,i).getDay()!==0)c++;return c}
+
+/* ----- PM schedule ----- */
+const TASKS=[];// {id,m,d,f,n,text}
+MACHINES.forEach((m,i)=>{const src=PM_SRC[PM_MAP[m.id]];if(!src)return;['M','E'].forEach(d=>{if(!src[d])return;['D','W','M'].forEach(f=>{(src[d][f]||[]).forEach((t,k)=>TASKS.push({id:m.id+'.'+d+'.'+f+'.'+(k+1),m:m.id,mi:i,d,f,text:t}))})})});
+const weeklyDay=i=>(i%6)+1; // Mon..Sat staggered
+function monthlyDate(i,y,mo){let day=2+((i*3)%25);let d=new Date(y,mo,day);if(d.getDay()===0)d=new Date(y,mo,day+1);return d.getDate()}
+function dueOn(ds,disc){
+  const d=parseD(ds);if(d.getDay()===0)return[];
+  return TASKS.filter(t=>(!disc||disc==='ALL'||t.d===disc)&&(t.f==='D'||(t.f==='W'&&d.getDay()===weeklyDay(t.mi))||(t.f==='M'&&d.getDate()===monthlyDate(t.mi,d.getFullYear(),d.getMonth()))));
+}
+function ticksOn(ds){const r={};Object.values(S.jobcards).forEach(j=>{if(j.date!==ds)return;Object.entries(j.ticks||{}).forEach(([k,v])=>{if(!r[k]||v.s==='nok')r[k]=Object.assign({by:j.tech},v)})});return r}
+function pmStats(ds,disc){const due=dueOn(ds,disc);const tk=ticksOn(ds);let done=0,nok=0;due.forEach(t=>{if(tk[t.id]){done++;if(tk[t.id].s==='nok')nok++}});return{due:due.length,done,nok}}
+
+/* ----- Spares ----- */
+function stockOf(c){const ov=S.stock['crit_'+c.k];if(ov&&ov.q!=null)return{q:+ov.q,src:'Updated '+fmtD(ov.updatedAt)};const hits=SPARES.filter(s=>c.re.test(s[0]));if(!hits.length)return{q:0,src:'Not found in stores list',missing:true};return{q:hits.reduce((a,s)=>a+s[1],0),src:'Stores list 02-Oct-26'}}
+function spareQty(i){const ov=S.stock['s'+i];return ov&&ov.q!=null?+ov.q:SPARES[i][1]}
+
+/* ----- Alerts ----- */
+function alerts(){
+  const A=[];const now=Date.now();
+  openBD().forEach(b=>{const m=MBY[b.m];const age=(now-b.start)/36e5;const crit=b.stopped||b.prio==='Critical';
+    A.push({k:'bd_'+b.id+'_'+b.status,sev:crit?'crit':'warn',t:(b.stopped?'Breakdown: ':'Defect: ')+m.n,d:b.sym+' · '+b.status+' · '+(age<48?hrs(age)+' h':Math.floor(age/24)+' days')+' open',go:()=>bdSheet(b.id)})});
+  const td=today();const yd=dstr(new Date(Date.now()-864e5));
+  Object.values(S.jobcards).forEach(j=>{if(j.date<dstr(new Date(Date.now()-7*864e5)))return;Object.entries(j.ticks||{}).forEach(([k,v])=>{if(v.s!=='nok'||v.raised)return;const t=TASKS.find(x=>x.id===k);if(!t)return;A.push({k:'nok_'+j.id+'_'+k,sev:'crit',t:'NOT OK: '+MBY[t.m].n,d:t.text+(v.r?' — '+v.r:'')+' · '+j.tech+' · '+fmtD(j.date),go:()=>newBD({m:t.m,d:t.d,sym:t.text+' — NOT OK',desc:v.r||'',fromTick:{jc:j.id,task:k}})})})});
+  const ys=pmStats(yd);if(parseD(yd).getDay()!==0&&ys.due&&ys.done<ys.due)A.push({k:'pm_'+yd,sev:'warn',t:'PM checks missed yesterday',d:(ys.due-ys.done)+' of '+ys.due+' checks not ticked on '+fmtD(yd),go:()=>go('pm')});
+  const h=new Date().getHours();const ts=pmStats(td);if(h>=14&&ts.due&&ts.done<ts.due*0.5)A.push({k:'pmt_'+td,sev:'warn',t:'Today\'s PM behind',d:ts.done+' of '+ts.due+' checks done by '+h+':00',go:()=>go('job')});
+  CRIT.forEach(c=>{const st=stockOf(c);if(st.q<c.min){const src=Object.values(S.sourcing).find(s=>s.crit===c.k&&s.stage!=='Received');A.push({k:'low_'+c.k+'_'+st.q,sev:c.pr==='IMMEDIATE'?'crit':'warn',t:'Low stock: '+c.n,d:'Stock '+st.q+' / min '+c.min+' '+c.u+' · '+MBY[c.m].n+(st.missing?' · not in stores list':'')+(src?' · on order ('+src.stage+')':' · no indent yet'),go:()=>{go('spares')}})}});
+  Object.values(S.sourcing).forEach(s=>{if(s.stage==='Received'||!s.eta)return;if(s.eta<td)A.push({k:'eta_'+s.id+'_'+s.eta,sev:'warn',t:'Sourcing overdue: '+s.item,d:'ETA was '+fmtD(s.eta)+' · '+s.stage+(s.vendor?' · '+s.vendor:''),go:()=>srcSheet(s.id)})});
+  MACHINES.forEach(m=>['M','E'].forEach(d=>{const p=m[d];if(p&&p.h!=null&&p.h<25)A.push({k:'hl_'+m.id+d,sev:'warn',t:'Health '+p.h+'/100: '+m.n+' ('+(d==='M'?'Mech':'Elec')+')',d:'Predicted driver: '+p.drv+' → '+p.act,go:()=>mSheet(m.id)})}));
+  const ord={crit:0,warn:1,info:2};A.sort((a,b)=>ord[a.sev]-ord[b.sev]);
+  A.forEach(a=>a.ack=S.acks[a.k]);
+  return A;
+}
+
+/* ======================= TABS ======================= */
+const TABS=[['home','Today'],['machines','Machines'],['bd','Breakdowns'],['job','Job Card'],['pm','PM Plan'],['spares','Spares'],['src','Sourcing'],['dt','Downtime'],['report','Daily Update'],['setup','Setup']];
+let TAB=(()=>{const h=(location.hash||'').slice(1);return TABS.some(t=>t[0]===h)?h:(pref('tab')||'home')})();
+function go(t){TAB=t;pref('tab',t);render();window.scrollTo(0,0)}
+function renderTabs(){
+  const al=alerts().filter(a=>!a.ack&&a.sev==='crit').length;const ob=openBD().length;
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button role="tab" aria-selected="${k===TAB}" data-t="${k}">${l}${k==='home'&&al?`<span class="cnt">${al}</span>`:''}${k==='bd'&&ob?`<span class="cnt">${ob}</span>`:''}</button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>go(b.dataset.t));
+}
+function renderMe(){const sel=$('#me');const cur=me();sel.innerHTML=team().map(t=>`<option ${t.n===cur?'selected':''}>${esc(t.n)}</option>`).join('');}
+$('#me').onchange=e=>{pref('me',e.target.value);toast('Using the app as '+e.target.value)};
+$('#fab').onclick=()=>newBD({});
+
+let renderQueued=false;
+function render(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;doRender()})}
+function doRender(){
+  renderTabs();renderMe();
+  $('#sync').textContent=MODE==='shared'?(READONLY?'Shared · view only':'Shared · live for the team'):'Saved on this device';
+  const fn={home:vHome,machines:vMachines,bd:vBD,job:vJob,pm:vPM,spares:vSpares,src:vSrc,dt:vDT,report:vReport,setup:vSetup}[TAB];
+  const main=$('#main');const keep=document.activeElement&&main.contains(document.activeElement)&&document.activeElement.id;const val=keep&&document.activeElement.value;
+  ALIDX.length=0;main.innerHTML='<div class="pane">'+fn()+'</div>';
+  bind[TAB]&&bind[TAB]();
+  if(keep){const el=document.getElementById(keep);if(el){el.focus();if(val!=null&&el.value!==val)el.value=val;try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
+}
+const bind={};
+
+/* ----- TODAY ----- */
+function vHome(){
+  const td=today();const st=MACHINES.map(m=>mStatus(m.id));const c=k=>st.filter(s=>s===k).length;
+  const ps=pmStats(td);const dt=downtime();const ym=td.slice(0,7);let mtd=0;Object.values(dt).forEach(r=>mtd+=r[ym]||0);
+  const al=alerts();const open=al.filter(a=>!a.ack),acked=al.filter(a=>a.ack);
+  const d=new Date();
+  return `<div class="spread"><div><div class="lbl">${DOW[d.getDay()]} · ${fmtD(td)}</div><h2>Plant maintenance today</h2></div>
+   <div class="row noprint"><button class="btn sm" data-go="report">Send daily update</button></div></div>
+  <div class="kpis">
+   <button class="kpi ok" data-go="machines"><span class="lbl">Running</span><span class="v">${c('Running')}</span><span class="small muted">of ${MACHINES.length} machines</span></button>
+   <button class="kpi ${c('Breakdown')?'crit':''}" data-go="bd"><span class="lbl">Breakdown</span><span class="v">${c('Breakdown')}</span><span class="small muted">${openBD().length} open job${openBD().length===1?'':'s'}</span></button>
+   <button class="kpi ${c('Watch')?'warn':''}" data-go="machines"><span class="lbl">On watch</span><span class="v">${c('Watch')}</span><span class="small muted">defect or flagged</span></button>
+   <button class="kpi" data-go="job"><span class="lbl">PM checks today</span><span class="v">${ps.done}<span class="small muted">/${ps.due}</span></span><span class="small muted">${ps.nok} NOT OK</span></button>
+   <button class="kpi" data-go="dt"><span class="lbl">Downtime ${MON[d.getMonth()]}</span><span class="v">${hrs(mtd)}<span class="small muted"> h</span></span><span class="small muted">month to date</span></button>
+  </div>
+  <div class="big-actions noprint">
+   <button class="btn danger" data-act="bd">Report breakdown</button>
+   <button class="btn pri" data-go="job">Open my job card</button>
+   <button class="btn" data-go="machines">Update machine status</button>
+   <button class="btn" data-act="indent">Raise spare indent</button>
+  </div>
+  <div class="grid2">
+   <section class="panel"><div class="spread"><h3>Alerts</h3><span class="small muted">Tick ✓ to acknowledge</span></div>
+    <div class="list">${open.length?open.map(alertRow).join(''):'<div class="empty">No open alerts. Good shift.</div>'}</div>
+    ${acked.length?`<details style="margin-top:10px"><summary class="small muted">${acked.length} acknowledged</summary><div class="list" style="margin-top:8px">${acked.map(alertRow).join('')}</div></details>`:''}
+   </section>
+   <section class="panel"><h3>Open breakdowns & defects</h3><div class="list">${openBD().length?openBD().map(bdRow).join(''):'<div class="empty">No open breakdowns. Use “Report breakdown” when a machine stops.</div>'}</div></section>
+  </div>`;
+}
+const ALIDX=[];
+function alertRow(a){const i=ALIDX.push(a)-1;return `<div class="item s-${a.sev} ${a.ack?'acked':''}"><span class="stripe"></span><div class="body" data-al="${i}" style="cursor:pointer"><div class="t">${esc(a.t)}</div><div class="d">${esc(a.d)}${a.ack?' · ✓ '+esc(a.ack.by)+' '+fmtDT(a.ack.at):''}</div></div>
+ <button class="btn sm ${a.ack?'ghost':''}" data-ack="${i}" aria-label="Acknowledge">${a.ack?'Undo':'✓ Ack'}</button></div>`}
+function bindCommon(){
+  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  document.querySelectorAll('[data-al]').forEach(b=>b.onclick=()=>ALIDX[b.dataset.al].go());
+  document.querySelectorAll('[data-ack]').forEach(b=>b.onclick=()=>{const a=ALIDX[b.dataset.ack];if(a.ack)del('acks',a.k);else put('acks',a.k,{by:me(),at:Date.now()})});
+  document.querySelectorAll('[data-bd]').forEach(b=>b.onclick=()=>bdSheet(b.dataset.bd));
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>mSheet(b.dataset.m));
+  document.querySelectorAll('[data-act=bd]').forEach(b=>b.onclick=()=>newBD({}));
+  document.querySelectorAll('[data-act=indent]').forEach(b=>b.onclick=()=>srcSheet(null,{}));
+}
+bind.home=bindCommon;
+
+/* ----- MACHINES ----- */
+let mFilter=pref('mf')||'All', mView=pref('mv')||'cards', mDisc='M';
+function vMachines(){
+  const areas=['All',...new Set(MACHINES.map(m=>m.a))];
+  const list=MACHINES.filter(m=>mFilter==='All'||m.a===mFilter);
+  const head=`<div class="spread"><h2>Machine health</h2><div class="seg" role="group">${[['cards','Status board'],['pred','Predictive actions']].map(([k,l])=>`<button aria-pressed="${mView===k}" data-mv="${k}">${l}</button>`).join('')}</div></div>
+  <div class="row"><select id="mfilter" style="max-width:220px" aria-label="Area">${areas.map(a=>`<option ${a===mFilter?'selected':''}>${a}</option>`).join('')}</select>
+  <span class="small muted">Tap a machine to change status, log a reading or pick a predictive action.</span></div>`;
+  if(mView==='pred'){
+    return head+`<div class="seg">${[['M','Mechanical'],['E','Electrical']].map(([k,l])=>`<button aria-pressed="${mDisc===k}" data-md="${k}">${l}</button>`).join('')}</div>
+    <div class="tblwrap"><table><thead><tr><th>Equipment</th><th>Area</th><th>Risk</th><th class="n">Health</th><th>Predicted failure driver</th><th>Next recommended action</th><th>Act</th></tr></thead><tbody>
+    ${list.filter(m=>m[mDisc]).sort((a,b)=>(a[mDisc].h??101)-(b[mDisc].h??101)).map(m=>{const p=m[mDisc];return `<tr><td><b>${esc(m.n)}</b></td><td>${m.a}</td><td><span class="pill ${riskCls(p.risk)}">${p.risk}</span></td><td class="n">${p.h??'—'}</td><td>${esc(p.drv)}</td><td>${esc(p.act)}</td><td><button class="btn sm" data-m="${m.id}">Open</button></td></tr>`}).join('')}
+    </tbody></table></div><p class="small muted">Health index = 100 − priority score (source risk + discipline exposure + open issue + spare priority). Bands: Critical ≥70 priority, High 50–69. Source: Predictive Maintenance Mech/Elect dashboard, Aug-2026.</p>`;
+  }
+  return head+`<div class="mgrid">${list.map(m=>{const s=mStatus(m.id);const note=mNote(m.id);const ob=openBD().filter(b=>b.m===m.id);
+   return `<button class="mcard st-${s.replace(' ','')}" data-m="${m.id}"><div class="spread"><span class="nm">${esc(m.n)}</span><span class="pill ${statusCls(s)}">${s}</span></div>
+   <span class="small muted">${m.a}${ob.length?' · '+ob.length+' open job'+(ob.length>1?'s':''):''}</span>
+   ${['M','E'].map(d=>m[d]?`<div class="hrow"><span>${d==='M'?'Mech':'Elec'}</span><span class="hbar"><i style="width:${m[d].h??0}%;background:${hcol(m[d].h)}"></i></span><span class="num">${m[d].h??'—'}</span></div>`:'').join('')}
+   ${note?`<span class="small" style="color:var(--warn)">${esc(note)}</span>`:''}</button>`}).join('')}</div>`;
+}
+bind.machines=()=>{bindCommon();
+  $('#mfilter').onchange=e=>{mFilter=e.target.value;pref('mf',mFilter);render()};
+  document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{mView=b.dataset.mv;pref('mv',mView);render()});
+  document.querySelectorAll('[data-md]').forEach(b=>b.onclick=()=>{mDisc=b.dataset.md;render()});
+};
+
+/* ----- SHEET ----- */
+function sheet(title,html,mount){
+  closeSheet();const bg=document.createElement('div');bg.className='sheet-bg';bg.id='sheet';
+  bg.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="sheet-h"><h3>${esc(title)}</h3><button class="btn sm ghost" id="sx">Close</button></div>${html}</div>`;
+  document.body.appendChild(bg);bg.addEventListener('click',e=>{if(e.target===bg)closeSheet()});$('#sx').onclick=closeSheet;
+  document.addEventListener('keydown',escClose);mount&&mount(bg);
+}
+function escClose(e){if(e.key==='Escape')closeSheet()}
+function closeSheet(){const s=$('#sheet');if(s)s.remove();document.removeEventListener('keydown',escClose)}
+
+function predOpts(mid,d){return [...((PRED[mid]||{})[d]||[]),...GEN[d]]}
+function mSheet(id){
+  const m=MBY[id];const s=mStatus(id);const rec=S.machines[id]||{};
+  const hist=Object.values(S.breakdowns).filter(b=>b.m===id).sort((a,b)=>b.start-a.start).slice(0,6);
+  const dt=downtime()[id]||{};const fy=fyMonths().reduce((a,ym)=>a+(dt[ym]||0),0);
+  const html=`<div class="form">
+   <div class="row"><span class="pill ${statusCls(s)}">${s}</span><span class="small muted">${m.a} · FY downtime ${hrs(fy)} h${m.dt?` · history avg ${m.dt} h/yr, ${m.bd} breakdowns/yr`:''}${m.spend?` · FY25-26 spares ${inr(m.spend)}`:''}</span></div>
+   <div><div class="lbl">Set status</div><div class="seg" id="mst">${['Running','Watch','Under PM','Idle'].map(x=>`<button aria-pressed="${s===x}" data-v="${x}">${x}</button>`).join('')}</div>
+   <p class="small muted">A breakdown with “machine stopped” sets status to Breakdown automatically until it is closed.</p></div>
+   <label class="f">Status note / condition reading<input type="text" id="mnote" value="${esc(rec.note||'')}" placeholder="e.g. Bearing temp 64 °C, oil top-up 15 L this month"></label>
+   <button class="btn" id="msave">Save note</button>
+   ${['M','E'].filter(d=>m[d]).map(d=>`<div class="panel"><div class="spread"><b>${d==='M'?'Mechanical':'Electrical'}</b><span class="pill ${riskCls(m[d].risk)}">${m[d].risk}${m[d].h!=null?' · health '+m[d].h:''}</span></div>
+     <p class="small muted" style="margin:6px 0">Likely failure: ${esc(m[d].drv)}<br>Planned action: ${esc(m[d].act)}</p>
+     <label class="f">What are you seeing?<select id="ps${d}"><option value="">Select a symptom…</option>${predOpts(id,d).map((o,i)=>`<option value="${i}">${esc(o.s)}</option>`).join('')}</select></label>
+     <div id="pa${d}"></div></div>`).join('')}
+   <div><div class="lbl">Recent jobs</div><div class="list" style="margin-top:6px">${hist.length?hist.map(bdRow).join(''):'<div class="empty">No breakdowns logged yet.</div>'}</div></div>
+   <div class="row"><button class="btn danger" id="mbd">Report breakdown on ${esc(m.n)}</button></div></div>`;
+  sheet(m.n,html,()=>{
+    document.querySelectorAll('#mst button').forEach(b=>b.onclick=()=>{put('machines',id,Object.assign({},S.machines[id]||{},{status:b.dataset.v}));document.querySelectorAll('#mst button').forEach(x=>x.setAttribute('aria-pressed',x===b));toast(m.n+' set to '+b.dataset.v)});
+    $('#msave').onclick=()=>{put('machines',id,Object.assign({},S.machines[id]||{status:s==='Breakdown'?'Running':s},{note:$('#mnote').value.trim()}));toast('Note saved')};
+    $('#mbd').onclick=()=>newBD({m:id});
+    document.querySelectorAll('#sheet [data-bd]').forEach(b=>b.onclick=()=>bdSheet(b.dataset.bd));
+    ['M','E'].forEach(d=>{const sel=$('#ps'+d);if(!sel)return;sel.onchange=()=>{const o=predOpts(id,d)[sel.value];const box=$('#pa'+d);if(!o){box.innerHTML='';return}
+      const c=o.sp&&CRIT.find(x=>x.n===o.sp);const st=c&&stockOf(c);
+      box.innerHTML=`<div class="advice" style="margin-top:8px"><div class="spread"><b>Recommended action</b><span class="pill ${riskCls(o.u)}">${o.u}</span></div><p style="margin:6px 0">${esc(o.a)}</p>${c?`<p class="small" style="margin:0">Spare: ${esc(c.n)} — stock <b>${st.q}</b> / min ${c.min} ${c.u}</p>`:''}</div>
+       <div class="row" style="margin-top:8px"><button class="btn sm danger" id="pb${d}">Log as defect / breakdown</button>${c?`<button class="btn sm" id="pi${d}">Raise indent</button>`:''}</div>`;
+      $('#pb'+d).onclick=()=>newBD({m:id,d,sym:o.s,desc:'Recommended: '+o.a,prio:o.u==='CRITICAL'?'Critical':'High'});
+      if(c)$('#pi'+d).onclick=()=>srcSheet(null,{item:c.n,m:id,crit:c.k,qty:Math.max(c.min-st.q,1)+' '+c.u,prio:c.pr==='IMMEDIATE'?'Critical':'High'});
+    }});
+  });
+}
+
+/* ----- BREAKDOWNS ----- */
+const BD_ST=['Reported','Attending','Waiting for spares','Under trial','Closed'];
+const ROOT=['Wear & tear','Lubrication failure','Electrical fault','Hydraulic / seal failure','Operator error','Spare quality','Overload','Design / installation','Other'];
+let bdFilter='open';
+function bdDur(b){if(!b.start)return 0;return((b.end||Date.now())-b.start)/36e5}
+function bdRow(b){const m=MBY[b.m]||{n:b.m};const sev=b.status==='Closed'?'ok':b.stopped?'crit':'warn';
+ return `<div class="item s-${sev}" data-bd="${b.id}" style="cursor:pointer"><span class="stripe"></span><div class="body"><div class="t">${esc(m.n)} <span class="small muted">· ${b.d==='E'?'Elec':'Mech'}</span></div><div class="d">${esc(b.sym)}${b.assigned?' · '+esc(b.assigned):''}</div><div class="d">${fmtDT(b.start)}${b.stopped?' · down '+hrs(bdDur(b))+' h':' · running with defect'}</div></div><span class="pill ${b.status==='Closed'?'p-ok':b.status==='Waiting for spares'?'p-acc':b.stopped?'p-crit':'p-warn'}">${b.status}</span></div>`}
+function vBD(){
+  const all=Object.values(S.breakdowns).sort((a,b)=>b.start-a.start);
+  const list=bdFilter==='open'?all.filter(b=>b.status!=='Closed'):bdFilter==='closed'?all.filter(b=>b.status==='Closed'):all;
+  const cl=all.filter(b=>b.status==='Closed'&&b.stopped&&b.end);const mttr=cl.length?cl.reduce((a,b)=>a+bdDur(b),0)/cl.length:null;
+  return `<div class="spread"><h2>Breakdowns & defects</h2><button class="btn danger" data-act="bd">+ Report breakdown</button></div>
+  <div class="row"><div class="seg">${[['open','Open'],['closed','Closed'],['all','All']].map(([k,l])=>`<button aria-pressed="${bdFilter===k}" data-bf="${k}">${l}</button>`).join('')}</div>
+  <span class="small muted">${all.filter(b=>b.status!=='Closed').length} open · ${cl.length} closed with downtime${mttr!=null?' · MTTR '+hrs(mttr)+' h':''}</span></div>
+  <div class="list">${list.length?list.map(bdRow).join(''):'<div class="empty">Nothing here yet. Report a breakdown from the red button; it starts the downtime clock.</div>'}</div>`;
+}
+bind.bd=()=>{bindCommon();document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{bdFilter=b.dataset.bf;render()})};
+
+function newBD(pre){
+  const mOpts=MACHINES.map(m=>`<option value="${m.id}" ${pre.m===m.id?'selected':''}>${esc(m.n)} — ${m.a}</option>`).join('');
+  const techs=team().map(t=>`<option>${esc(t.n)}</option>`).join('');
+  const html=`<form class="form" id="bdf">
+   <label class="f">Machine<select id="bm" required><option value="">Select machine…</option>${mOpts}</select></label>
+   <div class="two"><div><div class="lbl">Type</div><div class="seg" id="bdd">${[['M','Mechanical'],['E','Electrical']].map(([k,l])=>`<button type="button" aria-pressed="${(pre.d||'M')===k}" data-v="${k}">${l}</button>`).join('')}</div></div>
+   <div><div class="lbl">Is the machine stopped?</div><div class="seg" id="bds">${[['1','Yes — stopped'],['0','No — running']].map(([k,l])=>`<button type="button" aria-pressed="${(pre.stopped===false?'0':'1')===k}" data-v="${k}">${l}</button>`).join('')}</div></div></div>
+   <label class="f">Problem<select id="bsym"></select></label>
+   <label class="f" id="bsymo" hidden>Describe the problem<input type="text" id="bsymt" placeholder="Short description"></label>
+   <label class="f">Details / observation<textarea id="bdesc" placeholder="What happened, readings, location">${esc(pre.desc||'')}</textarea></label>
+   <div class="two"><label class="f">Start time<input type="datetime-local" id="bst" value="${nowLocalInput()}"></label>
+   <label class="f">Priority<select id="bpr">${['Critical','High','Medium','Low'].map(p=>`<option ${(pre.prio||'High')===p?'selected':''}>${p}</option>`).join('')}</select></label></div>
+   <div class="two"><label class="f">Reported by<select id="brb">${team().map(t=>`<option ${t.n===me()?'selected':''}>${esc(t.n)}</option>`).join('')}</select></label>
+   <label class="f">Assign to<select id="bas"><option value="">Not assigned</option>${techs}</select></label></div>
+   <button class="btn danger" type="submit">Report now</button></form>`;
+  sheet('Report breakdown',html,()=>{
+    let disc=pre.d||'M',stopped=pre.stopped!==false;
+    const fillSym=()=>{const mid=$('#bm').value;const opts=mid?predOpts(mid,disc).map(o=>o.s):GEN[disc].map(o=>o.s);if(pre.sym&&!opts.includes(pre.sym))opts.unshift(pre.sym);$('#bsym').innerHTML=opts.map(o=>`<option ${o===pre.sym?'selected':''}>${esc(o)}</option>`).join('')+'<option value="__o">Other (type it)</option>';$('#bsymo').hidden=$('#bsym').value!=='__o'};
+    fillSym();$('#bm').onchange=fillSym;$('#bsym').onchange=()=>$('#bsymo').hidden=$('#bsym').value!=='__o';
+    document.querySelectorAll('#bdd button').forEach(b=>b.onclick=()=>{disc=b.dataset.v;document.querySelectorAll('#bdd button').forEach(x=>x.setAttribute('aria-pressed',x===b));fillSym()});
+    document.querySelectorAll('#bds button').forEach(b=>b.onclick=()=>{stopped=b.dataset.v==='1';document.querySelectorAll('#bds button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+    $('#bdf').onsubmit=e=>{e.preventDefault();const mid=$('#bm').value;if(!mid){toast('Pick the machine first');return}
+      const sym=$('#bsym').value==='__o'?($('#bsymt').value.trim()||'Other'):$('#bsym').value;
+      const id=uid('bd');const asg=$('#bas').value;
+      put('breakdowns',id,{id,m:mid,d:disc,stopped,sym,desc:$('#bdesc').value.trim(),start:fromInput($('#bst').value)||Date.now(),prio:$('#bpr').value,by:$('#brb').value,assigned:asg,status:asg?'Attending':'Reported',log:[{t:Date.now(),by:me(),s:asg?'Attending':'Reported'}]});
+      if(pre.fromTick){const j=S.jobcards[pre.fromTick.jc];if(j){const nj=JSON.parse(JSON.stringify(j));nj.ticks[pre.fromTick.task].raised=id;put('jobcards',j.id,nj)}}
+      closeSheet();toast((stopped?'Breakdown':'Defect')+' reported on '+MBY[mid].n);
+    };
+  });
+}
+function bdSheet(id){
+  const b=S.breakdowns[id];if(!b)return;const m=MBY[b.m];
+  const html=`<div class="form">
+   <div class="row"><span class="pill ${b.stopped?'p-crit':'p-warn'}">${b.stopped?'Machine stopped':'Running with defect'}</span><span class="pill">${b.d==='E'?'Electrical':'Mechanical'}</span><span class="pill">${esc(b.prio||'')}</span></div>
+   <div><b>${esc(b.sym)}</b><p class="small muted" style="margin:4px 0">${esc(b.desc||'')}</p><p class="small muted" style="margin:0">Reported ${fmtDT(b.start)} by ${esc(b.by||'—')}${b.stopped?' · downtime '+hrs(bdDur(b))+' h':''}</p></div>
+   <div><div class="lbl">Status — tap to move</div><div class="stepper" id="bst">${BD_ST.map((s,i)=>{const ci=BD_ST.indexOf(b.status);return `<button type="button" class="${i<ci?'past':i===ci?'cur':''}" data-v="${s}">${s}</button>`}).join('')}</div></div>
+   <div class="two"><label class="f">Assigned to<select id="bas"><option value="">Not assigned</option>${team().map(t=>`<option ${t.n===b.assigned?'selected':''}>${esc(t.n)}</option>`).join('')}</select></label>
+   <label class="f">Machine stopped?<select id="bstp"><option value="1" ${b.stopped?'selected':''}>Yes</option><option value="0" ${!b.stopped?'selected':''}>No</option></select></label></div>
+   <label class="f">Spares needed / used<input type="text" id="bsp" value="${esc(b.spares||'')}" placeholder="e.g. Bearing 22216E ×2"></label>
+   <label class="f">Work done / update<textarea id="bwk">${esc(b.work||'')}</textarea></label>
+   <div class="two"><label class="f">Root cause<select id="brc"><option value="">—</option>${ROOT.map(r=>`<option ${r===b.root?'selected':''}>${r}</option>`).join('')}</select></label>
+   <label class="f">End time (when back in service)<input type="datetime-local" id="ben" value="${b.end?nowLocalInput(b.end):''}"></label></div>
+   <label class="f">Start time<input type="datetime-local" id="bstart" value="${nowLocalInput(b.start)}"></label>
+   <div class="row"><button class="btn pri" id="bsave">Save update</button>${b.status!=='Closed'?'<button class="btn" id="bclose">Close — machine back in service</button>':''}${b.spares&&b.status!=='Closed'?'<button class="btn" id="bind">Raise indent for spares</button>':''}<button class="btn ghost" id="bdel">Delete</button></div>
+   <div><div class="lbl">History</div><ul class="small muted" style="margin:6px 0;padding-left:18px">${(b.log||[]).map(l=>`<li>${fmtDT(l.t)} · ${esc(l.s)} · ${esc(l.by)}</li>`).join('')}</ul></div></div>`;
+  sheet(m.n,html,()=>{
+    let status=b.status;
+    document.querySelectorAll('#bst button').forEach(x=>x.onclick=()=>{status=x.dataset.v;const ci=BD_ST.indexOf(status);document.querySelectorAll('#bst button').forEach((y,i)=>y.className=i<ci?'past':i===ci?'cur':'');if(status==='Closed'&&!$('#ben').value)$('#ben').value=nowLocalInput()});
+    const save=(close)=>{const nb=JSON.parse(JSON.stringify(b));if(close){status='Closed';if(!$('#ben').value)$('#ben').value=nowLocalInput()}
+      if(status==='Closed'&&!$('#brc').value){toast('Pick a root cause before closing');return}
+      Object.assign(nb,{assigned:$('#bas').value,stopped:$('#bstp').value==='1',spares:$('#bsp').value.trim(),work:$('#bwk').value.trim(),root:$('#brc').value,start:fromInput($('#bstart').value)||b.start,end:status==='Closed'?fromInput($('#ben').value):(fromInput($('#ben').value)||null)});
+      if(nb.end&&nb.end<nb.start){toast('End time is before start time');return}
+      if(status!==b.status){nb.status=status;nb.log=(nb.log||[]).concat({t:Date.now(),by:me(),s:status})}
+      put('breakdowns',id,nb);closeSheet();toast(status==='Closed'?'Closed · downtime '+hrs(bdDur(nb))+' h':'Updated')};
+    $('#bsave').onclick=()=>save(false);
+    if($('#bclose'))$('#bclose').onclick=()=>save(true);
+    if($('#bind'))$('#bind').onclick=()=>srcSheet(null,{item:b.spares,m:b.m,bd:id,prio:b.prio});
+    let armed=false;$('#bdel').onclick=e=>{if(!armed){armed=true;e.target.textContent='Tap again to delete';e.target.classList.add('danger');return}del('breakdowns',id);closeSheet();toast('Deleted')};
+  });
+}
+
+/* ----- JOB CARD ----- */
+let jcDate=today(), jcTech=null;
+function techObj(){const n=jcTech||me();return team().find(t=>t.n===n)||team()[0]}
+function vJob(){
+  const t=techObj();const jid=jcDate+'_'+t.id;const jc=S.jobcards[jid]||{ticks:{}};
+  const disc=t.d==='ALL'?null:t.d;const due=dueOn(jcDate,disc);
+  const extra=openBD().filter(b=>b.assigned===t.n);
+  const byM={};due.forEach(x=>(byM[x.m]=byM[x.m]||[]).push(x));
+  const done=due.filter(x=>jc.ticks[x.id]).length;const nok=due.filter(x=>jc.ticks[x.id]&&jc.ticks[x.id].s==='nok').length;
+  const sun=parseD(jcDate).getDay()===0;
+  return `<div class="spread"><div><div class="lbl">Daily job card · ${DOW[parseD(jcDate).getDay()]}</div><h2>${esc(t.n)}</h2></div>
+   <div class="row noprint"><input type="date" id="jcd" value="${jcDate}" style="max-width:170px" aria-label="Date"><select id="jct" style="max-width:220px" aria-label="Technician">${team().map(x=>`<option ${x.id===t.id?'selected':''}>${esc(x.n)}</option>`).join('')}</select>${inFrame?'':'<button class="btn sm" onclick="window.print()">Print</button>'}</div></div>
+  <div class="panel"><div class="spread"><span><b class="num">${done}</b> of <b class="num">${due.length}</b> checks ticked${nok?` · <span style="color:var(--crit)">${nok} NOT OK</span>`:''}</span>
+   <span class="small muted">${t.role} · ${t.d==='ALL'?'Mech + Elec':t.d==='M'?'Mechanical':'Electrical'}${jc.submitted?' · submitted '+fmtDT(jc.submitted):''}${jc.verified?' · verified by '+esc(jc.verified):''}</span></div>
+   <div class="progress" style="margin-top:8px"><i style="width:${due.length?done/due.length*100:0}%"></i></div></div>
+  ${extra.length?`<section class="panel"><h3>Breakdown jobs assigned to you</h3><div class="list">${extra.map(bdRow).join('')}</div></section>`:''}
+  ${sun?'<div class="empty">Sunday — no scheduled PM. Use breakdown jobs above if any.</div>':''}
+  ${Object.entries(byM).map(([mid,ts])=>{const m=MBY[mid];const allDone=ts.every(x=>jc.ticks[x.id]);
+   return `<div class="jc-m"><div class="jc-h"><b>${esc(m.n)} <span class="small muted">· ${m.a}</span></b><button class="btn sm noprint" data-allok="${mid}" ${allDone?'disabled':''}>All remaining OK</button></div>
+   ${ts.map(x=>{const v=jc.ticks[x.id]||{};return `<div class="jc-t"><div class="q"><span class="fq ${x.f}">${{D:'DAILY',W:'WEEKLY',M:'MONTHLY'}[x.f]}</span>${x.d==='E'?'<span class="fq">ELEC</span>':''}${esc(x.text)}${v.raised?' <span class="pill p-crit">job raised</span>':''}</div>
+    <div class="tick" role="group" aria-label="Result">${[['ok','OK'],['nok','NOT OK'],['na','N/A']].map(([k,l])=>`<button class="${k} ${v.s===k?'on':''}" data-tk="${x.id}" data-v="${k}">${l}</button>`).join('')}</div>
+    ${v.s==='nok'?`<div class="rem row"><input type="text" id="rm_${x.id.replace(/\./g,'_')}" data-rm="${x.id}" value="${esc(v.r||'')}" placeholder="What is wrong? (reading, location)" style="flex:1;min-width:180px">${v.raised?'':`<button class="btn sm danger" data-raise="${x.id}">Raise breakdown</button>`}</div>`:''}</div>`}).join('')}</div>`}).join('')}
+  <div class="row noprint"><button class="btn pri" id="jsub">${jc.submitted?'Re-submit job card':'Submit job card'}</button>
+   <button class="btn" id="jver" ${jc.submitted?'':'disabled'}>Supervisor verify</button></div>`;
+}
+bind.job=()=>{bindCommon();
+  const t=techObj();const jid=jcDate+'_'+t.id;
+  const getJ=()=>JSON.parse(JSON.stringify(S.jobcards[jid]||{id:jid,date:jcDate,tech:t.n,techId:t.id,ticks:{}}));
+  $('#jcd').onchange=e=>{jcDate=e.target.value||today();render()};
+  $('#jct').onchange=e=>{jcTech=e.target.value;render()};
+  document.querySelectorAll('[data-tk]').forEach(b=>b.onclick=()=>{const j=getJ();const cur=j.ticks[b.dataset.tk];if(cur&&cur.s===b.dataset.v&&!cur.raised)delete j.ticks[b.dataset.tk];else j.ticks[b.dataset.tk]=Object.assign({},cur||{},{s:b.dataset.v,t:Date.now(),by:me()});put('jobcards',jid,j)});
+  document.querySelectorAll('[data-allok]').forEach(b=>b.onclick=()=>{const j=getJ();dueOn(jcDate,t.d==='ALL'?null:t.d).filter(x=>x.m===b.dataset.allok&&!j.ticks[x.id]).forEach(x=>j.ticks[x.id]={s:'ok',t:Date.now(),by:me()});put('jobcards',jid,j)});
+  document.querySelectorAll('[data-rm]').forEach(i=>i.onchange=()=>{const j=getJ();if(j.ticks[i.dataset.rm]){j.ticks[i.dataset.rm].r=i.value.trim();put('jobcards',jid,j)}});
+  document.querySelectorAll('[data-raise]').forEach(b=>b.onclick=()=>{const x=TASKS.find(q=>q.id===b.dataset.raise);const j=getJ();const inp=document.querySelector(`[data-rm="${x.id}"]`);if(inp&&j.ticks[x.id]){j.ticks[x.id].r=inp.value.trim();put('jobcards',jid,j)}newBD({m:x.m,d:x.d,sym:x.text+' — NOT OK',desc:inp?inp.value.trim():'',stopped:false,fromTick:{jc:jid,task:x.id}})});
+  $('#jsub').onclick=()=>{const j=getJ();j.submitted=Date.now();put('jobcards',jid,j);toast('Job card submitted')};
+  $('#jver').onclick=()=>{const j=getJ();j.verified=me();j.verifiedAt=Date.now();put('jobcards',jid,j);toast('Verified by '+me())};
+};
+
+/* ----- PM PLAN ----- */
+let pmMonth=today().slice(0,7), pmDisc='ALL';
+function vPM(){
+  const[y,mo]=pmMonth.split('-').map(Number);const n=new Date(y,mo,0).getDate();const td=today();
+  const days=[...Array(n)].map((_,i)=>dstr(new Date(y,mo-1,i+1)));
+  const tkBy={};days.forEach(d=>{if(d<=td)tkBy[d]=ticksOn(d)});
+  let due=0,done=0,nok=0;
+  const rows=MACHINES.filter(m=>TASKS.some(t=>t.m===m.id&&(pmDisc==='ALL'||t.d===pmDisc))).map(m=>{
+    const cells=days.map(d=>{const dd=parseD(d);if(dd.getDay()===0)return `<td class="sun"></td>`;
+      const ts=dueOn(d,pmDisc==='ALL'?null:pmDisc).filter(t=>t.m===m.id);if(!ts.length)return'<td></td>';
+      const f=ts.some(t=>t.f==='M')?'M':ts.some(t=>t.f==='W')?'W':'D';
+      let cls=f;let title=ts.length+' checks';
+      if(d<=td){const tk=tkBy[d];const dn=ts.filter(t=>tk[t.id]).length;const nk=ts.filter(t=>tk[t.id]&&tk[t.id].s==='nok').length;due+=ts.length;done+=dn;nok+=nk;
+        if(nk)cls+=' nok';else if(dn===ts.length)cls+=' done';else if(d<td)cls+=' miss';title=dn+'/'+ts.length+' done'+(nk?', '+nk+' NOT OK':'')}
+      return `<td title="${title}"><span class="pc ${cls}">${f==='D'?'·':f}</span></td>`}).join('');
+    return `<tr><td class="mn">${esc(m.n)}</td>${cells}</tr>`}).join('');
+  const cnt=f=>TASKS.filter(t=>t.f===f&&(pmDisc==='ALL'||t.d===pmDisc)).length;
+  return `<div class="spread"><h2>Preventive maintenance plan</h2><div class="row"><input type="month" id="pmm" value="${pmMonth}" style="max-width:170px" aria-label="Month">
+   <div class="seg">${[['ALL','All'],['M','Mech'],['E','Elec']].map(([k,l])=>`<button aria-pressed="${pmDisc===k}" data-pd="${k}">${l}</button>`).join('')}</div></div></div>
+  <div class="kpis"><div class="kpi"><span class="lbl">Compliance (to date)</span><span class="v">${due?Math.round(done/due*100):0}%</span><span class="small muted">${done} of ${due} checks</span></div>
+   <div class="kpi ${nok?'crit':''}"><span class="lbl">NOT OK found</span><span class="v">${nok}</span><span class="small muted">this month</span></div>
+   <div class="kpi"><span class="lbl">Checklist size</span><span class="v">${cnt('D')+cnt('W')+cnt('M')}</span><span class="small muted">${cnt('D')} daily · ${cnt('W')} weekly · ${cnt('M')} monthly</span></div></div>
+  <div class="row small muted"><span><span class="pc D" style="display:inline-block;width:22px;text-align:center">·</span> daily only</span><span><span class="pc W" style="display:inline-block;width:22px;text-align:center">W</span> weekly due</span><span><span class="pc M" style="display:inline-block;width:22px;text-align:center">M</span> monthly due</span><span><span class="pc done" style="display:inline-block;width:22px;text-align:center">✓</span> all ticked</span><span><span class="pc nok" style="display:inline-block;width:22px;text-align:center">!</span> NOT OK</span><span><span class="pc miss" style="display:inline-block;width:22px;text-align:center">&nbsp;</span> missed</span></div>
+  <div class="tblwrap"><table class="pmgrid"><thead><tr><th class="mn">Machine</th>${days.map(d=>{const dd=parseD(d);return `<th class="${d===td?'today':''} ${dd.getDay()===0?'sun':''}">${dd.getDate()}<br>${DOW[dd.getDay()][0]}</th>`}).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+  <section class="panel"><h3>Checklist by machine</h3><p class="small muted" style="margin-top:0">Weekly checks fall on a fixed weekday per machine; monthly checks on a fixed date (moved to Monday if it is a Sunday). Source: PM Checklist Critical Equipment (DCL/MAINT/ID/25-26).</p>
+   ${MACHINES.map(m=>{const ts=TASKS.filter(t=>t.m===m.id&&(pmDisc==='ALL'||t.d===pmDisc));if(!ts.length)return'';const i=MACHINES.indexOf(m);
+    return `<details><summary><b>${esc(m.n)}</b> <span class="small muted">· ${ts.length} checks · weekly on ${DOW[weeklyDay(i)]} · monthly on ${monthlyDate(i,y,mo-1)}-${MON[mo-1]}</span></summary><ul class="small" style="margin:6px 0 10px;padding-left:18px">${ts.map(t=>`<li><b>${{D:'Daily',W:'Weekly',M:'Monthly'}[t.f]}</b> · ${t.d==='M'?'Mech':'Elec'} · ${esc(t.text)}</li>`).join('')}</ul></details>`}).join('')}</section>`;
+}
+bind.pm=()=>{bindCommon();$('#pmm').onchange=e=>{pmMonth=e.target.value||today().slice(0,7);render()};document.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>{pmDisc=b.dataset.pd;render()})};
+
+/* ----- SPARES ----- */
+let spView='crit', spQ='', spCat='All';
+function vSpares(){
+  const tot=SPARES.reduce((a,s,i)=>a+spareQty(i)*s[3],0);
+  const head=`<div class="spread"><h2>Spares</h2><div class="seg">${[['crit','Critical spares'],['all','Stores list']].map(([k,l])=>`<button aria-pressed="${spView===k}" data-sv="${k}">${l}</button>`).join('')}</div></div>`;
+  if(spView==='crit'){
+    return head+`<p class="small muted" style="margin:0">Minimum stock from the predictive dashboard. Stock is read from the stores closing list (02-Oct-26) unless someone updates it here.</p>
+    <div class="tblwrap"><table><thead><tr><th>Priority</th><th>Spare</th><th>Machine</th><th class="n">Stock</th><th class="n">Min</th><th>Status</th><th class="n">Lead days</th><th class="n">Annual ₹</th><th></th></tr></thead><tbody>
+    ${CRIT.map(c=>{const st=stockOf(c);const low=st.q<c.min;const on=Object.values(S.sourcing).find(s=>s.crit===c.k&&s.stage!=='Received');
+      return `<tr><td><span class="pill ${c.pr==='IMMEDIATE'?'p-crit':c.pr==='HIGH'?'p-warn':'p-info'}">${c.pr}</span></td><td><b>${esc(c.n)}</b><div class="small muted">${esc(c.spec)} · ${c.d==='M'?'Mech':'Elec'}</div></td><td>${esc(MBY[c.m].n)}</td>
+      <td class="n"><button class="btn sm ghost num" data-cs="${c.k}" title="Update stock">${st.q}</button><div class="small muted" style="text-align:right">${st.src}</div></td><td class="n">${c.min} ${c.u}</td>
+      <td>${low?(on?`<span class="pill p-acc">On order · ${on.stage}</span>`:'<span class="pill p-crit">Below min</span>'):'<span class="pill p-ok">OK</span>'}</td><td class="n">${c.lead}</td><td class="n">${inr(c.cost)}</td>
+      <td>${low&&!on?`<button class="btn sm" data-ci="${c.k}">Indent</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`;
+  }
+  const cats=['All',...new Set(SPARES.map(s=>s[4]))];const q=spQ.toUpperCase();
+  const rows=SPARES.map((s,i)=>[s,i]).filter(([s])=>(spCat==='All'||s[4]===spCat)&&(!q||s[0].includes(q)));
+  return head+`<div class="row"><input type="search" id="spq" value="${esc(spQ)}" placeholder="Search part, bearing no., size…" style="flex:1;min-width:200px"><select id="spc" style="max-width:200px">${cats.map(c=>`<option ${c===spCat?'selected':''}>${c}</option>`).join('')}</select></div>
+  <div class="small muted">${rows.length} of ${SPARES.length} items in stock · stores value ${inr(tot)} · tap a quantity to record issue/receipt</div>
+  <div class="tblwrap" style="max-height:65vh"><table><thead><tr><th>Item</th><th>Group</th><th class="n">Qty</th><th>Unit</th><th class="n">Rate</th><th class="n">Value</th></tr></thead><tbody>
+  ${rows.slice(0,300).map(([s,i])=>{const qn=spareQty(i);return `<tr><td>${esc(s[0])}</td><td class="small muted">${s[4]}</td><td class="n"><button class="btn sm ghost num" data-sq="${i}">${+qn.toFixed(2)}</button></td><td>${s[2]}</td><td class="n">${s[3].toFixed(2)}</td><td class="n">${inr(qn*s[3])}</td></tr>`}).join('')}
+  ${rows.length>300?`<tr><td colspan="6" class="muted">Showing first 300 — narrow the search.</td></tr>`:''}</tbody></table></div>`;
+}
+bind.spares=()=>{bindCommon();
+  document.querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>{spView=b.dataset.sv;render()});
+  const q=$('#spq');if(q)q.oninput=e=>{spQ=e.target.value;render()};
+  const c=$('#spc');if(c)c.onchange=e=>{spCat=e.target.value;render()};
+  document.querySelectorAll('[data-ci]').forEach(b=>b.onclick=()=>{const k=CRIT.find(x=>x.k===b.dataset.ci);const st=stockOf(k);srcSheet(null,{item:k.n+' ('+k.spec+')',m:k.m,crit:k.k,qty:(k.min-st.q)+' '+k.u,prio:k.pr==='IMMEDIATE'?'Critical':'High'})});
+  document.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>{const k=CRIT.find(x=>x.k===b.dataset.cs);qtySheet(k.n,stockOf(k).q,k.u,v=>put('stock','crit_'+k.k,{q:v}))});
+  document.querySelectorAll('[data-sq]').forEach(b=>b.onclick=()=>{const i=+b.dataset.sq;qtySheet(SPARES[i][0],spareQty(i),SPARES[i][2],v=>put('stock','s'+i,{q:v}))});
+};
+function qtySheet(name,q,u,save){
+  sheet('Update stock',`<form class="form" id="qf"><b>${esc(name)}</b><p class="small muted" style="margin:0">Current: ${q} ${u}</p>
+   <div class="two"><label class="f">Issued (−)<input type="number" id="qi" min="0" step="any" inputmode="decimal"></label><label class="f">Received (+)<input type="number" id="qr" min="0" step="any" inputmode="decimal"></label></div>
+   <label class="f">Or set physical count<input type="number" id="qs" min="0" step="any" inputmode="decimal"></label><button class="btn pri" type="submit">Save</button></form>`,()=>{
+    $('#qf').onsubmit=e=>{e.preventDefault();let v=q;if($('#qs').value!=='')v=+$('#qs').value;else v=q-(+$('#qi').value||0)+(+$('#qr').value||0);if(v<0){toast('Stock cannot go below zero');return}save(v);closeSheet();toast('Stock updated to '+v+' '+u)}});
+}
+
+/* ----- SOURCING ----- */
+const STAGES=['Indent raised','Quotation','PO approved','Dispatched','Received'];
+let srcFilter='open';
+function vSrc(){
+  const all=Object.values(S.sourcing).sort((a,b)=>STAGES.indexOf(a.stage)-STAGES.indexOf(b.stage)||(a.eta||'9').localeCompare(b.eta||'9'));
+  const list=srcFilter==='open'?all.filter(s=>s.stage!=='Received'):all;const td=today();
+  return `<div class="spread"><h2>Sourcing tracker</h2><button class="btn pri" data-act="indent">+ New indent</button></div>
+  <div class="row"><div class="seg">${[['open','Pending'],['all','All']].map(([k,l])=>`<button aria-pressed="${srcFilter===k}" data-sf="${k}">${l}</button>`).join('')}</div>
+   <span class="small muted">${STAGES.slice(0,4).map(s=>s+': '+all.filter(x=>x.stage===s).length).join(' · ')}</span></div>
+  <div class="list">${list.length?list.map(s=>{const late=s.eta&&s.eta<td&&s.stage!=='Received';const ci=STAGES.indexOf(s.stage);
+   return `<div class="item s-${s.stage==='Received'?'ok':late?'crit':s.prio==='Critical'?'warn':'info'}"><span class="stripe"></span><div class="body" data-src="${s.id}" style="cursor:pointer">
+    <div class="t">${esc(s.item)}</div><div class="d">${s.m?esc(MBY[s.m]?.n||s.m)+' · ':''}${s.qty?esc(s.qty)+' · ':''}${s.vendor?esc(s.vendor)+' · ':''}${s.ref?esc(s.ref):''}</div>
+    <div class="d">${s.eta?(late?'<b style="color:var(--crit)">Overdue — ETA '+fmtD(s.eta)+'</b>':'ETA '+fmtD(s.eta)):'No ETA set'}${s.note?' · '+esc(s.note):''}</div>
+    <div class="stepper" style="margin-top:6px">${STAGES.map((x,i)=>`<button class="${i<ci?'past':i===ci?'cur':''}" data-stg="${s.id}" data-v="${x}">${x}</button>`).join('')}</div></div><span class="pill ${s.prio==='Critical'?'p-crit':s.prio==='High'?'p-warn':''}">${esc(s.prio||'Normal')}</span></div>`}).join(''):'<div class="empty">No pending sourcing. Raise an indent from here, from a low critical spare, or from a breakdown.</div>'}</div>`;
+}
+bind.src=()=>{bindCommon();
+  document.querySelectorAll('[data-sf]').forEach(b=>b.onclick=()=>{srcFilter=b.dataset.sf;render()});
+  document.querySelectorAll('[data-src]').forEach(b=>b.addEventListener('click',e=>{if(e.target.closest('[data-stg]'))return;srcSheet(b.dataset.src)}));
+  document.querySelectorAll('[data-stg]').forEach(b=>b.onclick=e=>{e.stopPropagation();const s=JSON.parse(JSON.stringify(S.sourcing[b.dataset.stg]));if(s.stage===b.dataset.v)return;s.stage=b.dataset.v;s.log=(s.log||[]).concat({t:Date.now(),by:me(),s:s.stage});
+    if(s.stage==='Received'&&s.crit){const c=CRIT.find(x=>x.k===s.crit);toast('Received — update stock of '+c.n+' in Spares')}else toast(s.item+' → '+s.stage);put('sourcing',s.id,s)});
+};
+function srcSheet(id,pre){
+  const s=id?S.sourcing[id]:Object.assign({stage:'Indent raised',prio:'High'},pre||{});
+  const html=`<form class="form" id="sf">
+   <label class="f">Item / job<input type="text" id="si" required value="${esc(s.item||'')}" placeholder="e.g. Bearing 22216E, motor rewinding"></label>
+   <div class="two"><label class="f">Machine<select id="sm"><option value="">General</option>${MACHINES.map(m=>`<option value="${m.id}" ${s.m===m.id?'selected':''}>${esc(m.n)}</option>`).join('')}</select></label>
+   <label class="f">Quantity<input type="text" id="sq" value="${esc(s.qty||'')}" placeholder="e.g. 6 Nos"></label></div>
+   <div class="two"><label class="f">Stage<select id="ss">${STAGES.map(x=>`<option ${x===s.stage?'selected':''}>${x}</option>`).join('')}</select></label>
+   <label class="f">Priority<select id="sp">${['Critical','High','Normal'].map(x=>`<option ${x===s.prio?'selected':''}>${x}</option>`).join('')}</select></label></div>
+   <div class="two"><label class="f">Vendor<input type="text" id="sv" value="${esc(s.vendor||'')}"></label><label class="f">Indent / PO / WO no.<input type="text" id="sr" value="${esc(s.ref||'')}"></label></div>
+   <div class="two"><label class="f">Expected arrival (ETA)<input type="date" id="se" value="${esc(s.eta||'')}"></label><label class="f">Value ₹<input type="number" id="sval" value="${s.val??''}" inputmode="decimal"></label></div>
+   <label class="f">Remarks<textarea id="sn">${esc(s.note||'')}</textarea></label>
+   <div class="row"><button class="btn pri" type="submit">${id?'Save':'Raise indent'}</button>${id?'<button class="btn ghost" type="button" id="sdel">Delete</button>':''}</div>
+   ${id&&s.log?`<ul class="small muted" style="padding-left:18px;margin:0">${s.log.map(l=>`<li>${fmtDT(l.t)} · ${esc(l.s)} · ${esc(l.by)}</li>`).join('')}</ul>`:''}</form>`;
+  sheet(id?'Sourcing update':'Raise spare indent',html,()=>{
+    $('#sf').onsubmit=e=>{e.preventDefault();const nid=id||uid('sr');const stage=$('#ss').value;
+      const ns=Object.assign({},s,{id:nid,item:$('#si').value.trim(),m:$('#sm').value,qty:$('#sq').value.trim(),stage,prio:$('#sp').value,vendor:$('#sv').value.trim(),ref:$('#sr').value.trim(),eta:$('#se').value,val:$('#sval').value===''?null:+$('#sval').value,note:$('#sn').value.trim()});
+      if(!ns.item){toast('Enter the item');return}
+      if(!id||stage!==s.stage)ns.log=(s.log||[]).concat({t:Date.now(),by:me(),s:stage});else ns.log=s.log||[];
+      if(!id)ns.raisedAt=Date.now();
+      put('sourcing',nid,ns);closeSheet();toast(id?'Saved':'Indent raised for '+ns.item)};
+    if($('#sdel')){let armed=false;$('#sdel').onclick=e=>{if(!armed){armed=true;e.target.textContent='Tap again to delete';e.target.classList.add('danger');return}del('sourcing',id);closeSheet()}}
+  });
+}
+
+/* ----- DOWNTIME ----- */
+function vDT(){
+  const fy=fyMonths();const dt=downtime();const curYM=today().slice(0,7);
+  const tot=fy.map(ym=>MACHINES.reduce((a,m)=>a+((dt[m.id]||{})[ym]||0),0));
+  const sh=cfg().shiftHrs;
+  const histAvg=MACHINES.reduce((a,m)=>a+(m.dt||0),0)/12;
+  const max=Math.max(histAvg*1.6,...tot,1);
+  const W=720,H=220,L=40,B=28,T=14,bw=(W-L-10)/12;
+  const yv=v=>T+(H-T-B)*(1-v/max);
+  const ticks=[0,max/2,max].map(v=>Math.round(v));
+  const svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Monthly downtime hours">
+   ${ticks.map(v=>`<line x1="${L}" x2="${W-6}" y1="${yv(v)}" y2="${yv(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L-6}" y="${yv(v)+4}" text-anchor="end" font-size="11">${v}</text>`).join('')}
+   ${tot.map((v,i)=>{const x=L+i*bw+bw*0.18;const w=bw*0.64;const fut=fy[i]>curYM;return `<rect x="${x}" y="${yv(v)}" width="${w}" height="${Math.max(0,H-B-yv(v))}" rx="3" fill="${fy[i]===curYM?'var(--accent)':'var(--info)'}" opacity="${fut?0.25:1}"><title>${ymLabel(fy[i])}: ${v.toFixed(1)} h</title></rect>${v>0?`<text x="${x+w/2}" y="${yv(v)-4}" text-anchor="middle" font-size="11" style="fill:var(--ink)">${hrs(v)}</text>`:''}<text x="${x+w/2}" y="${H-10}" text-anchor="middle" font-size="11">${MON[+fy[i].slice(5)-1]}</text>`}).join('')}
+   <line x1="${L}" x2="${W-6}" y1="${yv(histAvg)}" y2="${yv(histAvg)}" stroke="var(--crit)" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${W-8}" y="${yv(histAvg)-5}" text-anchor="end" font-size="11" style="fill:var(--crit)">FY23–26 avg ${histAvg.toFixed(1)} h/month</text></svg>`;
+  const ytd=tot.reduce((a,b)=>a+b,0);
+  return `<div class="spread"><h2>Machine downtime — FY ${fy[0].slice(0,4)}-${fy[11].slice(2,4)}</h2><div class="row"><button class="btn sm" id="dtcsv">Copy as CSV</button></div></div>
+  <div class="kpis"><div class="kpi"><span class="lbl">FY to date</span><span class="v">${hrs(ytd)}<span class="small muted"> h</span></span><span class="small muted">all machines</span></div>
+  <div class="kpi"><span class="lbl">This month</span><span class="v">${hrs(tot[fy.indexOf(curYM)]||0)}<span class="small muted"> h</span></span><span class="small muted">${ymLabel(curYM)}</span></div>
+  <div class="kpi"><span class="lbl">Breakdowns this FY</span><span class="v">${Object.values(S.breakdowns).filter(b=>b.stopped&&dstr(new Date(b.start)).slice(0,7)>=fy[0]).length}</span><span class="small muted">machine stopped</span></div></div>
+  <section class="panel"><h3>Monthly total</h3>${svg}<p class="small muted" style="margin:4px 0 0">Calculated from breakdowns marked “machine stopped” (start → back in service), split across months. Red line: historical average from the breakdown register (Roll Over, Mixer, Shot Blast, Shake Out, EOT cranes).</p></section>
+  <section><div class="spread"><h3>Machine × month (hours)</h3><span class="small muted">Tap a cell to add hours not logged as a breakdown (e.g. back-fill Apr–Sep)</span></div>
+  <div class="tblwrap"><table class="heat"><thead><tr><th>Machine</th>${fy.map(ym=>`<th class="n">${ymLabel(ym)}</th>`).join('')}<th class="n">FY total</th><th class="n">Avail. %</th><th class="n">Hist. h/yr</th></tr></thead><tbody>
+  ${MACHINES.map(m=>{const r=dt[m.id]||{};let s=0,avail=0;const cells=fy.map(ym=>{const v=r[ym]||0;s+=v;if(ym<=curYM)avail+=workDays(ym)*sh;const a=Math.min(1,v/40);
+    return `<td class="c" data-dt="${m.id}|${ym}" style="${v?`background:color-mix(in srgb,var(--crit) ${Math.round(10+a*60)}%,transparent)`:''}">${v?hrs(v):'<span class="muted">·</span>'}</td>`}).join('');
+    const av=avail?(1-s/avail)*100:100;return `<tr><td><b>${esc(m.n)}</b></td>${cells}<td class="n"><b>${hrs(s)}</b></td><td class="n" style="color:${av<95?'var(--crit)':av<98?'var(--warn)':'var(--ok)'}">${av.toFixed(1)}</td><td class="n muted">${m.dt??'—'}</td></tr>`}).join('')}
+  <tr><td><b>Total</b></td>${tot.map(v=>`<td class="n"><b>${v?hrs(v):'·'}</b></td>`).join('')}<td class="n"><b>${hrs(ytd)}</b></td><td></td><td class="n muted">${MACHINES.reduce((a,m)=>a+(m.dt||0),0).toFixed(1)}</td></tr></tbody></table></div>
+  <p class="small muted">Availability = 1 − downtime ÷ planned hours (${sh} h × working days, Mon–Sat). Change shift hours in Setup.</p></section>
+  <section class="panel"><h3>Maintenance spend FY 2025-26 (₹, for reference)</h3><div class="tblwrap"><table><thead><tr>${['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].map(x=>`<th class="n">${x}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody><tr>${CONS_FY26.map(v=>`<td class="n">${(v/1e5).toFixed(2)} L</td>`).join('')}<td class="n"><b>${(CONS_FY26.reduce((a,b)=>a+b,0)/1e5).toFixed(2)} L</b></td></tr></tbody></table></div></section>`;
+}
+bind.dt=()=>{bindCommon();
+  document.querySelectorAll('[data-dt]').forEach(c=>c.onclick=()=>{const[mid,ym]=c.dataset.dt.split('|');const rid=mid+'_'+ym;const cur=S.dtmanual[rid];const auto=((downtime()[mid]||{})[ym]||0)-(cur?+cur.h:0);
+    sheet('Downtime — '+MBY[mid].n,`<form class="form" id="df"><p class="small muted" style="margin:0">${ymLabel(ym)} · from breakdown records: <b>${hrs(auto)} h</b></p>
+     <label class="f">Additional hours (manual)<input type="number" id="dh" min="0" step="0.5" value="${cur?cur.h:''}" inputmode="decimal"></label>
+     <label class="f">Reason<input type="text" id="dr" value="${esc(cur?cur.r:'')}" placeholder="e.g. Back-filled from breakdown register"></label><button class="btn pri" type="submit">Save</button></form>`,()=>{
+      $('#df').onsubmit=e=>{e.preventDefault();const h=+$('#dh').value||0;if(h<0){toast('Hours cannot be negative');return}if(!h&&cur)del('dtmanual',rid);else if(h)put('dtmanual',rid,{m:mid,ym,h,r:$('#dr').value.trim()});closeSheet()}})});
+  $('#dtcsv').onclick=()=>{const fy=fyMonths();const dt=downtime();const csv=['Machine,'+fy.map(ymLabel).join(',')+',Total',...MACHINES.map(m=>{const r=dt[m.id]||{};const v=fy.map(ym=>(r[ym]||0).toFixed(1));return '"'+m.n+'",'+v.join(',')+','+v.reduce((a,b)=>a+ +b,0).toFixed(1)})].join('\n');copyText(csv,'Downtime CSV copied — paste into Excel')};
+};
+function copyText(t,msg){const done=()=>toast(msg||'Copied');try{navigator.clipboard.writeText(t).then(done,()=>fallbackCopy(t,msg))}catch(e){fallbackCopy(t,msg)}}
+function fallbackCopy(t,msg){sheet('Copy text',`<p class="small muted">Copy is blocked here. Select all text below and copy it.</p><textarea id="cpt" style="min-height:260px">${esc(t)}</textarea>`,()=>{const a=$('#cpt');a.focus();a.select()})}
+
+/* ----- DAILY UPDATE ----- */
+function reportText(){
+  const td=today();const d=new Date();const st=MACHINES.map(m=>[m,mStatus(m.id)]);
+  const c=k=>st.filter(x=>x[1]===k).length;const ps=pmStats(td);const yd=dstr(new Date(Date.now()-864e5));const ys=pmStats(yd);
+  const dt=downtime();const ym=td.slice(0,7);let mtd=0,fyt=0;const fy=fyMonths();Object.values(dt).forEach(r=>{mtd+=r[ym]||0;fy.forEach(m=>fyt+=r[m]||0)});
+  const L=[];
+  L.push('*DATRE FALTA — MAINTENANCE DAILY UPDATE*');
+  L.push(DOW[d.getDay()]+', '+fmtD(td)+'  ·  '+pad(d.getHours())+':'+pad(d.getMinutes())+'  ·  by '+me());
+  L.push('');
+  L.push('*Machines:* '+c('Running')+' running · '+c('Breakdown')+' breakdown · '+c('Watch')+' watch · '+c('Under PM')+' under PM · '+c('Idle')+' idle');
+  const bd=openBD();L.push('');L.push('*Open breakdowns / defects ('+bd.length+'):*');
+  if(!bd.length)L.push('• None');
+  bd.forEach(b=>L.push('• '+MBY[b.m].n+' — '+b.sym+' — '+b.status+(b.stopped?' — DOWN '+hrs(bdDur(b))+' h':' — running')+(b.assigned?' — '+b.assigned:'')+(b.spares?' — spares: '+b.spares:'')));
+  const closed=Object.values(S.breakdowns).filter(b=>b.status==='Closed'&&b.end&&b.end>Date.now()-864e5);
+  if(closed.length){L.push('');L.push('*Closed in last 24 h:*');closed.forEach(b=>L.push('• '+MBY[b.m].n+' — '+b.sym+' — '+(b.root||'')+(b.stopped?' — '+hrs(bdDur(b))+' h down':'')))}
+  L.push('');L.push('*PM checks:* today '+ps.done+'/'+ps.due+(ps.nok?' ('+ps.nok+' NOT OK)':'')+' · yesterday '+ys.done+'/'+ys.due+(ys.due?' ('+Math.round(ys.done/ys.due*100)+'%)':''));
+  L.push('*Downtime:* '+MON[d.getMonth()]+' to date '+hrs(mtd)+' h · FY to date '+hrs(fyt)+' h');
+  const low=CRIT.filter(x=>stockOf(x).q<x.min);
+  L.push('');L.push('*Critical spares below minimum ('+low.length+'):*');
+  low.forEach(x=>{const on=Object.values(S.sourcing).find(s=>s.crit===x.k&&s.stage!=='Received');L.push('• '+x.n+' — '+stockOf(x).q+'/'+x.min+' '+x.u+' — '+(on?on.stage:'NO INDENT'))});
+  const src=Object.values(S.sourcing).filter(s=>s.stage!=='Received');
+  if(src.length){L.push('');L.push('*Sourcing pending ('+src.length+'):*');src.sort((a,b)=>(a.eta||'9').localeCompare(b.eta||'9')).slice(0,10).forEach(s=>L.push('• '+s.item+' — '+s.stage+(s.eta?' — ETA '+fmtD(s.eta)+(s.eta<td?' (OVERDUE)':''):'')+(s.vendor?' — '+s.vendor:'')))}
+  const crit=alerts().filter(a=>!a.ack&&a.sev==='crit'&&!a.k.startsWith('bd_')&&!a.k.startsWith('low_'));
+  if(crit.length){L.push('');L.push('*Other critical alerts:*');crit.slice(0,8).forEach(a=>L.push('• '+a.t+' — '+a.d))}
+  return L.join('\n');
+}
+function vReport(){
+  const t=reportText();
+  return `<div class="spread"><h2>Daily update</h2><span class="small muted">Built from live data. Copy it, or send it on WhatsApp.</span></div>
+  <div class="row noprint"><button class="btn pri" id="rcopy">Copy text</button><a class="btn" id="rwa" href="https://wa.me/?text=${encodeURIComponent(t)}" target="_blank" rel="noopener">Share on WhatsApp</a><a class="btn" href="mailto:${esc(cfg().mailTo.replace(/\s/g,''))}?subject=${encodeURIComponent('Maintenance daily update '+fmtD(today()))}&body=${encodeURIComponent(t.replace(/\*/g,''))}">Open in email</a></div>
+  <p class="small muted" style="margin:0">Email list: <span class="mono" style="user-select:all">${esc(cfg().mailTo)}</span></p>
+  <pre class="report">${esc(t)}</pre>`;
+}
+bind.report=()=>{bindCommon();$('#rcopy').onclick=()=>copyText(reportText(),'Daily update copied')};
+
+/* ----- SETUP ----- */
+function vSetup(){
+  const c=cfg();
+  return `<h2>Setup</h2>
+  <section class="panel"><h3>Team</h3><p class="small muted" style="margin-top:0">Job cards are generated for each person by trade: Mechanical, Electrical or All.</p>
+  <div class="tblwrap"><table><thead><tr><th>Name</th><th>Role</th><th>Trade</th><th></th></tr></thead><tbody>
+  ${c.team.map((t,i)=>`<tr><td><input type="text" id="tn${i}" value="${esc(t.n)}" data-ti="${i}" data-f="n"></td><td><input type="text" id="tr${i}" value="${esc(t.role)}" data-ti="${i}" data-f="role"></td><td><select id="td${i}" data-ti="${i}" data-f="d">${[['M','Mechanical'],['E','Electrical'],['ALL','All']].map(([k,l])=>`<option value="${k}" ${t.d===k?'selected':''}>${l}</option>`).join('')}</select></td><td><button class="btn sm ghost" data-tdel="${i}">Remove</button></td></tr>`).join('')}
+  </tbody></table></div><div class="row" style="margin-top:10px"><button class="btn" id="tadd">+ Add person</button><button class="btn pri" id="tsave">Save team</button></div></section>
+  <section class="panel"><h3>Plant settings</h3><div class="form"><div class="two"><label class="f">Planned running hours per day<input type="number" id="csh" value="${c.shiftHrs}" min="1" max="24"></label>
+   <label class="f">Daily update email list<input type="text" id="cmail" value="${esc(c.mailTo)}"></label></div><button class="btn pri" id="csave">Save settings</button></div></section>
+  <section class="panel"><h3>Data & backup</h3>
+   <p class="small" style="margin-top:0">${MODE==='shared'?'<b>Shared mode.</b> Everyone who opens this page in Claude sees the same records live.':'<b>This-device mode.</b> Records are saved in this browser only. Take a backup each week, or open the shared link so the whole team works on one record.'}</p>
+   <div class="row"><button class="btn" id="bexp">Export backup (JSON)</button><label class="btn" for="bimp">Import backup</label><input type="file" id="bimp" accept=".json,application/json" hidden></div>
+   <p class="small muted">Sources: PM Checklist Critical Equipment (DCL/MAINT/ID/25-26), Predictive Maintenance Mech/Elect Dashboard (Aug-2026), stores closing list “MNT ITEMS” (02-Oct-2026), maintenance PO/WO approval mails (Sep-2026).</p></section>`;
+}
+bind.setup=()=>{bindCommon();
+  let tm=JSON.parse(JSON.stringify(cfg().team));
+  document.querySelectorAll('[data-ti]').forEach(el=>el.onchange=()=>{tm[el.dataset.ti][el.dataset.f]=el.value});
+  document.querySelectorAll('[data-tdel]').forEach(b=>b.onclick=()=>{tm.splice(+b.dataset.tdel,1);put('config','main',Object.assign({},cfg(),{team:tm}))});
+  $('#tadd').onclick=()=>{tm.push({id:uid('t'),n:'New technician',role:'Technician',d:'M'});put('config','main',Object.assign({},cfg(),{team:tm}))};
+  $('#tsave').onclick=()=>{if(tm.some(t=>!t.n.trim())){toast('Every person needs a name');return}put('config','main',Object.assign({},cfg(),{team:tm}));toast('Team saved')};
+  $('#csave').onclick=()=>{put('config','main',Object.assign({},cfg(),{shiftHrs:Math.max(1,Math.min(24,+$('#csh').value||16)),mailTo:$('#cmail').value.trim()}));toast('Settings saved')};
+  $('#bexp').onclick=exportBackup;
+  $('#bimp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async()=>{try{const j=JSON.parse(r.result);let n=0;for(const c of COLLS){for(const[id,o]of Object.entries(j[c]||{})){await put(c,id,o);n++}}toast('Imported '+n+' records')}catch(err){toast('That file is not a Maintenance Desk backup')}};r.readAsText(f)};
+};
+async function exportBackup(){
+  const data=JSON.stringify(Object.assign({exported:new Date().toISOString()},S),null,1);const fn='datre-maintenance-backup-'+today()+'.json';
+  if(inFrame){try{const dl=await window.claude.use('downloads');if(dl){await dl.save({filename:fn,data});return}}catch(e){}return copyText(data,'Backup copied — paste into a .json file')}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+/* ======================= STARTUP ======================= */
+const inFrame=!!(window.claude&&window.claude.use);
+// Open items recorded in the PM checklist summary and recent maintenance PO/WO mails. Used only for a first run on a device.
+function seedLocal(){
+  if(Object.keys(S.breakdowns).length||Object.keys(S.sourcing).length||pref('seeded'))return;
+  const t0=new Date(2026,8,26,9,0).getTime();
+  const bd=[['RO','M','Hydraulic seal leak at cylinder','Indent pending for seal kit CK-40/18','Waiting for spares','Seal Kit CK-40/18','Critical'],
+   ['RT','M','Air leakage at joints / valves','Air leakage repair urgent','Reported','','High'],
+   ['SB','M','2 of 3 impellers non-operational','Running on one impeller; impeller spares pending','Waiting for spares','Impeller spares','Critical'],
+   ['E2','E','LT drive motor absent — rewinding','LT drive motor sent for rewinding','Waiting for spares','LT motor rewinding','Critical']];
+  bd.forEach(([m,d,sym,desc,st,sp,pr],i)=>{const id='seedbd'+i;S.breakdowns[id]={id,m,d,stopped:false,sym,desc,spares:sp,start:t0,prio:pr,by:'PM checklist 26-Sep-26',assigned:'',status:st,log:[{t:t0,by:'PM checklist',s:st}]}});
+  const src=[['Hydraulic Oil-68 + Gear Oil-320','RO','PO approved','Aanarchey Technologies','DCL/MNT/26-27/240',47967,'PO dt 28-Sep; approved 30-Sep. Oil-68 ₹175/L (+8%), gear oil ₹195/L (−20%)','oil68'],
+   ['11 kW closing station power-pack motor rewinding + shaft lathe work','CS','PO approved','Arpon Enterprise','DCL/MNT/W/26-27/241',14050,'WO approved 30-Sep; delivery up to 20 days; DGM queried ₹12,850 vs rate chart ₹9,400',''],
+   ['Resilient coupling spring-104','E75','PO approved','GBM Manufacturing','DCL/MNT/26-27/227',null,'Approved 22-Sep',''],
+   ['Bearings','','PO approved','Premier India Bearings','DCL/MNT/26-27/219',null,'Approved 14-Sep',''],
+   ['Armatures (power tools)','','PO approved','Zenith Enterprises','DCL/MNT/26-27/220',null,'Amended for MRP change, approved 22-Sep',''],
+   ['Motwane HV-50 detector','','PO approved','','DCL/MNT/26-27/209',null,'Approved 10-Sep',''],
+   ['15 HP 1440 RPM flange motor (IE2, CG)','','PO approved','Vinod Trading Co','',null,'Approved 9-Sep',''],
+   ['33 kV module + relay with PWP ×2 + VD4','TR','PO approved','ABB','DCL/MNT/26-27/188',null,'Second-phase drawings approved 21-Sep; awaiting manufacture',''],
+   ['Seal Kit CK-40/18','RO','Indent raised','','',9440,'From PM checklist: hydraulic seal leak, indent pending','ck40'],
+   ['GLD wire (Inductotherm)','IFB','Indent raised','','',5000,'Critical spare — issue indent immediately','gld'],
+   ['Plummer block bearing for EOT crane','','PO approved','','',null,'PM checklist: spare on order','']];
+  src.forEach(([item,m,stage,vendor,ref,val,note,crit],i)=>{const id='seedsr'+i;S.sourcing[id]={id,item,m,stage,vendor,ref,val,note,crit,prio:i<2||crit?'High':'Normal',eta:'',raisedAt:t0,log:[{t:t0,by:'From mail',s:stage}]}});
+  pref('seeded','1');lsSave();
+}
+lsLoad();
+if(!inFrame)seedLocal();
+render();
+setInterval(()=>{if(!$('#sheet'))render()},60000);
+if(inFrame){
+  (async()=>{
+    let db=null;try{db=await window.claude.use('db')}catch(e){}
+    if(!db){if(!Object.keys(S.breakdowns).length)seedLocal();render();return}
+    DB=db;MODE='shared';COLLS.forEach(c=>S[c]={});render();
+    try{const u=await window.claude.use('user');if(u){const w=await u.can('data.write');if(w===false)READONLY=true}}catch(e){}
+    COLLS.forEach(c=>{
+      const q=c==='jobcards'?db.collection(c).orderBy('date','desc').limit(600):db.collection(c);
+      q.onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{const v=d.data();if(v)o[d.id]=v});S[c]=o;if(!$('#sheet'))render();else renderTabs()},err=>{if(err&&err.code==='revoked'){DB=null;MODE='local';render()}});
+    });
+  })();
+}
+</script>
+
+</body>
+</html>
