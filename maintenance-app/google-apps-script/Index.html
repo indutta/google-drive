@@ -372,7 +372,7 @@ let SPARES=[["FOUNDRY STORES & SPARES (OLD)",119.0,"NOS",183.72,"General"],["ACR
 let STOCK_SRC='Stores list 02-Oct-26', STOCK_VER=0;
 
 /* ======================= STORE (shared db when opened in Claude, else this device) ======================= */
-const COLLS=['breakdowns','sourcing','machines','stock','jobcards','dtmanual','acks','config'];
+const COLLS=['breakdowns','sourcing','machines','stock','jobcards','dtmanual','acks','config','moves'];
 const LSKEY='datre-maint-desk-v1';
 const S={};COLLS.forEach(c=>S[c]={});
 let DB=null, MODE='local', READONLY=false;
@@ -495,9 +495,17 @@ function ticksOn(ds){const r={};Object.values(S.jobcards).forEach(j=>{if(j.date!
 function pmStats(ds,disc){const due=dueOn(ds,disc);const tk=ticksOn(ds);let done=0,nok=0;due.forEach(t=>{if(tk[t.id]){done++;if(tk[t.id].s==='nok')nok++}});return{due:due.length,done,nok}}
 
 /* ----- Spares ----- */
-function critHits(c){return SPARES.filter(s=>c.re.test(String(s[0]).toUpperCase()))}
-function stockOf(c){const ov=MODE==='sheet'?null:S.stock['crit_'+c.k];if(ov&&ov.q!=null)return{q:+ov.q,src:'Updated '+fmtD(ov.updatedAt)};const hits=critHits(c);if(!hits.length)return{q:0,src:'Not found in stores list',missing:true};return{q:hits.reduce((a,s)=>a+(+s[1]||0),0),src:STOCK_SRC}}
-function spareQty(i){if(MODE==='sheet')return +SPARES[i][1]||0;const ov=S.stock['s'+i];return ov&&ov.q!=null?+ov.q:SPARES[i][1]}
+function stockKey(n){let h=0;for(const ch of String(n))h=(h*31+ch.charCodeAt(0))|0;return 'i_'+String(n).replace(/[^A-Za-z0-9]/g,'_').slice(0,80)+'_'+(h>>>0).toString(36)}
+function masterAt(){return MODE==='sheet'?0:((S.stock.master||{}).at||0)}
+let MASTER_LOADED=0;
+function syncMaster(){if(MODE==='sheet')return;const m=S.stock.master;if(m&&m.rows&&m.at!==MASTER_LOADED){SPARES=m.rows.map(r=>r.slice());MASTER_LOADED=m.at;STOCK_SRC='Tally import '+fmtDT(m.at)}}
+function critIdx(c){const o=[];SPARES.forEach((s,i)=>{if(c.re.test(String(s[0]).toUpperCase()))o.push(i)});return o}
+function critHits(c){return critIdx(c).map(i=>SPARES[i])}
+function stockOf(c){const ov=MODE==='sheet'?null:S.stock['crit_'+c.k];if(ov&&ov.q!=null&&(ov.updatedAt||0)>masterAt())return{q:+ov.q,src:'Updated '+fmtD(ov.updatedAt)};const ix=critIdx(c);if(!ix.length)return{q:0,src:'Not found in stores list',missing:true};return{q:ix.reduce((a,i)=>a+spareQty(i),0),src:STOCK_SRC}}
+function spareQty(i){if(MODE==='sheet')return +SPARES[i][1]||0;const ov=S.stock[stockKey(SPARES[i][0])];return ov&&ov.q!=null&&(ov.updatedAt||0)>masterAt()?+ov.q:+SPARES[i][1]||0}
+function catOf(n){n=String(n).toUpperCase();const R=[['Bobcat',/BOBCAT/],['Power tools',/ARMATURE|FIELD (COIL|CASE)|MAKITA|KPT|BOSCH|GRINDER|HAND DRILL|COLLET|GEAR & PINION|PENCIL/],['Furnace & HT',/INDUCTO|FURNACE|THERMOCOUPLE|CERAMIC|SCR|THYRISTOR|DIODE|ELEMENT-|KETTLE/],['Electrical',/CONTACTOR|MCB|MCCB|FUSE|RELAY|CABLE|LUG|SWITCH|CAPACITOR|COIL|SENSOR|TRANSFORMER|LAMP|TERMINAL|AMMETER|CONTROLLER|TIMER|CARBON BRUSH|MOTOR|WIRE|PANEL/],['Bearings',/BEARING|PLUMMER|BUSH/],['Belts & drives',/BELT|PULLEY|SPROCKET|CHAIN|COUPLING|GEAR|SHAFT|WHEEL|ROPE/],['Hydraulic & pneumatic',/HOSE|SEAL|CYLINDER|VALVE|FITTING|NIPPLE|UNION|ELBOW|PIPE|GASKET|O.RING|SOLENOID|FILTER|REGULATOR|CLAMP|BEND|SOCKET/],['Lubricants',/OIL|GREASE|LUBRIC/]];for(const[c,re]of R)if(re.test(n))return c;return 'General'}
+function logMove(name,m,q){const id=uid('mv');put('moves',id,{id,n:name,delta:m.delta,set:m.set,q,m:m.machine||'',ref:m.ref||'',t:Date.now(),by:me()})}
+function saveLocalStock(i,name,v,m){put('stock',i!=null?stockKey(SPARES[i][0]):name,{q:v,n:i!=null?SPARES[i][0]:name});logMove(i!=null?SPARES[i][0]:name,m,v)}
 
 /* ----- Alerts ----- */
 function alerts(){
@@ -526,12 +534,13 @@ function renderTabs(){
   $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>go(b.dataset.t));
 }
 function renderMe(){const sel=$('#me');const cur=me();sel.innerHTML=team().map(t=>`<option ${t.n===cur?'selected':''}>${esc(t.n)}</option>`).join('');}
-$('#me').onchange=e=>{pref('me',e.target.value);toast('Using the app as '+e.target.value)};
+$('#me').onchange=e=>{pref('me',e.target.value);jcTech=null;render();toast('Using the app as '+e.target.value)};
 $('#fab').onclick=()=>newBD({});
 
 let renderQueued=false;
 function render(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;doRender()})}
 function doRender(){
+  syncMaster();
   renderTabs();renderMe();
   renderSync();
   const fn={home:vHome,machines:vMachines,bd:vBD,job:vJob,pm:vPM,spares:vSpares,src:vSrc,dt:vDT,report:vReport,setup:vSetup}[TAB];
@@ -805,15 +814,18 @@ bind.pm=()=>{bindCommon();$('#pmm').onchange=e=>{pmMonth=e.target.value||today()
 let spView='crit', spQ='', spCat='All';
 function vSpares(){
   const tot=SPARES.reduce((a,s,i)=>a+spareQty(i)*s[3],0);
-  const head=`<div class="spread"><h2>Spares</h2><div class="seg">${[['crit','Critical spares'],['all','Stores list']].map(([k,l])=>`<button aria-pressed="${spView===k}" data-sv="${k}">${l}</button>`).join('')}</div></div>`;
+  const canImp=(team().find(x=>x.n===me())||{}).role!=='Technician';
+  const head=`<div class="spread"><h2>Spares</h2><div class="row">${canImp?'<button class="btn sm" id="simp">Update stock from Tally</button>':''}<div class="seg">${[['crit','Critical spares'],['all','Stores list']].map(([k,l])=>`<button aria-pressed="${spView===k}" data-sv="${k}">${l}</button>`).join('')}</div></div></div>`;
+  const mv=Object.values(S.moves).sort((a,b)=>b.t-a.t).slice(0,12);
+  const moves=`<section class="panel"><h3>Recent issues & receipts</h3>${mv.length?`<div class="tblwrap"><table><thead><tr><th>Time</th><th>Item</th><th class="n">Issued</th><th class="n">Received</th><th class="n">Balance</th><th>Machine</th><th>Ref</th><th>By</th></tr></thead><tbody>${mv.map(x=>`<tr><td>${fmtDT(x.t)}</td><td>${esc(x.n)}</td><td class="n">${x.delta<0?-x.delta:''}</td><td class="n">${x.delta>0?x.delta:''}${x.set!=null?'count':''}</td><td class="n">${x.q}</td><td>${x.m?esc(MBY[x.m]?.n||x.m):''}</td><td>${esc(x.ref)}</td><td>${esc(x.by)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No issues or receipts entered yet. Tap a stock quantity to enter one.</div>'}</section>`;
   if(spView==='crit'){
-    return head+`<p class="small muted" style="margin:0">Minimum stock from the predictive dashboard. ${MODE==='sheet'?'Live stock from the Google Sheet “Stock” tab. Issues and receipts entered here update it for everyone and are logged in “Stock Moves”.':'Stock is read from the stores closing list (02-Oct-26) unless someone updates it here.'}</p>
+    return head+`<p class="small muted" style="margin:0">Minimum stock from the predictive dashboard. Stock source: ${esc(STOCK_SRC)}. Every issue and receipt entered in this app updates it for everyone.</p>
     <div class="tblwrap"><table><thead><tr><th>Priority</th><th>Spare</th><th>Machine</th><th class="n">Stock</th><th class="n">Min</th><th>Status</th><th class="n">Lead days</th><th class="n">Annual ₹</th><th></th></tr></thead><tbody>
     ${CRIT.map(c=>{const st=stockOf(c);const low=st.q<c.min;const on=Object.values(S.sourcing).find(s=>s.crit===c.k&&s.stage!=='Received');
       return `<tr><td><span class="pill ${c.pr==='IMMEDIATE'?'p-crit':c.pr==='HIGH'?'p-warn':'p-info'}">${c.pr}</span></td><td><b>${esc(c.n)}</b><div class="small muted">${esc(c.spec)} · ${c.d==='M'?'Mech':'Elec'}</div></td><td>${esc(MBY[c.m].n)}</td>
       <td class="n"><button class="btn sm ghost num" data-cs="${c.k}" title="Update stock">${st.q}</button><div class="small muted" style="text-align:right">${st.src}</div></td><td class="n">${c.min} ${c.u}</td>
       <td>${low?(on?`<span class="pill p-acc">On order · ${on.stage}</span>`:'<span class="pill p-crit">Below min</span>'):'<span class="pill p-ok">OK</span>'}</td><td class="n">${c.lead}</td><td class="n">${inr(c.cost)}</td>
-      <td>${low&&!on?`<button class="btn sm" data-ci="${c.k}">Indent</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`;
+      <td>${low&&!on?`<button class="btn sm" data-ci="${c.k}">Indent</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`+moves;
   }
   const cats=['All',...new Set(SPARES.map(s=>s[4]))];const q=spQ.toUpperCase();
   const rows=SPARES.map((s,i)=>[s,i]).filter(([s])=>(spCat==='All'||s[4]===spCat)&&(!q||String(s[0]).toUpperCase().includes(q)));
@@ -821,7 +833,7 @@ function vSpares(){
   <div class="small muted">${rows.length} of ${SPARES.length} items · stores value ${inr(tot)} · ${esc(STOCK_SRC)} · tap a quantity to record issue/receipt</div>
   <div class="tblwrap" style="max-height:65vh"><table><thead><tr><th>Item</th><th>Group</th><th class="n">Qty</th><th>Unit</th><th class="n">Rate</th><th class="n">Value</th></tr></thead><tbody>
   ${rows.slice(0,300).map(([s,i])=>{const qn=spareQty(i);return `<tr><td>${esc(s[0])}</td><td class="small muted">${s[4]}</td><td class="n"><button class="btn sm ghost num" data-sq="${i}">${+qn.toFixed(2)}</button></td><td>${s[2]}</td><td class="n">${(+s[3]||0).toFixed(2)}</td><td class="n">${inr(qn*s[3])}</td></tr>`}).join('')}
-  ${rows.length>300?`<tr><td colspan="6" class="muted">Showing first 300 — narrow the search.</td></tr>`:''}</tbody></table></div>`;
+  ${rows.length>300?`<tr><td colspan="6" class="muted">Showing first 300 — narrow the search.</td></tr>`:''}</tbody></table></div>`+moves;
 }
 bind.spares=()=>{bindCommon();
   document.querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>{spView=b.dataset.sv;render()});
@@ -831,11 +843,47 @@ bind.spares=()=>{bindCommon();
   document.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>{const k=CRIT.find(x=>x.k===b.dataset.cs);
     if(MODE==='sheet'){const h=critHits(k);if(h.length>1){toast('Several stores items match '+k.n+'. Update them in the Stores list tab.');spView='all';spQ='';render();return}
       const nm=h.length?h[0][0]:k.n.toUpperCase();return qtySheet(nm,stockOf(k).q,h.length?h[0][2]:k.u,(v,m)=>stockMove(Object.assign({name:nm,unit:h.length?h[0][2]:k.u,machine:k.m},m)),k.m)}
-    qtySheet(k.n,stockOf(k).q,k.u,v=>put('stock','crit_'+k.k,{q:v}),k.m)});
+    const ix=critIdx(k);if(ix.length===1)return qtySheet(SPARES[ix[0]][0],spareQty(ix[0]),SPARES[ix[0]][2],(v,m)=>saveLocalStock(ix[0],null,v,m),k.m);
+    qtySheet(k.n,stockOf(k).q,k.u,(v,m)=>{put('stock','crit_'+k.k,{q:v});logMove(k.n,m,v)},k.m)});
   document.querySelectorAll('[data-sq]').forEach(b=>b.onclick=()=>{const i=+b.dataset.sq;const s=SPARES[i];
     if(MODE==='sheet')return qtySheet(s[0],spareQty(i),s[2],(v,m)=>stockMove(Object.assign({name:s[0],unit:s[2]},m)));
-    qtySheet(s[0],spareQty(i),s[2],v=>put('stock','s'+i,{q:v}))});
+    qtySheet(s[0],spareQty(i),s[2],(v,m)=>saveLocalStock(i,null,v,m))});
+  const im=$('#simp');if(im)im.onclick=importSheet;
 };
+/* ----- Tally stock import (inside the app) ----- */
+function parseCSVLine(l,sep){const o=[];let cur='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'){if(l[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}else if(ch==='"')q=true;else if(ch===sep){o.push(cur);cur=''}else cur+=ch}o.push(cur);return o}
+function parseStockRows(table){
+  const old={};SPARES.forEach(s=>old[String(s[0]).toUpperCase()]=s);const out=[];
+  table.forEach(r=>{const name=String(r[0]??'').trim();if(!name||/^(grand\s*)?total|^particulars/i.test(name))return;
+    let qv=r[1],unit='';if(qv==null||qv==='')return;
+    if(typeof qv!=='number'){const mm=String(qv).replace(/,/g,'').match(/^\s*(-?[\d.]+)\s*([A-Za-z]+)?/);if(!mm)return;qv=+mm[1];unit=mm[2]||''}
+    if(isNaN(qv))return;const p=old[name.toUpperCase()];const rate=parseFloat(String(r[2]??'').replace(/[^\d.]/g,''))||(p?+p[3]:0);
+    out.push([name,+qv,(unit||(p?p[2]:'NOS')).toUpperCase(),rate,p?p[4]:catOf(name)])});
+  return out;
+}
+function textToTable(txt){const lines=txt.replace(/\r/g,'').split('\n').filter(l=>l.trim());const sep=lines.some(l=>l.includes('\t'))?'\t':',';return lines.map(l=>parseCSVLine(l,sep))}
+async function xlsxToTable(file){
+  if(!window.XLSX){await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+  const wb=XLSX.read(await file.arrayBuffer());return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''});
+}
+function importSheet(){
+  let rows=[];
+  sheet('Update stock from Tally',`<div class="form">
+   <p class="small" style="margin:0">In Tally open <b>Stock Summary</b> (Main Godown) and export to Excel. Then either upload the file, or open it, select the item rows and paste them below. Columns: Item, Closing quantity, Rate, Value.</p>
+   <label class="f">Upload Excel / CSV<input type="file" id="tf" accept=".xlsx,.xls,.csv,.txt"></label>
+   <label class="f">…or paste rows<textarea id="tp" style="min-height:140px" placeholder="BEARING-22216 E&#9;4.00 NOS&#9;3734&#9;14936"></textarea></label>
+   <div id="tprev" class="small muted">Nothing loaded yet.</div>
+   <button class="btn pri" id="tgo" disabled>Replace stock list</button></div>`,()=>{
+    const show=()=>{const v=rows.reduce((a,r)=>a+r[1]*r[3],0);$('#tprev').innerHTML=rows.length?`<b>${rows.length}</b> items read · value ${inr(v)}<br>First: ${esc(rows[0][0])} — ${rows[0][1]} ${esc(rows[0][2])}<br>Last: ${esc(rows[rows.length-1][0])} — ${rows[rows.length-1][1]} ${esc(rows[rows.length-1][2])}`:'No stock rows found. Check the columns: Item, Quantity, Rate, Value.';$('#tgo').disabled=!rows.length};
+    $('#tp').oninput=()=>{rows=parseStockRows(textToTable($('#tp').value));show()};
+    $('#tf').onchange=async e=>{const f=e.target.files[0];if(!f)return;$('#tprev').textContent='Reading '+f.name+'…';
+      try{rows=parseStockRows(/\.xlsx?$/i.test(f.name)?await xlsxToTable(f):textToTable(await f.text()))}catch(err){rows=[];$('#tprev').textContent='Could not read that file here. Open it, copy the rows and paste them instead.';return}show()};
+    $('#tgo').onclick=async()=>{if(rows.length>2500){toast('Too many rows (max 2500). Export the Main Godown only.');return}
+      if(MODE==='sheet'){try{toast('Saving…');applyStock(await gasCall('replaceStock',rows,me()));render()}catch(e){toast('Not saved: no network. Try again.');return}}
+      else{await put('stock','master',{rows,at:Date.now(),by:me()})}
+      closeSheet();toast('Stock list replaced: '+rows.length+' items')};
+  });
+}
 function qtySheet(name,q,u,save,mid){
   sheet('Update stock',`<form class="form" id="qf"><b>${esc(name)}</b><p class="small muted" style="margin:0">Current: ${q} ${esc(u)}</p>
    <div class="two"><label class="f">Issued (−)<input type="number" id="qi" min="0" step="any" inputmode="decimal"></label><label class="f">Received (+)<input type="number" id="qr" min="0" step="any" inputmode="decimal"></label></div>
@@ -849,12 +897,12 @@ function qtySheet(name,q,u,save,mid){
       save(v,{delta:set!=null?null:rec-iss,set,machine:$('#qm').value,ref:$('#qref').value.trim()});closeSheet();if(MODE!=='sheet')toast('Stock updated to '+v+' '+u)}});
 }
 async function stockMove(m){
-  m.by=me();toast('Saving to Google Sheet…');
+  m.by=me();toast('Saving…');
   try{const r=await gasCall('adjustStock',m);const row=SPARES.find(s=>s[0]===r.name);if(row)row[1]=r.q;else SPARES.push([r.name,r.q,r.unit||m.unit||'NOS',0,'General']);
-    STOCK_VER=r.ver;STOCK_SRC='Google Sheet · '+fmtDT(Date.now());render();toast(r.name+' now '+r.q+' '+(r.unit||m.unit||''))}
+    STOCK_VER=r.ver;STOCK_SRC='Live stock · '+fmtDT(Date.now());logMove(r.name,m,r.q);toast(r.name+' now '+r.q+' '+(r.unit||m.unit||''))}
   catch(e){toast('Not saved: '+((e&&e.message)||'no network')+'. Try again when online.')}
 }
-function applyStock(r){if(!r||r.same||!r.rows)return false;SPARES=r.rows.map(x=>[String(x[0]),+x[1]||0,String(x[2]||''),+x[3]||0,String(x[4]||'General')]);STOCK_VER=r.ver;STOCK_SRC='Google Sheet · '+fmtDT(r.ver||Date.now());return true}
+function applyStock(r){if(!r||r.same||!r.rows)return false;SPARES=r.rows.map(x=>[String(x[0]),+x[1]||0,String(x[2]||''),+x[3]||0,String(x[4]||'General')]);STOCK_VER=r.ver;STOCK_SRC='Live stock · '+fmtDT(r.ver||Date.now());return true}
 async function loadStock(){try{let r=await gasCall('getStock',0);if(!r.rows.length){await gasCall('initStock',SPARES);r=await gasCall('getStock',0)}if(applyStock(r))render()}catch(e){}}
 
 /* ----- SOURCING ----- */
@@ -988,7 +1036,7 @@ function vSetup(){
   <section class="panel"><h3>Plant settings</h3><div class="form"><div class="two"><label class="f">Planned running hours per day<input type="number" id="csh" value="${c.shiftHrs}" min="1" max="24"></label>
    <label class="f">Daily update email list<input type="text" id="cmail" value="${esc(c.mailTo)}"></label></div><button class="btn pri" id="csave">Save settings</button></div></section>
   <section class="panel"><h3>Data & backup</h3>
-   <p class="small" style="margin-top:0">${MODE==='sheet'?'<b>Google Sheet mode.</b> Everyone using this link shares the same records, stored in the “Data” tab of the maintenance Google Sheet. Entries made without network are kept on the phone and sent when it reconnects.':MODE==='shared'?'<b>Shared mode.</b> Everyone who opens this page in Claude sees the same records live.':'<b>This-device mode.</b> Records are saved in this browser only. Take a backup each week, or open the shared link so the whole team works on one record.'}</p>
+   <p class="small" style="margin-top:0">${MODE==='sheet'?'<b>Shared mode (Google link).</b> Everyone using this link shares the same records. All entries are made here in the app; nobody needs to open the Google Sheet, which only stores the data. Entries made without network are kept on the phone and sent when it reconnects.':MODE==='shared'?'<b>Shared mode.</b> Everyone who opens this page in Claude sees the same records live.':'<b>This-device mode.</b> Records are saved in this browser only. Take a backup each week, or open the shared link so the whole team works on one record.'}</p>
    <div class="row"><button class="btn" id="bexp">Export backup (JSON)</button><label class="btn" for="bimp">Import backup</label><input type="file" id="bimp" accept=".json,application/json" hidden></div>
    <p class="small muted">Sources: PM Checklist Critical Equipment (DCL/MAINT/ID/25-26), Predictive Maintenance Mech/Elect Dashboard (Aug-2026), stores closing list “MNT ITEMS” (02-Oct-2026), maintenance PO/WO approval mails (Sep-2026).</p></section>`;
 }

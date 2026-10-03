@@ -38,37 +38,29 @@ are sent automatically when the phone reconnects.
 
 ## C. In the Google Sheet
 
+- The sheet is only the app's storage. Nobody needs to open it for daily work.
 - **Data** tab: raw records used by the app. Do not edit by hand.
 - Menu **Maintenance Desk → Refresh report tabs** builds readable **Breakdowns**,
   **Sourcing** and **Downtime** tabs (machine × month). Use **Turn on hourly
   report refresh** to keep them updated automatically. Download as Excel from
   File → Download.
 
-## Live stock (Stock tab)
+## All data is entered in the app
 
-The first time the app opens, it copies the stores list (454 items, 02-Oct-26)
-into a **Stock** tab. From then on the Stock tab is the live stock for every phone.
+Users never open the Google Sheet. It only stores what is typed in the app.
 
-**Every issue / receipt (stores, during the shift).** In the app: Spares → tap
-the quantity → enter **Issued** or **Received** (or a physical count), the
-machine and the issue-slip / GRN no. → Save. The Stock tab updates straight away,
-every phone sees it within a minute, and a line is added to **Stock Moves**
-(time, item, qty, machine, ref, person). Low-stock alerts update by themselves.
-This needs network at that moment; the app says so if a save fails.
+**Stock issue / receipt (stores, during the shift).** Spares → tap the quantity →
+Issued or Received (or physical count), machine and issue-slip / GRN no. → Save.
+Every phone sees the new balance within a minute; the entry appears under
+**Recent issues & receipts** with time, machine, reference and person.
 
-**Daily or weekly, from Tally.** In Tally open *Stock Summary* for the Main Godown
-(closing quantity, rate, value), export to Excel, then:
-1. In the Google Sheet use **Maintenance Desk → Create Tally Import tab** (first time only).
-2. Paste the exported rows into **Tally Import** from row 2: Particulars, Quantity, Rate, Value.
-3. Use **Maintenance Desk → Import Tally stock summary**.
-
-The Stock tab is rebuilt from Tally. Group headings and the total row are skipped,
-and each item keeps its group. Issues entered in the app after the Tally export
-date are replaced by the Tally figure, so run the import right after the stores
+**Tally stock update (manager / stores in-charge, daily or weekly).** Spares →
+**Update stock from Tally** → upload the Tally *Stock Summary* Excel/CSV, or copy
+the item rows from it and paste. The app shows how many items it read and the
+total value; tap **Replace stock list**. Group headings and the total row are
+skipped. This button is hidden for technicians. Issues entered after the Tally
+export date are replaced by the Tally figure, so import right after stores
 entries are posted in Tally.
-
-You can also correct a quantity by typing directly in the Stock tab; phones pick
-up the change within a minute.
 
 ## Updating the app later
 

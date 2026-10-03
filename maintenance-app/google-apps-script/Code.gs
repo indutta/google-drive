@@ -263,3 +263,19 @@ function importTally() {
   } finally { lock.releaseLock(); }
   ui.alert('Stock updated from Tally: ' + out.length + ' items. Phones pick it up within a minute.');
 }
+
+/** Stock list replaced from the app's "Update stock from Tally" screen. rows = [[item, qty, unit, rate, group], ...] */
+function replaceStock(rows, by) {
+  if (!rows || !rows.length) throw new Error('no rows');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const sh = stockSheet_();
+    const now = new Date();
+    if (sh.getLastRow() >= 2) sh.getRange(2, 1, sh.getLastRow() - 1, 7).clearContent();
+    sh.getRange(2, 1, rows.length, 7).setValues(rows.map(function (r) {
+      return [String(r[0]), Number(r[1]) || 0, String(r[2] || ''), Number(r[3]) || 0, String(r[4] || 'General'), now, 'Tally import by ' + (by || 'app')];
+    }));
+    bumpStock_();
+  } finally { lock.releaseLock(); }
+  return getStock(0);
+}
