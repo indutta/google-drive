@@ -2,7 +2,9 @@
 
 An agent for Indranil Dutta (CEO, Datre Corporation) that triages the
 inbox, preps meetings, tracks open commitments, and drafts (never sends)
-routine replies — on demand and on a scheduled weekday-morning Routine.
+routine replies — on demand, and fed continuously by two scheduled
+Routines (see below) that reconcile `executive-assistant/tasks.md`
+straight from Gmail on their own schedule.
 
 ## Pieces
 
@@ -36,35 +38,36 @@ routine replies — on demand and on a scheduled weekday-morning Routine.
   any of it gets written back to is `executive-assistant/tasks.md` in
   this private repo.
 
-## The scheduled Routine — not yet live
+## The scheduled Routines — live, via the claude.ai Routines UI
 
-I tried to set this up via Claude's Routines (`create_trigger`), cron
-`45 1 * * 1-5` UTC = **7:15 AM IST, Monday–Friday** (Datre's plant
-timezone, Asia/Kolkata). It was rejected: this organization's Routines
-can't be granted MCP connector access (Gmail/Calendar/Drive) through
-that API path — a session it spawns would wake up with no way to read
-your inbox or calendar, which defeats the point. I deleted the trigger
-rather than leave a silently-broken automation running.
+`create_trigger`'s API path can't grant a spawned session Gmail/Calendar/
+Drive access on this org (see git history on this file if curious), so
+these were set up directly in the **claude.ai Routines UI** instead,
+which can attach connectors the API path couldn't. Two of them now feed
+`executive-assistant/tasks.md` directly:
 
-**To get the automatic morning run working**, create the Routine from
-the **claude.ai Routines UI** instead (Settings → Routines, or wherever
-your client surfaces them) — that surface can attach connectors that
-this API call couldn't. Point it at this session or a new one, prompt:
-*"Follow `.claude/skills/executive-assistant/SKILL.md` in
-indutta/google-drive and post the briefing,"* schedule `45 1 * * 1-5`
-(UTC) or your client's local-time equivalent of 7:15 AM IST weekdays,
-and grant it Gmail + Google Calendar + Google Drive.
+| Routine | Schedule (IST) | What it does |
+|---|---|---|
+| **Weekly open-items tracker** | Fri 4:00 PM | Scans Gmail for threads 5+ working days without a reply from Indranil, logs/updates them under `tasks.md`'s `## Open`, moves resolved ones to `## Recently resolved`, commits straight to this branch, then sends a short chat digest pointing at the tracker. |
+| **Daily approvals digest** | Mon–Sat 8:00 AM (currently **disabled**) | Same consolidation, scoped to internal approval/sign-off requests (purchase orders, reimbursements, drawing approvals) — tagged `(internal approval)` in the tracker to stay distinguishable from vendor-correspondence follow-ups. |
 
-**Until then, run it on demand** — ask in any session on this repo
-("run my morning briefing", "what's in my inbox") or invoke
-`/executive-assistant`. That path already works end-to-end: it's how
-`executive-assistant/tasks.md` got seeded below.
+Both commit directly to the repo's default branch (no PR) — this file
+and `tasks.md` can change between your sessions without you doing
+anything. Two other routines exist alongside these but don't touch this
+repo: a **Weekly newsletter sweep** (labels marketing mail) and a
+**Daily Morning Briefing** (calendar + inbox + industry news via the
+built-in `/morning` skill, currently disabled) — ask Claude to run
+`list_triggers` for current schedules/status on all four.
+
+**On demand**, the on-demand agent/skill in this repo (see above) also
+reads and reconciles `tasks.md` the same way — ask things like "what's
+in my inbox" or invoke `/executive-assistant` any time; it doesn't wait
+for the next scheduled fire.
 
 ## First run
 
 Built and seeded 2026-08-30 from a live (read-only) scan of the inbox
-and calendar — see `executive-assistant/tasks.md` for what it found.
-One write action (a holding-reply draft to LCB on the stale "Mining
-prospects Canada" follow-up) hit a Gmail re-authorization error mid-build;
-retry it on the next run once Gmail is reconnected in your claude.ai
-connector settings.
+and calendar — see `executive-assistant/tasks.md`'s history for what
+that first pass found. One write action that run (a holding-reply draft
+to LCB) hit a Gmail re-authorization error mid-build; check whether it
+went through on a later pass before assuming it's still pending.

@@ -1,8 +1,13 @@
 # Open follow-ups & commitments
 
-Maintained by the `executive-assistant` skill/agent. Each run reconciles
-this list against recent mail — see `.claude/skills/executive-assistant/SKILL.md`.
-Manual edits are fine; the assistant reads this file before every run.
+Maintained by the `executive-assistant` skill/agent, and by two scheduled
+Routines that reconcile this file directly from Gmail: **Weekly
+open-items tracker** (vendor/colleague threads stuck 5+ working days,
+Fri 4:00 PM IST) and **Daily approvals digest** (internal approvals,
+tagged `(internal approval)`, currently disabled) — see
+`executive-assistant/README.md` for schedules and status. Also reconciled
+on demand — see `.claude/skills/executive-assistant/SKILL.md`. Manual
+edits are fine; every run reads this file first.
 
 ## Open
 
@@ -54,5 +59,8 @@ Manual edits are fine; the assistant reads this file before every run.
 - No calendar events found on 2026-08-30 (Sunday) at first run.
 
 ---
-*Last reconciled: 2026-08-30, on-demand build/seed run (not yet a
-scheduled Routine fire — see executive-assistant/README.md).*
+*Last reconciled: 2026-08-30, on-demand build/seed run — predates the
+Routine consolidation (2026-10-03). Everything above is over a month
+stale; the Weekly open-items tracker's next fire (Fri) will refresh the
+"Open" section against current mail. Treat ages/dates below as of
+2026-08-30, not current.*
