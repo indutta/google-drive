@@ -279,3 +279,61 @@ function replaceStock(rows, by) {
   } finally { lock.releaseLock(); }
   return getStock(0);
 }
+
+/* ======================= VENDOR ENQUIRY MAIL ======================= */
+const PURCHASE_MAIL = 'purchase@datre.com';
+const SENDER_NAME = 'Anwesha Manna Roy – Purchase, Datre Corporation Ltd';
+
+/**
+ * Mails one enquiry per vendor from purchase@datre.com.
+ * Works when the app is deployed while signed in as purchase@datre.com,
+ * or when the deploying account has purchase@datre.com as a "Send mail as" alias.
+ */
+function sendEnquiry(arg) {
+  const q = arg.q, vendors = arg.vendors || [];
+  const me = (Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  let viaAlias = false;
+  if (me !== PURCHASE_MAIL) {
+    const aliases = GmailApp.getAliases().map(function (a) { return a.toLowerCase(); });
+    if (aliases.indexOf(PURCHASE_MAIL) < 0) {
+      throw new Error('Enquiries must go from ' + PURCHASE_MAIL + '. Deploy the app while signed in as ' + PURCHASE_MAIL + '.');
+    }
+    viaAlias = true;
+  }
+  const res = [];
+  vendors.forEach(function (v) {
+    const to = String(v.e || '').split(/[,;\s]+/).filter(function (x) { return /@/.test(x); }).join(',');
+    if (!to) { res.push({ n: v.n, e: '', ok: false, err: 'no email' }); return; }
+    const m = enquiryMail_(q, v.n);
+    try {
+      if (viaAlias) GmailApp.sendEmail(to, m.subject, m.text, { htmlBody: m.html, from: PURCHASE_MAIL, name: SENDER_NAME, replyTo: PURCHASE_MAIL });
+      else MailApp.sendEmail({ to: to, subject: m.subject, body: m.text, htmlBody: m.html, name: SENDER_NAME, replyTo: PURCHASE_MAIL });
+      res.push({ n: v.n, e: to, ok: true });
+    } catch (err) {
+      res.push({ n: v.n, e: to, ok: false, err: String(err && err.message || err) });
+    }
+  });
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName('Enquiries') || (function () { const s = ss.insertSheet('Enquiries'); s.appendRow(['Time', 'Indent', 'Item', 'Qty', 'Vendor', 'Email', 'Result', 'Released by']); s.getRange(1, 1, 1, 8).setFontWeight('bold'); s.setFrozenRows(1); return s; })();
+  res.forEach(function (r) { sh.appendRow([new Date(), q.ref || '', q.item, q.qty || '', r.n, r.e, r.ok ? 'Sent' : 'Failed: ' + r.err, q.by || '']); });
+  return res;
+}
+
+function enquiryMail_(q, vendorName) {
+  const tz = Session.getScriptTimeZone();
+  const need = q.need || Utilities.formatDate(new Date(Date.now() + 7 * 864e5), tz, 'dd-MMM-yy');
+  const reply = Utilities.formatDate(new Date(Date.now() + 3 * 864e5), tz, 'dd-MMM-yy');
+  const subject = 'Enquiry ' + (q.ref || '') + ' – ' + q.item + ' – Datre Corporation Ltd, Falta';
+  const esc = function (s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  const rows = [['Item', q.item], ['Specification / part no.', q.spec || '—'], ['Quantity', q.qty || '—'], ['Required by', need], ['Indent ref', q.ref || '—']];
+  const sign = 'Anwesha Manna Roy<br>Purchase · Datre Corporation Limited<br>FIGC, Sector III, Falta, 24 Parganas (S), PIN 743504, West Bengal<br>Ph: 9064806731 | ' + PURCHASE_MAIL;
+  const html = '<p>Dear Sir/Madam' + (vendorName ? ' (' + esc(vendorName) + ')' : '') + ',</p>' +
+    '<p>Please quote your best rate for the following requirement at our foundry, Falta Industrial Growth Centre.</p>' +
+    '<table style="border-collapse:collapse" cellpadding="6">' + rows.map(function (r) { return '<tr><td style="border:1px solid #ccc;background:#f3f5f7"><b>' + esc(r[0]) + '</b></td><td style="border:1px solid #ccc">' + esc(r[1]) + '</td></tr>'; }).join('') + '</table>' +
+    '<p>Please mention in your quotation: unit price and GST %, make / brand, delivery period, freight (ex-works or F.O.R. Falta), payment terms and validity of the offer.</p>' +
+    '<p>Kindly reply to <b>' + PURCHASE_MAIL + '</b> by <b>' + reply + '</b>.</p><p>Regards,<br>' + sign + '</p>';
+  const text = 'Dear Sir/Madam' + (vendorName ? ' (' + vendorName + ')' : '') + ',\n\nPlease quote your best rate for the following requirement at our foundry, Falta Industrial Growth Centre.\n\n' +
+    rows.map(function (r) { return r[0] + ': ' + r[1]; }).join('\n') +
+    '\n\nPlease mention: unit price and GST %, make / brand, delivery period, freight (ex-works or F.O.R. Falta), payment terms and validity of the offer.\n\nKindly reply to ' + PURCHASE_MAIL + ' by ' + reply + '.\n\nRegards,\n' + sign.replace(/<br>/g, '\n');
+  return { subject: subject, html: html, text: text };
+}

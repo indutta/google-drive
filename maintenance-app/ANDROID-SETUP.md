@@ -4,7 +4,11 @@ One-time setup takes about 10 minutes on a PC. After that each technician only
 opens a link in Chrome and adds it to the home screen. It opens full screen like
 an app. Every phone shares the same records, stored in a Google Sheet you own.
 
-## A. One-time setup (maintenance manager or IT, on a PC)
+## A. One-time setup (on a PC, signed in as **purchase@datre.com**)
+
+Deploy while signed in as `purchase@datre.com`, so that vendor enquiry mails go
+out from the purchase mailbox (Anwesha). If you deploy from another account, that
+account must have `purchase@datre.com` set up as a Gmail "Send mail as" address.
 
 1. Go to **sheets.new** while signed in with your `@datre.com` account. Name the
    sheet **Datre Maintenance Desk**.
@@ -61,6 +65,27 @@ total value; tap **Replace stock list**. Group headings and the total row are
 skipped. This button is hidden for technicians. Issues entered after the Tally
 export date are replaced by the Tally figure, so import right after stores
 entries are posted in Tally.
+
+## Indent → vendor enquiry mail
+
+1. Anyone raises an indent: Sourcing → **+ New indent** (or the Indent button on a
+   low critical spare). Start typing the item. The app suggests matching items
+   from the stores list and the MNT vendor list, and shows the vendors who
+   supplied that item (or similar items) with email and phone. Tick the vendors.
+2. Technicians' indents wait for release. Managers / purchase see an alert:
+   *Indent waiting for release*.
+3. Anwesha (or Pallab, Monotosh, CEO) opens it and taps **Release indent & send
+   enquiry**. One email per vendor goes out from **purchase@datre.com** with
+   item, specification, quantity, required-by date and indent number
+   (IND/MNT/26-27/001 …), asking for price, GST, make, delivery, freight, payment
+   terms and validity, with replies to purchase@datre.com within 3 days.
+4. Vendors with no email but a mobile number get a **WhatsApp** button with the
+   same enquiry text.
+5. The indent moves to **Enquiry sent**. Every mail is listed on the indent and in
+   the sheet's **Enquiries** tab.
+
+In the Claude link the app cannot send mail by itself: it opens each enquiry in
+your mail app (or copies it) instead.
 
 ## Updating the app later
 
