@@ -1,0 +1,1157 @@
+[
+{
+"id": "pp01",
+"item": "ROPE PULLEY 1 TON SINGLE PULLEY",
+"spec": "",
+"m": "",
+"qty": "1 Nos",
+"ref": "MNT/021/26-27",
+"idate": "2026-06-26",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "No suitable quote received yet",
+"stage": "Enquiry sent",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1782448200000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1782448200000,
+"by": "Purchase register",
+"s": "Indent MNT/021/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "No suitable quote received yet"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp02",
+"item": "PVC FLEXIBLE MAGIC PIPE DIA-6\" INSIDE WIRE",
+"spec": "",
+"m": "MX",
+"qty": "6 Mtr",
+"ref": "MNT/024/26-27",
+"idate": "2026-07-09",
+"vendor": "STAR ENTERPRISE",
+"po": "DCL/MNT/26-27/245",
+"podate": "2026-10-01",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1783571400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1783571400000,
+"by": "Purchase register",
+"s": "Indent MNT/024/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp03",
+"item": "CI NON RETURN VALVE-4\"",
+"spec": "100 mm NRV, top & bottom inner side female thread; pump room RO water line for induction furnace cooling",
+"m": "",
+"qty": "1 Nos",
+"ref": "MNT/032/26-27",
+"idate": "2026-07-31",
+"vendor": "AIRA ELECTRO-PNEUMATICS",
+"po": "DCL/MNT/26-27/158",
+"podate": "2026-08-04",
+"st": "Awaiting ready confirmation",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1785472200000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1785472200000,
+"by": "Purchase register",
+"s": "Indent MNT/032/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Awaiting ready confirmation"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp04",
+"item": "TRANSFORMER OIL",
+"spec": "",
+"m": "TR",
+"qty": "210 Ltr",
+"ref": "MNT/032/26-27",
+"idate": "2026-07-31",
+"vendor": "TradeTech",
+"po": "",
+"podate": "",
+"st": "Awaiting quotation",
+"stage": "Enquiry sent",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1785472200000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1785472200000,
+"by": "Purchase register",
+"s": "Indent MNT/032/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Awaiting quotation"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp05",
+"item": "SINGLE CHAIN-5/8\"",
+"spec": "",
+"m": "",
+"qty": "100 Feet",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "REPUBLIC HARDWARE STORES",
+"po": "DCL/MNT/26-27/252",
+"podate": "2026-10-04",
+"st": "Under approval",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Under approval"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp06",
+"item": "DOUBLE CHAIN-5/8\"",
+"spec": "",
+"m": "",
+"qty": "30 Feet",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "REPUBLIC HARDWARE STORES",
+"po": "DCL/MNT/26-27/252",
+"podate": "2026-10-04",
+"st": "Under approval",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Under approval"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp07",
+"item": "SS WIRE-5 MM-GRADE-310",
+"spec": "",
+"m": "",
+"qty": "5 Kgs",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "STAR ENTERPRISE",
+"po": "DCL/MNT/26-27/245",
+"podate": "2026-10-01",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp08",
+"item": "HYDRAULIC HOSE-1/2\" (1700 MM LENGTH)",
+"spec": "",
+"m": "",
+"qty": "6 Nos",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "STAR ENTERPRISE",
+"po": "DCL/MNT/26-27/245",
+"podate": "2026-10-01",
+"st": "Hold (Pallab)",
+"stage": "PO approved",
+"prio": "Normal",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Hold (Pallab)"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp09",
+"item": "CLUTCH PLATE",
+"spec": "",
+"m": "",
+"qty": "2 Nos",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-22",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "Cash purchase",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787373000000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787373000000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Cash purchase"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp10",
+"item": "RUBBER HOSE PIPE-1/2\" (COMPRESSED AIR)",
+"spec": "",
+"m": "CP",
+"qty": "50 Mtr",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "STAR ENTERPRISE",
+"po": "DCL/MNT/26-27/245",
+"podate": "2026-10-01",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp11",
+"item": "SPROCKET-3/4\" PITCH, DUPLEX, OD-4\"",
+"spec": "",
+"m": "",
+"qty": "2 Nos",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "Cash purchase",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Cash purchase"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp12",
+"item": "SPROCKET-1\" PITCH, DUPLEX, OD-4\"",
+"spec": "",
+"m": "",
+"qty": "1 Nos",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "Cash purchase",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Cash purchase"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp13",
+"item": "WASHER-SS304 (OD-75, ID-20, THK-5 MM)",
+"spec": "",
+"m": "",
+"qty": "10 Nos",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "Cash purchase",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Cash purchase"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp14",
+"item": "ADAPTER-1/2\" X 1/2\"",
+"spec": "",
+"m": "",
+"qty": "6 Nos",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "STAR ENTERPRISE",
+"po": "DCL/MNT/26-27/245",
+"podate": "2026-10-01",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp15",
+"item": "MS UNION-1/2\"",
+"spec": "",
+"m": "",
+"qty": "4 Nos",
+"ref": "MNT/034/26-27",
+"idate": "2026-08-28",
+"vendor": "STAR ENTERPRISE",
+"po": "DCL/MNT/26-27/245",
+"podate": "2026-10-01",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1787891400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1787891400000,
+"by": "Purchase register",
+"s": "Indent MNT/034/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp16",
+"item": "COPPER FLEXIBLE CABLE-2.5 SQ MM X 3 CORE",
+"spec": "",
+"m": "",
+"qty": "100 Mtr",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "S.P. ENTERPRISE",
+"po": "DCL/MNT/26-27/250",
+"podate": "2026-10-04",
+"st": "Under approval",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Under approval"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp17",
+"item": "COPPER FLEXIBLE CABLE-2.5 SQ MM X 4 CORE",
+"spec": "",
+"m": "",
+"qty": "100 Mtr",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "S.P. ENTERPRISE",
+"po": "DCL/MNT/26-27/250",
+"podate": "2026-10-04",
+"st": "Under approval",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Under approval"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp18",
+"item": "HYDRAULIC OIL-68",
+"spec": "",
+"m": "RO",
+"qty": "210 Ltr",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "AANARCHEY TECHNOLOGIES PRIVATE LIMITED",
+"po": "DCL/MNT/26-27/240",
+"podate": "2026-09-29",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp19",
+"item": "GEAR OIL-GRADE 320",
+"spec": "",
+"m": "",
+"qty": "20 Ltr",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "AANARCHEY TECHNOLOGIES PRIVATE LIMITED",
+"po": "DCL/MNT/26-27/240",
+"podate": "2026-09-29",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp20",
+"item": "RESILIENT COUPLING SPRING-104Z",
+"spec": "",
+"m": "E75",
+"qty": "2 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "GBM MANUFACTURING PVT. LTD",
+"po": "DCL/MNT/26-27/227",
+"podate": "2026-09-22",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp21",
+"item": "PLIER-8\" (TAPARIA)",
+"spec": "",
+"m": "",
+"qty": "1 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "Cash purchase",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Cash purchase"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp22",
+"item": "SCREW DRIVER-12\"",
+"spec": "",
+"m": "",
+"qty": "1 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "Cash purchase",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Cash purchase"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp23",
+"item": "STEEL WIRE ROPE-10MM (NEW 2T CRANE)",
+"spec": "",
+"m": "E2",
+"qty": "16 Mtr",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "REPUBLIC HARDWARE STORES",
+"po": "DCL/MNT/26-27/243",
+"podate": "2026-09-29",
+"st": "PO placed",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "PO placed"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp24",
+"item": "COUNTERSUNK SCREW WITH NUT & WASHER-M12X60",
+"spec": "",
+"m": "",
+"qty": "120 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Deepak Trading Co.",
+"po": "",
+"podate": "",
+"st": "Ready for order",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for order"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp25",
+"item": "COUNTERSUNK SCREW WITH NUT & WASHER-M16X60",
+"spec": "",
+"m": "",
+"qty": "80 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Deepak Trading Co.",
+"po": "",
+"podate": "",
+"st": "Ready for order",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for order"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp26",
+"item": "PROPELLER-12\"",
+"spec": "",
+"m": "",
+"qty": "2 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "POONAM METALS",
+"po": "",
+"podate": "",
+"st": "Awaiting price confirmation",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Awaiting price confirmation"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp27",
+"item": "CARBIDE STRAIGHT SHANK DRILL-10.5MM",
+"spec": "",
+"m": "",
+"qty": "2 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Cash purchase",
+"po": "",
+"podate": "",
+"st": "Cash purchase",
+"stage": "PO approved",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Cash purchase"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp28",
+"item": "HEX BOLT, NUT WITH FLAT & SPRING WASHER-M12X50",
+"spec": "",
+"m": "",
+"qty": "30 Set",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Deepak Trading Co.",
+"po": "",
+"podate": "",
+"st": "Ready for order",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for order"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp29",
+"item": "HEX BOLT, NUT WITH FLAT & SPRING WASHER-M10X50",
+"spec": "",
+"m": "",
+"qty": "30 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Deepak Trading Co.",
+"po": "",
+"podate": "",
+"st": "Ready for order",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for order"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp30",
+"item": "HEX BOLT NUT WITH WASHER-M8X35",
+"spec": "",
+"m": "",
+"qty": "30 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "Deepak Trading Co.",
+"po": "",
+"podate": "",
+"st": "Ready for order",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for order"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp31",
+"item": "PROXIMITY SWITCH-M30",
+"spec": "",
+"m": "",
+"qty": "10 Nos",
+"ref": "MNT/042/26-27",
+"idate": "2026-09-22",
+"vendor": "PRAKASH ELECTRICALS",
+"po": "DCL/MNT/26-27/254",
+"podate": "2026-10-06",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790051400000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790051400000,
+"by": "Purchase register",
+"s": "Indent MNT/042/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp32",
+"item": "HRC FUSE-315 AMP",
+"spec": "Make: Bussmann",
+"m": "HT5O",
+"qty": "10 Nos",
+"ref": "MNT/043/26-27",
+"idate": "2026-10-01",
+"vendor": "",
+"po": "",
+"podate": "",
+"st": "Awaiting lower quote",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790829000000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790829000000,
+"by": "Purchase register",
+"s": "Indent MNT/043/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Awaiting lower quote"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp33",
+"item": "ON-DELAY TIMER-110V-800XA",
+"spec": "Make: Selec; supply A1-A2 20-240 VAC / 18-240 VDC; contact 5 A, 250 VAC / 24 VDC resistive",
+"m": "HT5O",
+"qty": "6 Nos",
+"ref": "MNT/043/26-27",
+"idate": "2026-10-01",
+"vendor": "",
+"po": "",
+"podate": "",
+"st": "Awaiting lower quote",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790829000000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790829000000,
+"by": "Purchase register",
+"s": "Indent MNT/043/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Awaiting lower quote"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp34",
+"item": "BCH CONTACTOR-CE 15DN3-110V AC",
+"spec": "",
+"m": "",
+"qty": "4 Nos",
+"ref": "MNT/043/26-27",
+"idate": "2026-10-01",
+"vendor": "",
+"po": "",
+"podate": "",
+"st": "Awaiting lower quote",
+"stage": "Quotation",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790829000000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790829000000,
+"by": "Purchase register",
+"s": "Indent MNT/043/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Awaiting lower quote"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+},
+{
+"id": "pp35",
+"item": "CONTACTOR-24V DC (SCHNEIDER LC1D25BD)",
+"spec": "25 A, 3 pole, coil 24 V DC",
+"m": "",
+"qty": "4 Nos",
+"ref": "MNT/043/26-27",
+"idate": "2026-10-01",
+"vendor": "PRAKASH ELECTRICALS",
+"po": "DCL/MNT/26-27/254",
+"podate": "2026-10-06",
+"st": "Ready for pick up",
+"stage": "Dispatched",
+"prio": "High",
+"eta": "",
+"note": "",
+"raisedAt": 1790829000000,
+"src": "MNT purchase pending 06-Oct-26",
+"log": [
+{
+"t": 1790829000000,
+"by": "Purchase register",
+"s": "Indent MNT/043/26-27"
+},
+{
+"t": 1791261000000,
+"by": "Purchase pending list",
+"s": "Ready for pick up"
+}
+],
+"updatedAt": 1791261000000,
+"updatedBy": "Purchase pending list 06-Oct-26"
+}
+]
