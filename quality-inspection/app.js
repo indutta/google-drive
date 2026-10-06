@@ -222,14 +222,16 @@
 
   V.dashboard = () => {
     const s = QI.stats(); const st = S();
-    if (!st.jobs.length) return `<h2>Dashboard</h2>${empty('<b>Welcome to the DCL Quality Inspection app.</b><br>Start by creating a work order, then add castings and follow each one through the 10 inspection stages.',
-      QI.can('create', 'job') ? `<div class="row c"><a class="btn primary" href="#/jobs">Create first work order</a><button class="btn" data-act="demo">Load demo data</button></div>` : '<div class="muted pad">Planning or Quality will create the first work order.</div>')}`;
+    const intro = st.jobs.length ? '' : `<div class="empty intro"><b>Welcome to the DCL Quality Inspection app.</b><br>No work orders yet. Create a work order, add castings, and follow each one through the 10 inspection stages.${QI.can('create', 'job') ? `<div class="row c"><a class="btn primary" href="#/jobs">Create first work order</a><button class="btn" data-act="demo">Load sample data</button></div>` : '<div class="muted pad">Planning or Quality will create the first work order.</div>'}</div>`;
+    const dp = QI.dept();
+    const mine = QI.mode === 'shared' && dp && dp.stages.length && !dp.all ? st.castings.filter((c) => { if (c.status !== 'active') return false; const x = QI.castingState(c); return x.stageNo && dp.stages.includes(x.stageNo) && x.label.startsWith('Stage'); }) : null;
     const max = Math.max(1, ...Object.values(s.wip));
     const nmax = Math.max(1, ...Object.values(s.ncrByStage));
     const due = QI.due();
     const attention = st.castings.filter((c) => c.status === 'active' && QI.castingState(c).failing);
     const pct = (v) => v == null ? '–' : Math.round(v * 100) + '%';
-    return `<h2>Dashboard</h2>
+    return `<h2>Dashboard</h2>${intro}
+    ${mine ? `<section class="card"><h3>Waiting for ${esc(dp.name)} <span class="badge info">${mine.length}</span></h3>${mine.length ? mine.slice(0, 12).map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} <span class="muted sm">${esc(QI.castingState(c).label)}</span></div>`).join('') : '<div class="muted">Nothing waiting for your department ✔</div>'}</section>` : ''}
     <div class="kpis">
       <div class="kpi"><b>${s.active}</b><span>Castings in process</span></div>
       <div class="kpi"><b>${s.released}</b><span>Released</span></div>
