@@ -1,0 +1,2485 @@
+<title>DCL Quality Inspection</title>
+<style>
+:root{--bg:#f6f6f3;--surface:#fff;--s2:#f0efeb;--text:#161616;--mut:#6b6a66;--line:#dedcd4;--accent:#1f5fbf;--ok:#1b7f4b;--okbg:#e3f4ea;--bad:#c0322b;--badbg:#fbe7e5;--warn:#9a5b00;--warnbg:#fff2d6;--info:#1f5fbf;--infobg:#e4edfb}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141413;--surface:#1d1d1b;--s2:#262624;--text:#ecebe6;--mut:#9a988f;--line:#383834;--accent:#6aa3ff;--ok:#5dd08d;--okbg:#17301f;--bad:#ff8a80;--badbg:#3a1b19;--warn:#f2b64d;--warnbg:#3a2c10;--info:#8db8ff;--infobg:#172742;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141413;--surface:#1d1d1b;--s2:#262624;--text:#ecebe6;--mut:#9a988f;--line:#383834;--accent:#6aa3ff;--ok:#5dd08d;--okbg:#17301f;--bad:#ff8a80;--badbg:#3a1b19;--warn:#f2b64d;--warnbg:#3a2c10;--info:#8db8ff;--infobg:#172742;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+h2{margin:0 0 .6rem;font-size:1.4rem}h2 small{font-weight:400;color:var(--mut);font-size:.8em}h3{margin:0 0 .6rem;font-size:1.05rem}h5{margin:.6rem 0 .3rem;font-size:.95rem}
+.top{display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.brand span{color:var(--mut);margin-left:.4rem}.who{background:none;border:1px solid var(--line);border-radius:99px;padding:.25rem .8rem;color:var(--text);cursor:pointer}
+.nav{display:flex;gap:.25rem;overflow-x:auto;padding:.4rem 1rem;background:var(--surface);border-bottom:1px solid var(--line)}
+.nav a{padding:.4rem .8rem;border-radius:8px;color:var(--text);white-space:nowrap}.nav a.on{background:var(--infobg);color:var(--info);font-weight:600}.nav a:hover{background:var(--s2);text-decoration:none}
+main{max-width:1180px;margin:0 auto;padding:1rem 16px 4rem}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:.8rem}.hd h2{margin:0}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}.row.c{justify-content:center;margin-top:1rem}.pad{padding:.4rem 0}
+.muted{color:var(--mut)}.sm{font-size:.85rem}.warnT{color:var(--warn)}.badT{color:var(--bad)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem;margin-bottom:1rem}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}@media(max-width:800px){.cols,.grid2{grid-template-columns:1fr!important}.grid3{grid-template-columns:1fr 1fr!important}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem;margin-bottom:1rem}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.8rem}.kpi b{display:block;font-size:1.8rem}.kpi span{color:var(--mut);font-size:.82rem}
+.bar{display:grid;grid-template-columns:minmax(120px,42%) 1fr 2rem;gap:.5rem;align-items:center;font-size:.85rem;margin:.25rem 0}.bl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt{height:10px;background:var(--s2);border-radius:5px;overflow:hidden}.bt i{display:block;height:100%;background:var(--info);border-radius:5px}.bt.bad i{background:var(--bad)}
+.btn{display:inline-block;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:8px;padding:.45rem .9rem;font:inherit;cursor:pointer}.btn:hover{background:var(--s2);text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{filter:brightness(1.08)}.btn.ghost{background:none}.btn.danger{color:var(--bad);border-color:var(--bad)}.btn.sm{padding:.25rem .65rem;font-size:.85rem}.btn[disabled]{opacity:.45;cursor:not-allowed}
+.badge{display:inline-block;border-radius:99px;padding:.05rem .55rem;font-size:.75rem;font-weight:600;background:var(--s2);color:var(--mut);white-space:nowrap}
+.badge.ok{background:var(--okbg);color:var(--ok)}.badge.bad{background:var(--badbg);color:var(--bad)}.badge.warn{background:var(--warnbg);color:var(--warn)}.badge.info{background:var(--infobg);color:var(--info)}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--line);flex:none;margin-top:.35rem}.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.info{background:var(--info)}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;color:var(--mut);padding:.4rem .5rem;border-bottom:1px solid var(--line)}td{padding:.5rem;border-bottom:1px solid var(--line);vertical-align:top}
+.pbar{display:inline-flex;gap:2px}.pbar i{width:14px;height:10px;background:var(--line);border-radius:2px}.pbar i.ok{background:var(--ok)}.pbar i.bad{background:var(--bad)}.pbar i.info{background:var(--info)}.pbar i.na{background:repeating-linear-gradient(45deg,var(--line),var(--line) 2px,transparent 2px,transparent 4px)}
+.empty{text-align:center;color:var(--mut);padding:2.5rem 1rem;background:var(--surface);border:1px dashed var(--line);border-radius:12px}
+.search,input,select,textarea{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.4rem .6rem;max-width:100%}.search{min-width:240px}
+.f{display:block;margin-bottom:.6rem}.f>span,.lbl{display:block;font-size:.82rem;color:var(--mut);margin-bottom:.2rem}.f input,.f select,.f textarea{width:100%}.f small{color:var(--mut)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 .8rem}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 .8rem}
+.radios{display:flex;gap:1.2rem}.radios label{display:flex;gap:.3rem;align-items:center;padding:.4rem .8rem;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.chk{border-top:1px solid var(--line);padding:.6rem 0}.chk-h{display:flex;gap:.7rem}.chk-t{flex:1;min-width:0}.chk-a{flex:none}
+.chkform{background:var(--s2);border-radius:10px;padding:.8rem;margin:.6rem 0 .2rem 1.5rem}
+.preview{min-height:1.3rem;margin:.3rem 0 .6rem;font-weight:600}.preview.ok{color:var(--ok)}.preview.nok,.preview.err{color:var(--bad)}
+.hist{margin:.3rem 0 0 1.5rem;font-size:.85rem;color:var(--mut)}.hrow{padding:.15rem 0}
+.dimt input{width:100%;min-width:70px}.x{border:0;background:none;font-size:1.2rem;color:var(--bad);cursor:pointer}
+.specgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.6rem}.specgrid label span{display:block;font-size:.82rem}.specgrid em{color:var(--mut);font-style:normal}.specgrid input{width:100%}
+.grp{margin:.8rem 0 .2rem;font-weight:700;color:var(--info);border-bottom:2px solid var(--infobg)}
+.step.na h5{color:var(--mut)}
+.stage .sh{display:flex;gap:.6rem;align-items:center;cursor:pointer;flex-wrap:wrap}.sn{width:2rem;height:2rem;border-radius:50%;background:var(--s2);display:grid;place-items:center;font-weight:700}
+.stage.done .sn{background:var(--ok);color:#fff}.stage.fail .sn{background:var(--bad);color:#fff}.stage.progress .sn{background:var(--info);color:#fff}.sname{font-weight:600;flex:1}.chev{color:var(--mut)}.sb{margin-top:.6rem}
+.banner{padding:.7rem 1rem;border-radius:10px;margin-bottom:1rem}.banner.bad{background:var(--badbg);color:var(--bad)}.banner.ok{background:var(--okbg);color:var(--ok)}.banner.warn{background:var(--warnbg);color:var(--warn)}
+.warnBox{background:var(--warnbg);color:var(--warn);padding:.6rem .8rem;border-radius:8px}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem}.chip{border:1px solid var(--line);border-radius:99px;padding:.2rem .7rem;font-size:.85rem;cursor:pointer}
+.li{padding:.35rem 0;border-bottom:1px solid var(--line)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg button{border:0;background:var(--surface);color:var(--text);padding:.4rem .9rem;cursor:pointer}.seg .on{background:var(--accent);color:#fff}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--text);padding:0;width:min(560px,94vw);max-height:92vh}dialog::backdrop{background:rgba(0,0,0,.45)}
+.mform{padding:1.2rem}.mbody{max-height:62vh;overflow:auto;padding:.2rem}.merr{color:var(--bad);min-height:1.2rem;margin:.3rem 0}.mact{display:flex;justify-content:flex-end;gap:.5rem}
+#toast{position:fixed;left:50%;bottom:1.2rem;transform:translate(-50%,20px);background:#222;color:#fff;padding:.6rem 1.1rem;border-radius:10px;opacity:0;pointer-events:none;transition:.25s;max-width:92vw;z-index:20}#toast.show{opacity:1;transform:translate(-50%,0)}#toast.bad{background:var(--bad)}#toast.ok{background:var(--ok)}
+.report{background:#fff;color:#000;padding:1.5rem;border:1px solid var(--line);font-size:.85rem}.report header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:.5rem;margin-bottom:.8rem}.report h1{margin:0;font-size:1.3rem}.rs-r{text-align:right}
+.report table{margin-bottom:.8rem}.report th,.report td{border:1px solid #999;padding:.25rem .4rem;color:#000;font-size:.8rem}.report th{background:#eee;text-transform:none}.kv th{width:16%}.rt .rs td{background:#d9ead3;font-weight:700}
+.sig{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:2.5rem}.sig div{border-top:1px solid #000;padding-top:.3rem}
+@media print{.top,.nav,.noprint,#toast{display:none!important}body{background:#fff}main{padding:0;max-width:none}.report{border:0;padding:0}}
+[hidden]{display:none!important}
+.other{margin-top:.4rem}
+.chip .x{font-size:1rem;padding:0 .2rem;margin-left:.2rem}
+/* phones / tablets: big touch targets, 16px inputs (stops Android/iOS zoom-on-focus) */
+@media(max-width:700px){
+  body{font-size:16px}
+  input,select,textarea,.search{font-size:16px;min-height:44px}
+  .btn{min-height:44px;padding:.55rem 1rem}.btn.sm{min-height:40px}
+  .nav a{padding:.6rem .9rem}
+  .chkform{margin-left:0;padding:.6rem}
+  .chk-h{flex-wrap:wrap}.chk-a{width:100%}.chk-a .btn{width:100%}
+  .hd .row{width:100%}.hd .row .btn{flex:1;text-align:center}
+  .brand span{display:none}
+  .search{min-width:0;width:100%}
+  .radios label{flex:1;justify-content:center;min-height:48px}
+  dialog{width:100vw;max-width:100vw;height:auto;max-height:96vh;margin:auto auto 0;border-radius:16px 16px 0 0}
+  .dimt{min-width:520px}.f:has(.dimt){overflow-x:auto}
+  .kpi b{font-size:1.5rem}
+}
+
+.brandrow{display:flex;align-items:center;gap:.5rem;min-width:0}.back{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:8px;min-width:40px;min-height:40px;font-size:1.2rem;cursor:pointer}
+.top{gap:.6rem;flex-wrap:wrap}.sync{font-size:.78rem;color:var(--mut);margin-left:auto}.sync.on{color:var(--ok)}
+.stale{border:0;background:var(--warnbg);color:var(--warn);border-radius:99px;padding:.3rem .8rem;cursor:pointer;font:inherit;font-size:.82rem}
+.pre{white-space:pre-line}
+
+</style>
+<header class="top">
+  <div class="brandrow"><button id="back" class="back" hidden aria-label="Back">←</button><div class="brand"><b>DATRE</b> <span>Quality Inspection · Casting process</span></div></div>
+  <span id="sync" class="sync"></span>
+  <button id="stale" class="stale" hidden>Updates available – tap to refresh</button>
+  <button id="who" class="who" title="Inspector"></button>
+</header>
+<nav id="nav" class="nav"></nav>
+<main id="main"></main>
+<dialog id="dlg"></dialog>
+<div id="toast" role="status"></div>
+<script>
+/* Generated by tools/build_plan.py from source/INS_Inspection_Flow.xlsx - do not edit by hand */
+window.PLAN = {
+ "company": "DATRE CORPORATION LIMITED",
+ "title": "Casting Process Flow – Inspection Plan",
+ "stages": [
+  {
+   "no": 1,
+   "name": "Pattern & Core Box Making",
+   "scope": "job",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "1.1",
+       "name": "Making of Pattern Layout",
+       "checks": [
+        {
+         "id": "1.1.1",
+         "step": "1.1",
+         "sample": "1",
+         "param": "Dimension",
+         "method": "Contraction scale, angle protector, calipers",
+         "criteria": "As per drawing, measured by contraction scale",
+         "action": "Layout rectification",
+         "actions": [
+          "Layout rectification"
+         ],
+         "tbc": false,
+         "kind": "dim"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "1.2",
+       "name": "Making of Templates",
+       "checks": [
+        {
+         "id": "1.2.1",
+         "step": "1.2",
+         "sample": "1",
+         "param": "Matching with layout",
+         "method": "Pattern layout",
+         "criteria": "Absolutely matched with layout",
+         "action": "Rectification or remaking",
+         "actions": [
+          "Rectification or remaking"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "1.3",
+       "name": "Manufacturing of Pattern & Core Box",
+       "checks": [
+        {
+         "id": "1.3.1",
+         "step": "1.3",
+         "sample": "1",
+         "param": "Dimension",
+         "method": "Pattern layout, templates, angle protector, contraction scale, calipers",
+         "criteria": "As per drawing, measured by contraction scale",
+         "action": "Rectification",
+         "actions": [
+          "Rectification"
+         ],
+         "tbc": false,
+         "kind": "dim"
+        },
+        {
+         "id": "1.3.2",
+         "step": "1.3",
+         "sample": "1",
+         "param": "Surface finish, coating, visual defects",
+         "method": "Visual check",
+         "criteria": "Internal standard",
+         "action": "Rectification",
+         "actions": [
+          "Rectification"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "1.4",
+       "name": "Match Plate Fitting & Methoding",
+       "checks": [
+        {
+         "id": "1.4.1",
+         "step": "1.4",
+         "sample": "1",
+         "param": "Dimension",
+         "method": "Scale, tape, vernier scale, calipers",
+         "criteria": "Method drawing",
+         "action": "Rectification",
+         "actions": [
+          "Rectification"
+         ],
+         "tbc": false,
+         "kind": "dim"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": false
+  },
+  {
+   "no": 2,
+   "name": "Sand Preparation, Calibration & Mix Testing",
+   "scope": "log",
+   "groups": [
+    {
+     "name": "Sand quality",
+     "steps": [
+      {
+       "id": "2.1",
+       "name": "New Sand (P1)",
+       "checks": [
+        {
+         "id": "2.1.1",
+         "step": "2.1",
+         "sample": "Per incoming QAP",
+         "param": "Incoming sand verified",
+         "method": "Doc No. DCL/QAP/ICI",
+         "criteria": "All details as per Quality Assurance Plan for Critical Incoming Material, Doc No. DCL/QAP/ICI",
+         "action": "Reject lot / return to supplier",
+         "actions": [
+          "Reject lot / return to supplier"
+         ],
+         "tbc": false,
+         "kind": "yn",
+         "freq": "shift"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.2",
+       "name": "Reclaimed Sand (P2)",
+       "checks": [
+        {
+         "id": "2.2.1",
+         "step": "2.2",
+         "sample": "100 gms min at start of shift",
+         "param": "Fines %",
+         "method": "Sieve shaker & weighing balance",
+         "criteria": "5% Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 5.0,
+         "unit": "%",
+         "freq": "shift"
+        },
+        {
+         "id": "2.2.2",
+         "step": "2.2",
+         "sample": "100 gms min at start of shift",
+         "param": "Moisture %",
+         "method": "Muffle furnace & weighing balance",
+         "criteria": "1% Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 1.0,
+         "unit": "%",
+         "freq": "shift"
+        },
+        {
+         "id": "2.2.3",
+         "step": "2.2",
+         "sample": "100 gms once in a week",
+         "param": "LOI",
+         "method": "Muffle furnace & weighing balance",
+         "criteria": "3.5 Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 3.5,
+         "unit": "%",
+         "freq": "weekly"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.3",
+       "name": "Mixed Sand (P3)",
+       "checks": [
+        {
+         "id": "2.3.1",
+         "step": "2.3",
+         "sample": "100 gms min at start of shift",
+         "param": "Fines %",
+         "method": "Sieve shaker & weighing balance",
+         "criteria": "5% Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 5.0,
+         "unit": "%",
+         "freq": "shift"
+        },
+        {
+         "id": "2.3.2",
+         "step": "2.3",
+         "sample": "100 gms min at start of shift",
+         "param": "Moisture %",
+         "method": "Muffle furnace & weighing balance",
+         "criteria": "1% Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 1.0,
+         "unit": "%",
+         "freq": "shift"
+        },
+        {
+         "id": "2.3.3",
+         "step": "2.3",
+         "sample": "100 gms once in a week",
+         "param": "LOI",
+         "method": "Muffle furnace & weighing balance",
+         "criteria": "3 Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 3.0,
+         "unit": "%",
+         "freq": "weekly"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    },
+    {
+     "name": "Machine calibration",
+     "steps": [
+      {
+       "id": "2.4",
+       "name": "Resin Calibration",
+       "checks": [
+        {
+         "id": "2.4.1",
+         "step": "2.4",
+         "sample": "Once a day min",
+         "param": "Volume in 15 sec",
+         "method": "Measuring cylinder 1000 ml",
+         "criteria": "1.8–2 % of sand wt",
+         "action": "Re-adjust",
+         "actions": [
+          "Re-adjust"
+         ],
+         "tbc": false,
+         "kind": "range",
+         "min": 1.8,
+         "max": 2.0,
+         "unit": "% of sand wt",
+         "freq": "daily"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.5",
+       "name": "Catalyst Calibration",
+       "checks": [
+        {
+         "id": "2.5.1",
+         "step": "2.5",
+         "sample": "Once a day min",
+         "param": "Volume in 15 sec",
+         "method": "Measuring cylinder 500 ml",
+         "criteria": "18–21 % of resin wt",
+         "action": "Re-adjust",
+         "actions": [
+          "Re-adjust"
+         ],
+         "tbc": false,
+         "kind": "range",
+         "min": 18.0,
+         "max": 21.0,
+         "unit": "% of resin wt",
+         "freq": "daily"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.6",
+       "name": "P1 Sand Calibration",
+       "checks": [
+        {
+         "id": "2.6.1",
+         "step": "2.6",
+         "sample": "Once in three months min",
+         "param": "Weight in 15 sec",
+         "method": "Weighing scale",
+         "criteria": "60 to 70 kg / 15 sec",
+         "action": "Adjust sand gate opening",
+         "actions": [
+          "Adjust sand gate opening"
+         ],
+         "tbc": false,
+         "kind": "range",
+         "min": 60.0,
+         "max": 70.0,
+         "unit": "kg / 15 sec",
+         "freq": "quarterly"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.7",
+       "name": "P2 Sand Calibration",
+       "checks": [
+        {
+         "id": "2.7.1",
+         "step": "2.7",
+         "sample": "Once in three months min",
+         "param": "Weight in 15 sec",
+         "method": "Weighing scale",
+         "criteria": "60 to 70 kg / 15 sec",
+         "action": "Adjust sand gate opening",
+         "actions": [
+          "Adjust sand gate opening"
+         ],
+         "tbc": false,
+         "kind": "range",
+         "min": 60.0,
+         "max": 70.0,
+         "unit": "kg / 15 sec",
+         "freq": "quarterly"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.8",
+       "name": "P3 Sand Calibration",
+       "checks": [
+        {
+         "id": "2.8.1",
+         "step": "2.8",
+         "sample": "Once in three months min",
+         "param": "Weight in 15 sec",
+         "method": "Weighing scale",
+         "criteria": "20–25 kg of total 70–75 kg / 15 sec",
+         "action": "Adjust sand gate opening",
+         "actions": [
+          "Adjust sand gate opening"
+         ],
+         "tbc": false,
+         "kind": "range",
+         "min": 20.0,
+         "max": 25.0,
+         "unit": "kg / 15 sec",
+         "freq": "quarterly"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.9",
+       "name": "P3 Reclaim Sand Calibration",
+       "checks": [
+        {
+         "id": "2.9.1",
+         "step": "2.9",
+         "sample": "Once in three months min",
+         "param": "Weight in 15 sec",
+         "method": "Weighing scale",
+         "criteria": "50–55 kg of total 70–75 kg / 15 sec",
+         "action": "Adjust sand gate opening",
+         "actions": [
+          "Adjust sand gate opening"
+         ],
+         "tbc": false,
+         "kind": "range",
+         "min": 50.0,
+         "max": 55.0,
+         "unit": "kg / 15 sec",
+         "freq": "quarterly"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    },
+    {
+     "name": "Sand mix testing",
+     "steps": [
+      {
+       "id": "2.10",
+       "name": "Sand Mix P1",
+       "checks": [
+        {
+         "id": "2.10.1",
+         "step": "2.10",
+         "sample": "Min once every shift",
+         "param": "Compressive strength",
+         "method": "Universal strength testing machine",
+         "criteria": "6 kg/cm² min after keeping 10 min at 150 °C",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "min",
+         "min": 6.0,
+         "unit": "kg/cm²",
+         "freq": "shift"
+        },
+        {
+         "id": "2.10.2",
+         "step": "2.10",
+         "sample": "Min once every shift",
+         "param": "Transverse strength",
+         "method": "Universal strength testing machine",
+         "criteria": "3 kg/cm² min after keeping 10 min at 150 °C",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "min",
+         "min": 3.0,
+         "unit": "kg/cm²",
+         "freq": "shift"
+        },
+        {
+         "id": "2.10.3",
+         "step": "2.10",
+         "sample": "Min once every shift",
+         "param": "Impact penetration",
+         "method": "Impact penetration testing machine",
+         "criteria": "Mix 2.5 mm measured after 1 hr of stripping",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 2.5,
+         "unit": "mm",
+         "assumed": true,
+         "freq": "shift"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.11",
+       "name": "Sand Mix P2",
+       "checks": [
+        {
+         "id": "2.11.1",
+         "step": "2.11",
+         "sample": "Min once every shift",
+         "param": "Compressive strength",
+         "method": "Universal strength testing machine",
+         "criteria": "6 kg/cm² min after keeping 10 min at 150 °C",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "min",
+         "min": 6.0,
+         "unit": "kg/cm²",
+         "freq": "shift"
+        },
+        {
+         "id": "2.11.2",
+         "step": "2.11",
+         "sample": "Min once every shift",
+         "param": "Transverse strength",
+         "method": "Universal strength testing machine",
+         "criteria": "3 kg/cm² min after keeping 10 min at 150 °C",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "min",
+         "min": 3.0,
+         "unit": "kg/cm²",
+         "freq": "shift"
+        },
+        {
+         "id": "2.11.3",
+         "step": "2.11",
+         "sample": "Min once every shift",
+         "param": "Gas content",
+         "method": "Core gas determinator",
+         "criteria": "10 cc/gm of sand Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 10.0,
+         "unit": "cc/gm",
+         "freq": "shift"
+        },
+        {
+         "id": "2.11.4",
+         "step": "2.11",
+         "sample": "Min once every shift",
+         "param": "Impact penetration",
+         "method": "Impact penetration testing machine",
+         "criteria": "Mix 2.6 mm measured after 1 hr of stripping",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 2.6,
+         "unit": "mm",
+         "assumed": true,
+         "freq": "shift"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "2.12",
+       "name": "Sand Mix P3",
+       "checks": [
+        {
+         "id": "2.12.1",
+         "step": "2.12",
+         "sample": "Min once every shift",
+         "param": "Compressive strength",
+         "method": "Universal strength testing machine",
+         "criteria": "6 kg/cm² min after keeping 10 min at 150 °C",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "min",
+         "min": 6.0,
+         "unit": "kg/cm²",
+         "freq": "shift"
+        },
+        {
+         "id": "2.12.2",
+         "step": "2.12",
+         "sample": "Min once every shift",
+         "param": "Transverse strength",
+         "method": "Universal strength testing machine",
+         "criteria": "3 kg/cm² min after keeping 10 min at 150 °C",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "min",
+         "min": 3.0,
+         "unit": "kg/cm²",
+         "freq": "shift"
+        },
+        {
+         "id": "2.12.3",
+         "step": "2.12",
+         "sample": "Min once every shift",
+         "param": "Gas content",
+         "method": "Core gas determinator",
+         "criteria": "10 cc/gm of sand Max",
+         "action": "Increase new sand addition / Disposal of sand",
+         "actions": [
+          "Increase new sand addition",
+          "Disposal of sand"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 10.0,
+         "unit": "cc/gm",
+         "freq": "shift"
+        },
+        {
+         "id": "2.12.4",
+         "step": "2.12",
+         "sample": "Min once every shift",
+         "param": "Impact penetration",
+         "method": "Impact penetration testing machine",
+         "criteria": "Mix 2.7 mm measured after 1 hr of stripping",
+         "action": "Adjust resin and catalyst %",
+         "actions": [
+          "Adjust resin and catalyst %"
+         ],
+         "tbc": false,
+         "kind": "max",
+         "max": 2.7,
+         "unit": "mm",
+         "assumed": true,
+         "freq": "shift"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": false
+  },
+  {
+   "no": 3,
+   "name": "Mould & Core Preparation",
+   "scope": "casting",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "3.1",
+       "name": "Mould Coating",
+       "checks": [
+        {
+         "id": "3.1.1",
+         "step": "3.1",
+         "sample": "In every batch",
+         "param": "Viscosity",
+         "method": "Baume meter",
+         "criteria": "55–65 Baume",
+         "action": "Re-mix",
+         "actions": [
+          "Re-mix"
+         ],
+         "tbc": false,
+         "kind": "range",
+         "min": 55.0,
+         "max": 65.0,
+         "unit": "Baumé"
+        },
+        {
+         "id": "3.1.2",
+         "step": "3.1",
+         "sample": "1",
+         "param": "Area covered, surface finish & peel off",
+         "method": "Visual",
+         "criteria": "Desired surface covered, smooth surface finish, no peel off after heating",
+         "action": "Repainting",
+         "actions": [
+          "Repainting"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "3.2",
+       "name": "Mould & Core Hardness",
+       "checks": [
+        {
+         "id": "3.2.1",
+         "step": "3.2",
+         "sample": "10% min",
+         "param": "Scratch hardness",
+         "method": "Scratch hardness tester",
+         "criteria": "Hardness 50 min",
+         "action": "Destroyed",
+         "actions": [
+          "Destroyed"
+         ],
+         "tbc": false,
+         "kind": "min",
+         "min": 50.0,
+         "unit": "scratch hardness"
+        }
+       ],
+       "optional": false,
+       "sampled": true
+      },
+      {
+       "id": "3.3",
+       "name": "Mould & Core Setting",
+       "checks": [
+        {
+         "id": "3.3.1",
+         "step": "3.3",
+         "sample": "1",
+         "param": "Visual – only good mould/core to be used",
+         "method": "Visual",
+         "criteria": "Mould & core properly cleaned; no damage / loose particles",
+         "action": "Repaired",
+         "actions": [
+          "Repaired"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "3.4",
+       "name": "Closing",
+       "checks": [
+        {
+         "id": "3.4.1",
+         "step": "3.4",
+         "sample": "1",
+         "param": "Closing condition",
+         "method": "Visual",
+         "criteria": "No loose sand, no gap, all vents clear, closing pin fitted",
+         "action": "Re-close after repair / destroyed",
+         "actions": [
+          "Re-close after repair",
+          "Destroyed"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": false
+  },
+  {
+   "no": 4,
+   "name": "Melting & Pouring",
+   "scope": "heat",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "4.1",
+       "name": "Melting Process",
+       "checks": [
+        {
+         "id": "4.1.1",
+         "step": "4.1",
+         "sample": "Each bath",
+         "param": "All elements as per specification",
+         "method": "Online spectrometer",
+         "criteria": "As per drawing / standard specification",
+         "action": "Addition of ferro alloys / Pig the melt",
+         "actions": [
+          "Addition of ferro alloys",
+          "Pig the melt"
+         ],
+         "tbc": false,
+         "kind": "chem"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "4.2",
+       "name": "Final Chemical Composition",
+       "checks": [
+        {
+         "id": "4.2.1",
+         "step": "4.2",
+         "sample": "Each heat",
+         "param": "All elements as per specification",
+         "method": "Online spectrometer",
+         "criteria": "As per drawing / standard specification",
+         "action": "Reject all castings poured",
+         "actions": [
+          "Reject all castings poured"
+         ],
+         "tbc": false,
+         "kind": "chem"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "4.3",
+       "name": "Tapping",
+       "checks": [
+        {
+         "id": "4.3.1",
+         "step": "4.3",
+         "sample": "Before tapping",
+         "param": "Tapping temperature",
+         "method": "Immersion pyrometer",
+         "criteria": "As per method plan Doc No. DCL/MTD/01",
+         "action": "Adjust temperature",
+         "actions": [
+          "Adjust temperature"
+         ],
+         "tbc": false,
+         "kind": "spec",
+         "unit": "°C"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "4.4",
+       "name": "Pouring",
+       "checks": [
+        {
+         "id": "4.4.1",
+         "step": "4.4",
+         "sample": "From ladle during first mould pouring of each heat",
+         "param": "Pouring temperature",
+         "method": "Immersion pyrometer",
+         "criteria": "As per method plan Doc No. DCL/MTD/01",
+         "action": "Wait (if high) / Back to furnace (if low)",
+         "actions": [
+          "Wait (if high)",
+          "Back to furnace (if low)"
+         ],
+         "tbc": false,
+         "kind": "spec",
+         "unit": "°C"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": false
+  },
+  {
+   "no": 5,
+   "name": "Shot Blasting & Fettling",
+   "scope": "casting",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "5.1",
+       "name": "Shot Blasting",
+       "checks": [
+        {
+         "id": "5.1.1",
+         "step": "5.1",
+         "sample": "1",
+         "param": "Surface finish & casting defect",
+         "method": "Visual",
+         "criteria": "As per material specification",
+         "action": "Re-shot blasting / Salvaging / Reject",
+         "actions": [
+          "Re-shot blasting",
+          "Salvaging",
+          "Reject"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "5.2",
+       "name": "Fettling",
+       "checks": [
+        {
+         "id": "5.2.1",
+         "step": "5.2",
+         "sample": "1",
+         "param": "Critical dimensions",
+         "method": "Scale / tape / vernier / gauge",
+         "criteria": "As per drawing",
+         "action": "Salvaging / Reject",
+         "actions": [
+          "Salvaging",
+          "Reject"
+         ],
+         "tbc": false,
+         "kind": "dim"
+        },
+        {
+         "id": "5.2.2",
+         "step": "5.2",
+         "sample": "1",
+         "param": "D.P. test",
+         "method": "DP test kit",
+         "criteria": "No surface crack",
+         "action": "Salvaging / Reject",
+         "actions": [
+          "Salvaging",
+          "Reject"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": false
+  },
+  {
+   "no": 6,
+   "name": "Heat Treatment",
+   "scope": "casting",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "6.1",
+       "name": "Heat Treatment",
+       "checks": [
+        {
+         "id": "6.1.1",
+         "step": "6.1",
+         "sample": "1",
+         "param": "Heat cycle",
+         "method": "Thermocouple, indicator, recorder",
+         "criteria": "As per method plan Doc No. DCL/MTD/01",
+         "action": "Re-heat treatment / Reject",
+         "actions": [
+          "Re-heat treatment",
+          "Reject"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": false
+  },
+  {
+   "no": 7,
+   "name": "Non-Destructive Testing (NDT)",
+   "scope": "casting",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "7.1",
+       "name": "D.P. Test",
+       "checks": [
+        {
+         "id": "7.1.1",
+         "step": "7.1",
+         "sample": "As per PO / QAP requirement",
+         "param": "Surface defects",
+         "method": "DP testing kit",
+         "criteria": "As per IS: or as per PO/QAP",
+         "action": "Salvaging / Reject",
+         "actions": [
+          "Salvaging",
+          "Reject"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      },
+      {
+       "id": "7.2",
+       "name": "Ultrasonic Testing",
+       "checks": [
+        {
+         "id": "7.2.1",
+         "step": "7.2",
+         "sample": "As per PO / QAP requirement",
+         "param": "Internal flaw of casting",
+         "method": "Ultrasonic testing machine",
+         "criteria": "As per IS: or as per PO/QAP",
+         "action": "Rejected & remelted",
+         "actions": [
+          "Rejected & remelted"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      },
+      {
+       "id": "7.3",
+       "name": "Radiography",
+       "checks": [
+        {
+         "id": "7.3.1",
+         "step": "7.3",
+         "sample": "As per PO / QAP requirement",
+         "param": "Internal flaw of casting",
+         "method": "Radiography camera",
+         "criteria": "As per ASTM E466 Level II or as per PO/QAP",
+         "action": "Rejected & remelted",
+         "actions": [
+          "Rejected & remelted"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      },
+      {
+       "id": "7.4",
+       "name": "Magnetic Particle Test",
+       "checks": [
+        {
+         "id": "7.4.1",
+         "step": "7.4",
+         "sample": "100% where applicable",
+         "param": "Sub-surface crack",
+         "method": "MPI tester",
+         "criteria": "To be confirmed",
+         "action": "To be confirmed",
+         "actions": [
+          "Salvaging",
+          "Reject"
+         ],
+         "tbc": true,
+         "kind": "yn",
+         "assumed": true
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": true
+  },
+  {
+   "no": 8,
+   "name": "Mechanical & Metallurgical Testing",
+   "scope": "heat",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "8.1",
+       "name": "Tensile Test",
+       "checks": [
+        {
+         "id": "8.1.1",
+         "step": "8.1",
+         "sample": "One sample per heat",
+         "param": "UTS, YS, E%, RA%, Impact",
+         "method": "Universal testing machine, impact tester, vernier caliper, micrometer",
+         "criteria": "As per ASTM A370 MT:CBC:001",
+         "action": "Rejected & returned to re-heat treatment",
+         "actions": [
+          "Rejected & returned to re-heat treatment"
+         ],
+         "tbc": false,
+         "kind": "mech"
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      },
+      {
+       "id": "8.2",
+       "name": "Microstructure",
+       "checks": [
+        {
+         "id": "8.2.1",
+         "step": "8.2",
+         "sample": "One sample per heat",
+         "param": "Microstructure & hardness of test lug",
+         "method": "Microscope",
+         "criteria": "As per IS: or as per customer specification/QAP",
+         "action": "Rejected & returned to re-heat treatment",
+         "actions": [
+          "Rejected & returned to re-heat treatment"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      },
+      {
+       "id": "8.3",
+       "name": "Hardness",
+       "checks": [
+        {
+         "id": "8.3.1",
+         "step": "8.3",
+         "sample": "10% per heat / as per customer requirement",
+         "param": "Hardness",
+         "method": "Hardness testing machine",
+         "criteria": "As per drawing / standard specification",
+         "action": "Rejected & returned to re-heat treatment",
+         "actions": [
+          "Rejected & returned to re-heat treatment"
+         ],
+         "tbc": false,
+         "kind": "spec",
+         "unit": "HBW"
+        }
+       ],
+       "optional": true,
+       "sampled": true
+      },
+      {
+       "id": "8.4",
+       "name": "Impact Test",
+       "checks": [
+        {
+         "id": "8.4.1",
+         "step": "8.4",
+         "sample": "As per customer's QAP",
+         "param": "Impact strength",
+         "method": "Impact tester",
+         "criteria": "Charpy V-notch Type A as per ASTM A370",
+         "action": "Re-heat treatment",
+         "actions": [
+          "Re-heat treatment"
+         ],
+         "tbc": false,
+         "kind": "spec",
+         "unit": "J"
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": true
+  },
+  {
+   "no": 9,
+   "name": "Machining (if applicable)",
+   "scope": "casting",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "9.1",
+       "name": "After Machining",
+       "checks": [
+        {
+         "id": "9.1.1",
+         "step": "9.1",
+         "sample": "1",
+         "param": "Machined dimensions",
+         "method": "Scale / vernier / micrometer",
+         "criteria": "To be confirmed",
+         "action": "Re-machined / Reject",
+         "actions": [
+          "Re-machined",
+          "Reject"
+         ],
+         "tbc": true,
+         "kind": "dim"
+        }
+       ],
+       "optional": true,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": true
+  },
+  {
+   "no": 10,
+   "name": "Final Inspection & Packing",
+   "scope": "casting",
+   "groups": [
+    {
+     "name": null,
+     "steps": [
+      {
+       "id": "10.1",
+       "name": "Final Inspection",
+       "checks": [
+        {
+         "id": "10.1.1",
+         "step": "10.1",
+         "sample": "1",
+         "param": "Visual inspection",
+         "method": "Visual",
+         "criteria": "As per drawing",
+         "action": "Rejected & returned for melting",
+         "actions": [
+          "Rejected & returned for melting"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        },
+        {
+         "id": "10.1.2",
+         "step": "10.1",
+         "sample": "1",
+         "param": "Specified dimensions as per drawing & spec.",
+         "method": "Inspection gauge, measuring instruments",
+         "criteria": "As per drawing",
+         "action": "Rejected & returned for melting",
+         "actions": [
+          "Rejected & returned for melting"
+         ],
+         "tbc": false,
+         "kind": "dim"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      },
+      {
+       "id": "10.2",
+       "name": "Packing",
+       "checks": [
+        {
+         "id": "10.2.1",
+         "step": "10.2",
+         "sample": "1",
+         "param": "1 pc in each bag / wooden box (heat wise)",
+         "method": "Poly bag / wooden box",
+         "criteria": "As per specification / PO",
+         "action": "Re-packing",
+         "actions": [
+          "Re-packing"
+         ],
+         "tbc": false,
+         "kind": "yn"
+        }
+       ],
+       "optional": false,
+       "sampled": false
+      }
+     ]
+    }
+   ],
+   "optional": false
+  }
+ ]
+};
+
+</script>
+<script>
+/* DCL Quality Inspection – data layer, plan indexes, evaluation rules and workflow logic.
+   Everything lives in localStorage (key dcl_qi_v1) so the app works offline on the shop floor. */
+(function () {
+  'use strict';
+  const KEY = 'dcl_qi_v1';
+  const QI = (window.QI = {});
+  const PLAN = window.PLAN;
+
+  /* ---------- plan indexes ---------- */
+  QI.plan = PLAN;
+  QI.stages = PLAN.stages;
+  QI.checks = {};
+  QI.steps = {};
+  QI.stageOf = {};
+  PLAN.stages.forEach((st) => {
+    QI.stageOf[st.no] = st;
+    st.groups.forEach((g) => g.steps.forEach((sp) => {
+      sp.stageNo = st.no;
+      QI.steps[sp.id] = sp;
+      sp.checks.forEach((c) => { c.stageNo = st.no; c.scope = st.scope; QI.checks[c.id] = c; });
+    }));
+  });
+  QI.allChecks = () => Object.values(QI.checks);
+
+  /* ---------- state ---------- */
+  const blank = () => ({ v: 1, seq: { ncr: 0, log: 0 }, settings: { inspector: '', overrides: {} },
+    jobs: [], castings: [], heats: [], logs: [], results: {}, ncrs: [] });
+  let S = blank();
+  QI.persistent = true;
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) S = Object.assign(blank(), JSON.parse(raw));
+  } catch (e) { QI.persistent = false; }
+  QI.S = () => S;
+  QI.mode = 'local';                       // 'shared' once attached to the artifact database
+  QI.save = () => {
+    if (QI.mode === 'shared') return pushDiff();
+    try { localStorage.setItem(KEY, JSON.stringify(S)); QI.persistent = true; } catch (e) { QI.persistent = false; }
+  };
+  QI.replace = (obj) => { const keep = S.settings.inspector; S = Object.assign(blank(), obj); S.settings = Object.assign({ overrides: {} }, S.settings, { inspector: keep }); QI.save(); };
+  QI.reset = () => { const keep = S.settings.inspector; S = blank(); S.settings.inspector = keep; QI.save(); };
+  QI.ncrId = () => {
+    const d = new Date(); const base = `NCR-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-`;
+    let id; do { id = base + Math.random().toString(36).slice(2, 5).toUpperCase(); } while (S.ncrs.some((n) => n.id === id));
+    return id;
+  };
+
+  /* ---------- departments & permissions (shared mode only; local mode = everything allowed) ---------- */
+  QI.DEPTS = [
+    { id: 'planning', name: 'Planning / PPC', stages: [], create: ['job', 'casting'], about: 'Creates work orders and castings' },
+    { id: 'pattern', name: 'Pattern shop', stages: [1], about: 'Stage 1' },
+    { id: 'sand', name: 'Sand lab & moulding', stages: [2, 3], create: ['log'], link: ['log'], about: 'Stages 2–3, sand logs' },
+    { id: 'melt', name: 'Melting & pouring', stages: [4], create: ['heat'], link: ['heat'], about: 'Stage 4, heats' },
+    { id: 'fettle', name: 'Shot blasting, fettling & heat treatment', stages: [5, 6], about: 'Stages 5–6' },
+    { id: 'lab', name: 'NDT & mechanical / metallurgical lab', stages: [7, 8], about: 'Stages 7–8' },
+    { id: 'mach', name: 'Machining', stages: [9], about: 'Stage 9' },
+    { id: 'qa', name: 'Quality assurance & final inspection', stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], all: true, about: 'Stage 10, release, rejection, NCR closure, everything else' },
+    { id: 'mgmt', name: 'Management (view only)', stages: [], about: 'Dashboards and reports' },
+  ];
+  QI.me = { uid: null, name: '', dept: null, canWrite: true };
+  QI.people = {};
+  QI.dept = () => QI.DEPTS.find((d) => d.id === QI.me.dept) || null;
+  QI.can = (action, arg) => {
+    if (QI.mode === 'local') return true;
+    const d = QI.dept(); if (!QI.me.canWrite || !d) return false;
+    if (d.all) return true;
+    if (action === 'record') return d.stages.includes(arg);
+    if (action === 'create') return (d.create || []).includes(arg);
+    if (action === 'link') return (d.link || []).includes(arg);
+    if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
+    return false;                                 // release, reject, ncr, plan, admin: quality only
+  };
+
+  /* ---------- shared backend: one db document per job / casting / heat / log / NCR / result ---------- */
+  let DB = null, ready = true, synced = {}, queue = Promise.resolve();
+  QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
+  const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
+  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id' };
+  const cfgForm = () => ({ lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const desired = () => {
+    const m = {};
+    Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
+    Object.keys(S.results).forEach((k) => (m['results/' + enc(k)] = { key: k, attempts: S.results[k].attempts }));
+    m['meta/config'] = cfgForm();
+    return m;
+  };
+  function pushDiff() {
+    if (!DB || !ready) return;
+    const d = desired(), ops = [];
+    Object.keys(d).forEach((p) => { const j = JSON.stringify(d[p]); if (synced[p] !== j) { synced[p] = j; ops.push([p, () => DB.doc(p).set(JSON.parse(j))]); } });
+    Object.keys(synced).forEach((p) => { if (!(p in d)) { delete synced[p]; ops.push([p, () => DB.doc(p).delete()]); } });
+    ops.forEach(([p, op]) => { queue = queue.then(op).catch((e) => { delete synced[p]; QI.onError(e); }); });
+  }
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  function putInPlace(arr, keyName, body) {
+    const i = arr.findIndex((x) => x[keyName] === body[keyName]);
+    if (i < 0) { arr.push(body); return { item: body, changed: true }; }
+    const cur = arr[i];
+    if (JSON.stringify(cur) === JSON.stringify(body)) return { item: cur, changed: false };
+    Object.keys(cur).forEach((k) => delete cur[k]); Object.assign(cur, body);
+    return { item: cur, changed: true };
+  }
+  function listen(path, handler, firstDone) {
+    let first = true;
+    DB.collection(path).onSnapshot((snap) => {
+      let changed = false;
+      snap.docChanges().forEach((ch) => { if (handler(ch)) changed = true; });
+      if (first) { first = false; firstDone(); } else if (changed) QI.onChange();
+    }, (e) => QI.onError(e));
+  }
+  QI.attach = async (db, user) => {
+    DB = db; QI.mode = 'shared'; ready = false; QI.ready = false; S = blank(); synced = {};
+    if (user) {
+      try { QI.me.uid = await user.id(); const m = await user.me(); QI.me.name = (m && m.name) || ''; } catch (e) {}
+      const w = user.can ? user.can('data.write') : null; QI.me.canWrite = w !== false;
+    }
+    let pending = 0;
+    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; pushDiff(); QI.onChange(true); } };
+    const reg = (path, handler) => { pending++; listen(path, handler, done); };
+    Object.keys(COLS).forEach((col) => reg(col, (ch) => {
+      const body = clone(ch.doc.data() || {}), p = col + '/' + ch.doc.id;
+      if (ch.type === 'removed') { const i = S[col].findIndex((x) => x[COLS[col]] === body[COLS[col]]); if (i >= 0) S[col].splice(i, 1); delete synced[p]; return true; }
+      const r = putInPlace(S[col], COLS[col], body); synced[p] = JSON.stringify(r.item); return r.changed;
+    }));
+    reg('results', (ch) => {
+      const body = clone(ch.doc.data() || {}), p = 'results/' + ch.doc.id;
+      if (ch.type === 'removed') { delete S.results[body.key]; delete synced[p]; return true; }
+      const cur = S.results[body.key];
+      const same = cur && JSON.stringify(cur.attempts) === JSON.stringify(body.attempts);
+      if (!cur) S.results[body.key] = { attempts: body.attempts }; else if (!same) cur.attempts = body.attempts;
+      synced[p] = JSON.stringify({ key: body.key, attempts: S.results[body.key].attempts });
+      return !same;
+    });
+    reg('meta', (ch) => {
+      if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
+      const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
+      S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
+    });
+    reg('people', (ch) => {
+      if (ch.type === 'removed') { delete QI.people[ch.doc.id]; return true; }
+      QI.people[ch.doc.id] = clone(ch.doc.data() || {});
+      if (QI.me.uid && ch.doc.id === enc(QI.me.uid)) { QI.me.dept = QI.people[ch.doc.id].dept || null; if (QI.people[ch.doc.id].name) QI.me.name = QI.people[ch.doc.id].name; S.settings.inspector = QI.me.name; }
+      return true;
+    });
+  };
+  QI.setPerson = (name, dept) => {
+    QI.me.name = name; QI.me.dept = dept; S.settings.inspector = name;
+    if (DB && QI.me.uid) DB.doc('people/' + enc(QI.me.uid)).set({ name, dept, ts: Date.now() }).catch((e) => QI.onError(e));
+    QI.people[enc(QI.me.uid || 'local')] = { name, dept };
+  };
+
+  /* ---------- helpers ---------- */
+  const num = (v) => { if (v === '' || v == null) return null; const n = parseFloat(v); return isFinite(n) ? n : null; };
+  QI.num = num;
+  const inLim = (v, min, max) => (min == null || v >= min) && (max == null || v <= max);
+  QI.limText = (min, max, unit) => {
+    const u = unit ? ' ' + unit : '';
+    if (min != null && max != null) return `${min} – ${max}${u}`;
+    if (min != null) return `≥ ${min}${u}`;
+    if (max != null) return `≤ ${max}${u}`;
+    return '';
+  };
+  /* ---- dropdown lists: defaults + values users typed under "Other" (learned automatically) ---- */
+  QI.opts = (key, defs) => {
+    const l = (S.settings.lists && S.settings.lists[key]) || [];
+    return [...new Set([...(defs || []), ...l])];
+  };
+  QI.learn = (key, v) => {
+    v = (v || '').trim(); if (!v) return;
+    const L = S.settings.lists || (S.settings.lists = {});
+    const a = L[key] || (L[key] = []);
+    if (!a.some((x) => x.toLowerCase() === v.toLowerCase())) { a.push(v); QI.save(); }
+  };
+  QI.unlearn = (key, v) => { const a = S.settings.lists && S.settings.lists[key]; if (a) { S.settings.lists[key] = a.filter((x) => x !== v); QI.save(); } };
+  QI.learnAction = (checkId, text, cls) => {
+    QI.learn('action:' + checkId, text);
+    (S.settings.actionCls || (S.settings.actionCls = {}))[text] = cls || 'rework'; QI.save();
+  };
+  QI.DEFAULTS = {
+    rejectReason: ['Shrinkage', 'Gas porosity / blow hole', 'Sand inclusion', 'Crack', 'Misrun / cold shut', 'Dimensional out of tolerance', 'Chemistry out of spec', 'Surface defect', 'Mould / core damage'],
+    remarks: ['Re-tested', 'Sample taken from ladle', 'Customer witnessed', 'Instrument re-calibrated', 'Repeat reading confirmed'],
+    closeNote: ['Reworked and re-inspected OK', 'Sand corrected and re-tested', 'Machine re-adjusted and re-calibrated', 'Material disposed / scrapped', 'Accepted as per customer concession'],
+    releaseRemarks: ['Dispatch as per PO', 'Customer inspection pending', 'Hold for customer witness'],
+  };
+  QI.classify = (action) => {
+    const a = action || '';
+    if (S.settings.actionCls && S.settings.actionCls[a]) return S.settings.actionCls[a];
+    if (/re-?heat|re-?machin|rework|repair|re-?close|repaint|re-?mix|re-?adjust|adjust|rectif|salvag|re-?shot|re-?pack|addition|increase|wait|back to furnace|pig the melt|re-?make|remaking|re-?work/i.test(a)) return 'rework';
+    if (/reject|destroy|remelt|scrap|dispos|return to supplier/i.test(a)) return 'reject';
+    return 'rework';
+  };
+
+  /* check definition merged with user overrides from the Inspection Plan page */
+  QI.eff = (id) => {
+    const base = QI.checks[id];
+    const o = S.settings.overrides[id];
+    return o ? Object.assign({}, base, o) : base;
+  };
+
+  /* ---------- records ---------- */
+  const rkey = (scope, owner, id) => `${scope}|${owner}|${id}`;
+  QI.rkey = rkey;
+  QI.rec = (scope, owner, id) => S.results[rkey(scope, owner, id)] || null;
+  QI.last = (scope, owner, id) => { const r = QI.rec(scope, owner, id); return r ? r.attempts[r.attempts.length - 1] : null; };
+  QI.status = (scope, owner, id) => { const a = QI.last(scope, owner, id); return a ? a.result : 'none'; };
+
+  /* ---------- lookups ---------- */
+  QI.job = (no) => S.jobs.find((j) => j.no === no);
+  QI.casting = (id) => S.castings.find((c) => c.id === id);
+  QI.heat = (no) => S.heats.find((h) => h.no === no);
+  QI.log = (id) => S.logs.find((l) => l.id === id);
+  QI.heatCastings = (no) => S.castings.filter((c) => c.heatNo === no);
+  QI.logCastings = (id) => S.castings.filter((c) => c.logId === id);
+  QI.jobCastings = (no) => S.castings.filter((c) => c.jobNo === no);
+
+  QI.ownerOf = (c, scope) => scope === 'job' ? c.jobNo : scope === 'log' ? c.logId : scope === 'heat' ? c.heatNo : c.id;
+  const dflt = { '9.1': false, '7.4': false };
+  QI.defaultApplic = () => { const o = {}; Object.keys(QI.steps).forEach((id) => { if (QI.steps[id].optional) o[id] = dflt[id] !== undefined ? dflt[id] : true; }); return o; };
+  QI.required = (job, check) => {
+    const sp = QI.steps[check.step];
+    if (sp.sampled) return false;
+    if (sp.optional) return !!(job && job.applic && job.applic[sp.id]);
+    return true;
+  };
+  QI.applicable = (job, check) => { const sp = QI.steps[check.step]; return !sp.optional || !!(job && job.applic && job.applic[sp.id]); };
+
+  /* ---------- evaluation ---------- */
+  QI.evaluate = (check, input, ctx) => {
+    input = input || {};
+    const unit = check.unit || '';
+    const k = check.kind;
+    if (k === 'max' || k === 'min' || k === 'range') {
+      const v = num(input.value);
+      if (v == null) return { error: 'Enter the measured value.' };
+      return { result: inLim(v, check.min, check.max) ? 'ok' : 'nok', summary: `${v}${unit ? ' ' + unit : ''}` };
+    }
+    if (k === 'spec') {
+      const v = num(input.value), mn = num(input.min), mx = num(input.max);
+      if (mn == null && mx == null) {
+        if (input.result !== 'ok' && input.result !== 'nok') return { error: 'Enter the limits, or choose OK / Not OK.' };
+        return { result: input.result, summary: v != null ? `${v}${unit ? ' ' + unit : ''}` : '' };
+      }
+      if (v == null) return { error: 'Enter the measured value.' };
+      return { result: inLim(v, mn, mx) ? 'ok' : 'nok', summary: `${v}${unit ? ' ' + unit : ''} (limit ${QI.limText(mn, mx, unit)})` };
+    }
+    if (k === 'yn') {
+      if (input.result !== 'ok' && input.result !== 'nok') return { error: 'Choose OK or Not OK.' };
+      return { result: input.result, summary: input.result === 'ok' ? 'OK' : 'Not OK' };
+    }
+    if (k === 'dim') {
+      const rows = (input.rows || []).filter((r) => r.name || r.nominal != null || r.actual != null);
+      if (!rows.length) return { error: 'Add at least one dimension.' };
+      let bad = [];
+      for (const r of rows) {
+        const nom = num(r.nominal), act = num(r.actual), tm = num(r.tm) || 0, tp = num(r.tp) || 0;
+        if (nom == null || act == null) return { error: 'Each dimension needs a nominal and an actual value.' };
+        r.ok = act >= nom - Math.abs(tm) - 1e-9 && act <= nom + Math.abs(tp) + 1e-9;
+        if (!r.ok) bad.push(r.name || nom);
+      }
+      return { result: bad.length ? 'nok' : 'ok', summary: bad.length ? `Out of tolerance: ${bad.join(', ')}` : `${rows.length} dimension(s) within tolerance` };
+    }
+    if (k === 'chem' || k === 'mech') {
+      const spec = ctx && ctx.heat ? (k === 'chem' ? ctx.heat.chemSpec : ctx.heat.mechSpec) : null;
+      if (!spec || !spec.length) return { error: `Define the ${k === 'chem' ? 'chemical composition' : 'mechanical'} specification on the heat first.` };
+      const vals = input.vals || {};
+      const bad = [], out = [];
+      for (const row of spec) {
+        const v = num(vals[row.name]);
+        if (v == null) return { error: `Enter a value for ${row.name}.` };
+        out.push(`${row.name} ${v}`);
+        if (!inLim(v, num(row.min), num(row.max))) bad.push(row.name);
+      }
+      return { result: bad.length ? 'nok' : 'ok', summary: bad.length ? `Out of spec: ${bad.join(', ')}` : 'All within specification', detail: out.join(' · ') };
+    }
+    return { error: 'Unknown check type.' };
+  };
+
+  /* ---------- creating records ---------- */
+  QI.addJob = (d) => {
+    if (!QI.can('create', 'job')) return { error: 'Your department cannot create work orders.' };
+    if (!d.no) return { error: 'Work order number is required.' };
+    if (QI.job(d.no)) return { error: 'A work order with this number already exists.' };
+    S.jobs.push(Object.assign({ created: Date.now(), applic: QI.defaultApplic(), counter: 0 }, d));
+    QI.save(); return { ok: true };
+  };
+  QI.addCastings = (jobNo, n, extra) => {
+    const j = QI.job(jobNo); if (!j || !QI.can('create', 'casting')) return [];
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      do { j.counter = (j.counter || 0) + 1; } while (QI.casting(`${j.no}-${String(j.counter).padStart(3, '0')}`));
+      const c = Object.assign({ id: `${j.no}-${String(j.counter).padStart(3, '0')}`, jobNo: j.no, heatNo: null, logId: null, status: 'active', created: Date.now() }, extra || {});
+      S.castings.push(c); out.push(c);
+    }
+    QI.save(); return out;
+  };
+  QI.addHeat = (d) => {
+    if (!QI.can('create', 'heat')) return { error: 'Your department cannot create heats.' };
+    if (!d.no) return { error: 'Heat number is required.' };
+    if (QI.heat(d.no)) return { error: 'A heat with this number already exists.' };
+    S.heats.push(Object.assign({ created: Date.now(), chemSpec: [], mechSpec: defaultMech() }, d));
+    QI.save(); return { ok: true };
+  };
+  const defaultMech = () => [
+    { name: 'UTS (MPa)', min: '', max: '' }, { name: 'YS (MPa)', min: '', max: '' },
+    { name: 'Elongation (%)', min: '', max: '' }, { name: 'RA (%)', min: '', max: '' }, { name: 'Impact (J)', min: '', max: '' }];
+  QI.addLog = (date, shift) => {
+    if (!QI.can('create', 'log')) return { error: 'Your department cannot create sand logs.' };
+    const id = `SL-${date.replace(/-/g, '')}-${shift}`;
+    if (QI.log(id)) return { error: 'A log for this date and shift already exists.', id };
+    S.logs.push({ id, date, shift, created: Date.now(), by: S.settings.inspector });
+    QI.save(); return { ok: true, id };
+  };
+
+  /* ---------- recording an inspection ---------- */
+  const ctxFor = (scope, owner) => ({ heat: scope === 'heat' ? QI.heat(owner) : null });
+  QI.affected = (scope, owner) => scope === 'casting' ? [owner] : scope === 'heat' ? QI.heatCastings(owner).map((c) => c.id)
+    : scope === 'log' ? QI.logCastings(owner).map((c) => c.id) : QI.jobCastings(owner).map((c) => c.id);
+  /* castings that would be scrapped by this outcome (shown to the inspector before they confirm) */
+  QI.rejectTargets = (scope, owner, checkId, action) => {
+    if (QI.classify(action) !== 'reject') return [];
+    if (scope === 'casting') return [owner];
+    if (scope === 'heat' && checkId === '4.2.1') return QI.heatCastings(owner).filter((c) => c.status === 'active').map((c) => c.id);
+    return [];
+  };
+  QI.record = (scope, owner, checkId, input) => {
+    if (!S.settings.inspector) return { error: 'Set the inspector name first (Settings).' };
+    const check = QI.eff(checkId);
+    if (!QI.can('record', check.stageNo)) return { error: `Stage ${check.stageNo} is recorded by ${(QI.DEPTS.filter((d) => d.stages.includes(check.stageNo) && !d.all)[0] || { name: 'another department' }).name}.` };
+    const ev = QI.evaluate(check, input, ctxFor(scope, owner));
+    if (ev.error) return { error: ev.error };
+    const key = rkey(scope, owner, checkId);
+    const rec = S.results[key] || (S.results[key] = { attempts: [] });
+    const action = ev.result === 'nok' ? (input.action || (check.actions || [])[0] || 'Other') : null;
+    const att = { n: rec.attempts.length + 1, ts: Date.now(), by: S.settings.inspector, result: ev.result,
+      input: JSON.parse(JSON.stringify(input)), summary: ev.summary, detail: ev.detail || '', ref: input.ref || '', remarks: input.remarks || '', action };
+    rec.attempts.push(att);
+    const res = { attempt: att, rejected: [] };
+    if (ev.result === 'ok') {
+      S.ncrs.forEach((n) => { if (n.key === key && n.status === 'open') { n.status = 'closed'; n.closedTs = att.ts; n.closeNote = `Re-inspected OK (attempt ${att.n}) by ${att.by}`; } });
+    } else {
+      const cls = QI.classify(action);
+      const ncr = { id: QI.ncrId(), ts: att.ts, key, scope, owner, checkId, stageNo: check.stageNo,
+        param: check.param, found: ev.summary, by: att.by, action, cls, castings: QI.affected(scope, owner), status: 'open', remarks: att.remarks };
+      const tg = QI.rejectTargets(scope, owner, checkId, action);
+      if (tg.length) {
+        tg.forEach((id) => { const c = QI.casting(id); if (c && c.status === 'active') { c.status = 'rejected'; c.reject = { checkId, stageNo: check.stageNo, reason: `${check.param}: ${ev.summary}`, action, by: att.by, ts: att.ts }; res.rejected.push(id); } });
+        ncr.status = 'closed'; ncr.closedTs = att.ts; ncr.closeNote = `Rejected – ${action}`;
+      }
+      S.ncrs.push(ncr); res.ncr = ncr;
+    }
+    QI.save();
+    return res;
+  };
+  QI.closeNcr = (id, note) => { const n = S.ncrs.find((x) => x.id === id); if (n) { n.status = 'closed'; n.closedTs = Date.now(); n.closeNote = note || 'Closed manually'; QI.save(); } };
+
+  /* ---------- casting traveller ---------- */
+  const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  QI.castingStages = (c) => {
+    const job = QI.job(c.jobNo);
+    let prevOk = true, current = null;
+    const out = ORDER.map((no) => {
+      const st = QI.stageOf[no];
+      const items = [];
+      st.groups.forEach((g) => g.steps.forEach((sp) => sp.checks.forEach((ch) => {
+        if (!QI.applicable(job, ch)) return;
+        const owner = QI.ownerOf(c, st.scope);
+        items.push({ check: ch, scope: st.scope, owner, required: QI.required(job, ch), status: owner ? QI.status(st.scope, owner, ch.id) : 'none' });
+      })));
+      const req = items.filter((i) => i.required);
+      let status;
+      if (no === 2) {
+        const l = c.logId;
+        const bad = l ? items.some((i) => i.status === 'nok') : false;
+        status = !l ? 'open' : bad ? 'fail' : 'done';
+      } else if (!items.length) status = 'na';
+      else if (req.some((i) => i.status === 'nok')) status = 'fail';
+      else if (req.every((i) => i.status === 'ok')) status = 'done';
+      else if (req.some((i) => i.status === 'ok')) status = 'progress';
+      else status = 'open';
+      const locked = !prevOk || c.status === 'rejected';
+      if (!locked && !current && status !== 'done' && status !== 'na') current = no;
+      if (status !== 'done' && status !== 'na') prevOk = false;
+      return { stage: st, status, locked, items };
+    });
+    return { stages: out, current, allDone: out.every((s) => s.status === 'done' || s.status === 'na') };
+  };
+  QI.castingState = (c) => {
+    if (c.status === 'rejected') return { label: 'Rejected', cls: 'bad', stageNo: c.reject ? c.reject.stageNo : null };
+    if (c.status === 'released') return { label: 'Released', cls: 'ok', stageNo: 10 };
+    const t = QI.castingStages(c);
+    if (t.allDone) return { label: 'Ready for release', cls: 'ok', stageNo: 10 };
+    const st = t.stages.find((s) => s.stage.no === t.current);
+    const failing = t.stages.some((s) => s.status === 'fail');
+    return { label: `Stage ${t.current}: ${QI.stageOf[t.current].name}`, cls: failing ? 'warn' : 'info', stageNo: t.current, failing };
+  };
+  QI.release = (c, by, remarks) => {
+    if (!QI.can('release')) return { error: 'Only Quality can release castings.' };
+    const t = QI.castingStages(c);
+    if (c.status !== 'active') return { error: 'Casting is not active.' };
+    if (!t.allDone) return { error: 'All applicable stages must be completed before release.' };
+    if (S.ncrs.some((n) => n.status === 'open' && n.castings.includes(c.id))) return { error: 'Close all open NCRs for this casting first.' };
+    c.status = 'released'; c.release = { by, remarks: remarks || '', ts: Date.now() };
+    QI.save(); return { ok: true };
+  };
+  QI.manualReject = (c, reason) => {
+    c.status = 'rejected';
+    c.reject = { checkId: null, stageNo: (QI.castingState(Object.assign({}, c, { status: 'active' })).stageNo) || null, reason, action: 'Rejected by inspector', by: S.settings.inspector, ts: Date.now() };
+    const ncr = { id: QI.ncrId(), ts: Date.now(), key: `casting|${c.id}|manual`, scope: 'casting', owner: c.id, checkId: null, stageNo: c.reject.stageNo,
+      param: 'Manual rejection', found: reason, by: S.settings.inspector, action: 'Rejected by inspector', cls: 'reject', castings: [c.id], status: 'closed', closedTs: Date.now(), closeNote: 'Rejected', remarks: '' };
+    S.ncrs.push(ncr); QI.save();
+  };
+
+  /* ---------- calibration / sand-test schedule ---------- */
+  const PERIOD = { shift: 0.4, daily: 1, weekly: 7, quarterly: 90 };
+  QI.PERIOD_LABEL = { shift: 'every shift', daily: 'daily', weekly: 'weekly', quarterly: 'every 3 months' };
+  QI.lastDone = (checkId) => {
+    let best = null;
+    S.logs.forEach((l) => { const a = QI.last('log', l.id, checkId); if (a && (!best || a.ts > best)) best = a.ts; });
+    return best;
+  };
+  QI.due = () => {
+    const out = [];
+    QI.allChecks().filter((c) => c.scope === 'log' && c.freq && c.freq !== 'shift').forEach((c) => {
+      const last = QI.lastDone(c.id);
+      const age = last ? (Date.now() - last) / 864e5 : Infinity;
+      const p = PERIOD[c.freq];
+      if (age > p) out.push({ check: c, last, overdue: last ? Math.floor(age - p) : null });
+    });
+    return out;
+  };
+
+  /* ---------- statistics ---------- */
+  QI.stats = () => {
+    const cs = S.castings;
+    const active = cs.filter((c) => c.status === 'active');
+    const wip = {};
+    QI.stages.forEach((s) => (wip[s.no] = 0));
+    active.forEach((c) => { const st = QI.castingState(c); if (st.stageNo && st.label !== 'Ready for release') wip[st.stageNo]++; else wip[10]++; });
+    const ncrByStage = {}; QI.stages.forEach((s) => (ncrByStage[s.no] = 0));
+    S.ncrs.forEach((n) => { if (n.stageNo) ncrByStage[n.stageNo]++; });
+    let first = 0, total = 0;
+    Object.values(S.results).forEach((r) => { total++; if (r.attempts[0].result === 'ok') first++; });
+    const released = cs.filter((c) => c.status === 'released').length, rejected = cs.filter((c) => c.status === 'rejected').length;
+    return { total: cs.length, active: active.length, released, rejected, openNcr: S.ncrs.filter((n) => n.status === 'open').length,
+      wip, ncrByStage, fpy: total ? first / total : null, yield: released + rejected ? released / (released + rejected) : null, checksDone: total };
+  };
+
+  /* ---------- export ---------- */
+  QI.csv = () => {
+    const rows = [['Scope', 'Owner', 'Check', 'Stage', 'Parameter', 'Attempt', 'Date/time', 'Inspector', 'Result', 'Reading / summary', 'Detail', 'Ref no.', 'Action if Not OK', 'Remarks']];
+    Object.keys(S.results).forEach((k) => {
+      const [scope, owner, id] = k.split('|'); const ch = QI.checks[id];
+      S.results[k].attempts.forEach((a) => rows.push([scope, owner, id, ch ? ch.stageNo : '', ch ? ch.param : '', a.n, new Date(a.ts).toISOString(), a.by, a.result === 'ok' ? 'OK' : 'NOT OK', a.summary, a.detail, a.ref, a.action || '', a.remarks]));
+    });
+    return rows.map((r) => r.map((v) => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }).join(',')).join('\n');
+  };
+})();
+
+</script>
+<script>
+/* DCL Quality Inspection – UI. Hash-routed single page app, no build step. */
+(function () {
+  'use strict';
+  const { S, num } = { S: () => QI.S(), num: QI.num };
+  const $ = (sel, el) => (el || document).querySelector(sel);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fdt = (ts) => ts ? new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
+  const fd = (ts) => ts ? new Date(ts).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '–';
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  let route = 'dashboard', booting = !!(window.claude && window.claude.use), DL = null;
+  const hist = [];
+  const HOSTED = !!window.claude;
+  const go = (p) => { p = String(p).replace(/^#?\/?/, '') || 'dashboard'; if (p !== route) { hist.push(route); route = p; } window.scrollTo(0, 0); render(); };
+  const ui = { open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
+  const SCOPE_LABEL = { job: 'Work order', log: 'Sand & calibration log', heat: 'Heat', casting: 'Casting' };
+
+  /* ================= small components ================= */
+  const badge = (t, cls) => `<span class="badge ${cls || ''}">${esc(t)}</span>`;
+  const stBadge = (s) => ({ ok: badge('OK', 'ok'), nok: badge('Not OK', 'bad'), none: badge('Pending', 'mute'), done: badge('Complete', 'ok'), fail: badge('Failed – action needed', 'bad'),
+    progress: badge('In progress', 'info'), open: badge('Not started', 'mute'), na: badge('Not applicable', 'mute') }[s] || '');
+  const dot = (s) => `<span class="dot ${s === 'ok' || s === 'done' ? 'ok' : s === 'nok' || s === 'fail' ? 'bad' : s === 'progress' ? 'info' : ''}"></span>`;
+  const link = (href, t) => `<a href="#${href}">${esc(t)}</a>`;
+  const empty = (msg, extra) => `<div class="empty">${msg}${extra || ''}</div>`;
+  const table = (head, rows) => `<div class="tw"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  const progressBar = (c) => {
+    const t = QI.castingStages(c);
+    return `<span class="pbar" title="Stage progress">${t.stages.map((s) => `<i class="${s.status === 'done' ? 'ok' : s.status === 'fail' ? 'bad' : s.status === 'progress' ? 'info' : s.status === 'na' ? 'na' : ''}" title="${s.stage.no}. ${esc(s.stage.name)}"></i>`).join('')}</span>`;
+  };
+  const deptName = (no) => ((QI.DEPTS.find((d) => d.stages.includes(no) && !d.all) || { name: 'Quality' }).name);
+  const stateBadge = (c) => { const s = QI.castingState(c); return badge(s.label, s.cls); };
+
+  /* ================= modal ================= */
+  function modal(title, body, onOk, okLabel) {
+    const dlg = $('#dlg'); if (dlg.open) dlg.close();
+    dlg.innerHTML = `<form method="dialog" class="mform"><h3>${esc(title)}</h3><div class="mbody">${body}</div><div class="merr" id="merr"></div>
+      <div class="mact"><button type="button" class="btn ghost" data-act="modal-cancel">Cancel</button>${onOk ? `<button type="submit" class="btn primary">${esc(okLabel || 'Save')}</button>` : ''}</div></form>`;
+    const form = $('form', dlg);
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      if (!onOk) return dlg.close();
+      const err = onOk(form);
+      if (err) { $('#merr').textContent = err; } else { dlg.close(); render(); }
+    };
+    dlg.showModal();
+    const f = $('input,select,textarea', form); if (f) f.focus();
+  }
+  const ask = (msg, yes, label) => modal('Please confirm', `<p class="pre">${esc(msg)}</p>`, () => { yes(); }, label || 'Continue');
+  const fld = (label, name, val, attrs) => `<label class="f"><span>${label}</span><input name="${name}" value="${esc(val == null ? '' : val)}" ${attrs || ''}></label>`;
+  const sel = (label, name, opts, val) => `<label class="f"><span>${label}</span><select name="${name}">${opts.map((o) => { const [v, t] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(t)}</option>`; }).join('')}</select></label>`;
+  const ta = (label, name, val, hint, rows) => `<label class="f"><span>${label}</span><textarea name="${name}" rows="${rows || 4}">${esc(val || '')}</textarea>${hint ? `<small>${hint}</small>` : ''}</label>`;
+  const val = (form, n) => (form.elements[n] ? form.elements[n].value.trim() : '');
+
+  /* dropdown with "Other (specify)…"; whatever is typed under Other is remembered for next time */
+  const combo = (label, name, listKey, cur, defs, o) => {
+    o = o || {};
+    const opts = QI.opts(listKey, defs);
+    if (cur && !opts.includes(cur)) opts.unshift(cur);
+    return `<label class="f"><span>${label}</span><select name="${name}" data-combo>${o.noBlank ? '' : `<option value="">${esc(o.blank || '– select –')}</option>`}${opts.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option></select>
+      <input name="${name}__o" class="other" placeholder="Type new value – saved for next time" hidden></label>`;
+  };
+  const cval = (form, name, listKey) => {
+    const sl = form.elements[name]; if (!sl) return '';
+    if (sl.value !== '__other') return sl.value.trim();
+    const v = (form.elements[name + '__o'].value || '').trim();
+    if (v && listKey) QI.learn(listKey, v);
+    return v;
+  };
+
+  function profileModal() {
+    modal('Your name and department', `${fld('Your name (stamped on every record you sign)', 'name', QI.me.name, 'required')}
+      <label class="f"><span>Department</span><select name="dept">${QI.DEPTS.map((d) => `<option value="${d.id}" ${d.id === QI.me.dept ? 'selected' : ''}>${esc(d.name)} – ${esc(d.about)}</option>`).join('')}</select></label>
+      <small class="muted">Each department records its own stages; everything else is view-only. Pick the department you work in.</small>`, (f) => {
+      if (!val(f, 'name')) return 'Enter your name.';
+      QI.setPerson(val(f, 'name'), val(f, 'dept'));
+    }, 'Save');
+  }
+  function needInspector(force) {
+    if (QI.mode === 'shared') { if (QI.me.dept && QI.me.name && !force) return false; profileModal(); return true; }
+    if (S().settings.inspector && !force) return false;
+    modal('Who is inspecting?', combo('Inspector (shown on every record you sign)', 'name', 'inspector', S().settings.inspector, [], { blank: '– choose your name –' }), (f) => {
+      const n = cval(f, 'name', 'inspector'); if (!n) return 'Choose or enter your name.'; S().settings.inspector = n; QI.save();
+    }, 'Continue');
+    return true;
+  }
+
+  /* ================= check rows & forms ================= */
+  function critText(ch) {
+    if (ch.min != null || ch.max != null) return QI.limText(ch.min, ch.max, ch.unit);
+    return ch.criteria || '';
+  }
+  function lastSummary(a) {
+    if (!a) return '<span class="muted">No record yet</span>';
+    return `${a.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')} <span class="muted">${esc(a.summary || '')} · ${esc(a.by)} · ${fdt(a.ts)}${a.n > 1 ? ` · attempt ${a.n}` : ''}</span>`;
+  }
+  function checkRow(scope, owner, id, o) {
+    o = o || {};
+    const ch = QI.eff(id);
+    const key = QI.rkey(scope, owner, id);
+    const last = owner ? QI.last(scope, owner, id) : null;
+    const st = last ? last.result : 'none';
+    const rec = owner ? QI.rec(scope, owner, id) : null;
+    const open = ui.open[key];
+    const perm = QI.can('record', ch.stageNo);
+    const canRecord = owner && !o.locked && !o.readonly && perm;
+    const pending = last && last.result === 'nok' && QI.classify(last.action) === 'rework';
+    const tags = [ch.tbc || ch.assumed ? badge(ch.assumed && !ch.tbc ? 'criteria assumed – confirm' : 'to be confirmed', 'warn') : '',
+      o.required === false ? badge('sampled / optional', 'mute') : '', owner && !o.locked && !perm ? badge('view only · ' + deptName(ch.stageNo), 'mute') : '', ch.freq ? badge(QI.PERIOD_LABEL[ch.freq], 'mute') : ''].join('');
+    return `<div class="chk ${st}" data-key="${esc(key)}">
+      <div class="chk-h">${dot(st)}<div class="chk-t"><b>${esc(ch.id)}</b> ${esc(ch.param)} ${tags}
+        <div class="muted sm">Sample: ${esc(ch.sample || '–')} · Method: ${esc(ch.method || '–')} · Accept: <b>${esc(critText(ch))}</b></div>
+        <div class="sm">${lastSummary(last)}</div>
+        ${pending ? `<div class="sm warnT">⚠ Rework required: ${esc(last.action)} – then re-inspect.</div>` : ''}</div>
+        <div class="chk-a">${canRecord ? `<button class="btn ${st === 'ok' ? 'ghost' : 'primary'} sm" data-act="toggle" data-key="${esc(key)}">${open ? 'Close' : st === 'none' ? 'Record' : st === 'ok' ? 'Re-record' : 'Re-inspect'}</button>` : ''}</div></div>
+      ${open && canRecord ? checkForm(scope, owner, ch, key) : ''}
+      ${rec && rec.attempts.length ? `<details class="hist"><summary>History (${rec.attempts.length})</summary>${rec.attempts.slice().reverse().map((a) => `<div class="hrow">${a.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')} #${a.n} · ${fdt(a.ts)} · ${esc(a.by)} · ${esc(a.summary || '')}${a.detail ? ` <span class="muted">(${esc(a.detail)})</span>` : ''}${a.ref ? ` · Ref ${esc(a.ref)}` : ''}${a.action ? ` · Action: ${esc(a.action)}` : ''}${a.remarks ? ` · “${esc(a.remarks)}”` : ''}</div>`).join('')}</details>` : ''}
+    </div>`;
+  }
+
+  function checkForm(scope, owner, ch, key) {
+    const last = QI.last(scope, owner, ch.id);
+    const li = (last && last.input) || {};
+    const heat = scope === 'heat' ? QI.heat(owner) : null;
+    let inner = '';
+    const unit = ch.unit ? ` (${esc(ch.unit)})` : '';
+    if (['max', 'min', 'range'].includes(ch.kind)) {
+      inner = fld(`Measured value${unit} — limit ${esc(critText(ch))}`, 'value', '', 'type="number" step="any" inputmode="decimal" autocomplete="off"');
+    } else if (ch.kind === 'yn') {
+      inner = `<div class="f"><span>Result</span><div class="radios"><label><input type="radio" name="result" value="ok"> OK</label><label><input type="radio" name="result" value="nok"> Not OK</label></div></div>`;
+    } else if (ch.kind === 'spec') {
+      let mn = li.min || '', mx = li.max || '';
+      if (heat && ch.id === '4.3.1') { mn = heat.tapMin || mn; mx = heat.tapMax || mx; }
+      if (heat && ch.id === '4.4.1') { mn = heat.pourMin || mn; mx = heat.pourMax || mx; }
+      inner = `<div class="grid3">${fld(`Measured value${unit}`, 'value', '', 'type="number" step="any" inputmode="decimal"')}${fld('Min limit', 'min', mn, 'type="number" step="any"')}${fld('Max limit', 'max', mx, 'type="number" step="any"')}</div>
+        ${sel('Result (only needed when no limits are entered)', 'result', [['', 'Auto – from limits'], ['ok', 'OK'], ['nok', 'Not OK']], '')}`;
+    } else if (ch.kind === 'dim') {
+      const jobNo = scope === 'casting' ? (QI.casting(owner) || {}).jobNo : scope === 'job' ? owner : null;
+      let rows = (li.rows && li.rows.length) ? li.rows : parseDims((QI.job(jobNo) || {}).dims);
+      if (!rows.length) rows = [{}];
+      inner = `<div class="f"><span>Dimensions (nominal ± tolerance, actual measured)</span><table class="dimt"><thead><tr><th>Feature</th><th>Nominal</th><th>− Tol</th><th>+ Tol</th><th>Actual</th><th></th></tr></thead><tbody>${rows.map(dimRow).join('')}</tbody></table>
+        <button type="button" class="btn ghost sm" data-act="dim-add">+ Add dimension</button></div>`;
+    } else if (ch.kind === 'chem' || ch.kind === 'mech') {
+      const spec = heat ? (ch.kind === 'chem' ? heat.chemSpec : heat.mechSpec) : [];
+      inner = !spec.length ? `<div class="warnBox">No specification defined. <button type="button" class="btn sm" data-act="heat-spec" data-no="${esc(owner)}">Define ${ch.kind === 'chem' ? 'chemistry' : 'mechanical'} spec</button></div>`
+        : `<div class="f"><span>${ch.kind === 'chem' ? 'Spectrometer reading (%)' : 'Test results'}</span><div class="specgrid">${spec.map((r) => `<label><span>${esc(r.name)} <em>${esc(QI.limText(num(r.min), num(r.max), ''))}</em></span><input data-val="${esc(r.name)}" type="number" step="any" inputmode="decimal"></label>`).join('')}</div></div>`;
+    }
+    const acts = [...new Set([...(ch.actions || []).filter((x) => x !== 'Other'), ...QI.opts('action:' + ch.id)])];
+    return `<form class="chkform" data-key="${esc(key)}" data-scope="${scope}" data-owner="${esc(owner)}" data-check="${ch.id}" onsubmit="return false">
+      ${inner}
+      <div class="grid2">${fld('Report / certificate / ref. no. (optional)', 'ref', '')}${combo('Remarks (optional)', 'remarks', 'remarks', '', QI.DEFAULTS.remarks, { blank: '– none –' })}</div>
+      ${`<label class="f"><span>If Not OK – action / disposal</span><select name="action" data-combo>${acts.map((x, i) => `<option value="${esc(x)}" ${i === 0 ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option></select><input name="action__o" class="other" placeholder="Describe the action – saved for next time" hidden></label>
+      <label class="f clsrow" hidden><span>This action means the casting is…</span><select name="actionCls"><option value="rework">Reworked / corrected (re-inspect)</option><option value="reject">Rejected / scrapped</option></select></label>`}
+      <div class="preview" aria-live="polite"></div>
+      <div class="row"><button type="button" class="btn primary" data-act="save-check" data-key="${esc(key)}">Save inspection result</button><button type="button" class="btn ghost" data-act="toggle" data-key="${esc(key)}">Cancel</button></div>
+    </form>`;
+  }
+  const dimRow = (r) => `<tr class="dimrow"><td><input data-d="name" value="${esc(r.name || '')}" placeholder="e.g. Bore Ø"></td><td><input data-d="nominal" type="number" step="any" value="${esc(r.nominal == null ? '' : r.nominal)}"></td>
+    <td><input data-d="tm" type="number" step="any" value="${esc(r.tm == null ? '' : r.tm)}"></td><td><input data-d="tp" type="number" step="any" value="${esc(r.tp == null ? '' : r.tp)}"></td><td><input data-d="actual" type="number" step="any"></td>
+    <td><button type="button" class="x" data-act="dim-del" title="Remove">×</button></td></tr>`;
+  function parseDims(txt) {
+    return String(txt || '').split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).map((p) => ({ name: p[0], nominal: p[1], tm: p[2], tp: p[3] == null || p[3] === '' ? p[2] : p[3] }));
+  }
+  function readForm(f) {
+    const ch = QI.eff(f.dataset.check);
+    const g = (n) => (f.elements[n] ? f.elements[n].value : '');
+    const input = { ref: g('ref').trim(), remarks: g('remarks') === '__other' ? g('remarks__o').trim() : g('remarks').trim(), action: g('action') === '__other' ? g('action__o').trim() : g('action') };
+    if (g('action') === '__other') { input.newAction = true; input.actionCls = g('actionCls'); }
+    if (g('remarks') === '__other') input.newRemark = true;
+    if (['max', 'min', 'range'].includes(ch.kind)) input.value = g('value');
+    if (ch.kind === 'yn') input.result = g('result');
+    if (ch.kind === 'spec') { input.value = g('value'); input.min = g('min'); input.max = g('max'); input.result = g('result'); }
+    if (ch.kind === 'dim') input.rows = [...f.querySelectorAll('tr.dimrow')].map((tr) => { const r = {}; tr.querySelectorAll('[data-d]').forEach((i) => (r[i.dataset.d] = i.value)); return r; });
+    if (ch.kind === 'chem' || ch.kind === 'mech') { input.vals = {}; f.querySelectorAll('[data-val]').forEach((i) => (input.vals[i.dataset.val] = i.value)); }
+    return input;
+  }
+  function liveEval(f) {
+    const ch = QI.eff(f.dataset.check);
+    const ev = QI.evaluate(ch, readForm(f), { heat: f.dataset.scope === 'heat' ? QI.heat(f.dataset.owner) : null });
+    const p = $('.preview', f);
+    p.className = 'preview ' + (ev.error ? '' : ev.result);
+    p.textContent = ev.error ? '' : ev.result === 'ok' ? `✔ OK — ${ev.summary}` : `✖ NOT OK — ${ev.summary}. An NCR will be raised.`;
+  }
+  function saveCheck(key, confirmed) {
+    if (needInspector()) return;
+    const f = $(`form.chkform[data-key="${CSS.escape(key)}"]`);
+    const { scope, owner, check } = f.dataset;
+    const input = readForm(f);
+    const ch = QI.eff(check);
+    const ev = QI.evaluate(ch, input, { heat: scope === 'heat' ? QI.heat(owner) : null });
+    if (ev.error) { const p = $('.preview', f); p.className = 'preview err'; p.textContent = ev.error; return; }
+    if (ev.result === 'nok' && input.newAction) {
+      if (!input.action) { const p = $('.preview', f); p.className = 'preview err'; p.textContent = 'Describe the action taken / required.'; return; }
+      QI.learnAction(check, input.action, input.actionCls);
+    }
+    if (input.newRemark) QI.learn('remarks', input.remarks);
+    if (ev.result === 'nok') {
+      const tg = QI.rejectTargets(scope, owner, check, input.action);
+      if (tg.length && !confirmed) { ask(`“${input.action}” will REJECT ${tg.length} casting(s): ${tg.join(', ')}.`, () => saveCheck(key, true), 'Reject & save'); return; }
+    }
+    const r = QI.record(scope, owner, check, input);
+    if (r.error) { const p = $('.preview', f); p.className = 'preview err'; p.textContent = r.error; return; }
+    delete ui.open[key];
+    render();
+    if (r.ncr) toast(`${r.ncr.id} raised – ${ch.param}${r.rejected.length ? ` · ${r.rejected.length} casting(s) rejected` : ''}`, 'bad'); else toast('Saved – OK', 'ok');
+  }
+
+  /* stage block */
+  function stageBlock(st, scope, owner, o) {
+    o = o || {};
+    const items = [];
+    st.groups.forEach((g) => {
+      if (g.name) items.push(`<div class="grp">${esc(g.name)}</div>`);
+      g.steps.forEach((sp) => {
+        if (o.job && !QI.applicable(o.job, sp.checks[0])) { items.push(`<div class="step na"><h5>${esc(sp.id)} ${esc(sp.name)} ${badge('not required for this work order', 'mute')}</h5></div>`); return; }
+        items.push(`<div class="step"><h5>${esc(sp.id)} ${esc(sp.name)}</h5>${sp.checks.map((c) => checkRow(scope, owner, c.id, { locked: o.locked, required: o.job ? QI.required(o.job, c) : !sp.sampled })).join('')}</div>`);
+      });
+    });
+    return items.join('');
+  }
+
+  /* ================= views ================= */
+  const V = {};
+
+  V.dashboard = () => {
+    const s = QI.stats(); const st = S();
+    if (!st.jobs.length) return `<h2>Dashboard</h2>${empty('<b>Welcome to the DCL Quality Inspection app.</b><br>Start by creating a work order, then add castings and follow each one through the 10 inspection stages.',
+      QI.can('create', 'job') ? `<div class="row c"><a class="btn primary" href="#/jobs">Create first work order</a><button class="btn" data-act="demo">Load demo data</button></div>` : '<div class="muted pad">Planning or Quality will create the first work order.</div>')}`;
+    const max = Math.max(1, ...Object.values(s.wip));
+    const nmax = Math.max(1, ...Object.values(s.ncrByStage));
+    const due = QI.due();
+    const attention = st.castings.filter((c) => c.status === 'active' && QI.castingState(c).failing);
+    const pct = (v) => v == null ? '–' : Math.round(v * 100) + '%';
+    return `<h2>Dashboard</h2>
+    <div class="kpis">
+      <div class="kpi"><b>${s.active}</b><span>Castings in process</span></div>
+      <div class="kpi"><b>${s.released}</b><span>Released</span></div>
+      <div class="kpi"><b class="${s.rejected ? 'badT' : ''}">${s.rejected}</b><span>Rejected</span></div>
+      <div class="kpi"><b class="${s.openNcr ? 'warnT' : ''}">${s.openNcr}</b><span>Open NCRs</span></div>
+      <div class="kpi"><b>${pct(s.fpy)}</b><span>First-time-OK rate (checks)</span></div>
+      <div class="kpi"><b>${pct(s.yield)}</b><span>Casting yield (released ÷ finished)</span></div>
+    </div>
+    <div class="cols">
+      <section class="card"><h3>Castings by current stage</h3>${QI.stages.map((x) => `<div class="bar"><span class="bl">${x.no}. ${esc(x.name)}</span><span class="bt"><i style="width:${s.wip[x.no] / max * 100}%"></i></span><b>${s.wip[x.no]}</b></div>`).join('')}</section>
+      <section class="card"><h3>Non-conformances by stage</h3>${QI.stages.map((x) => `<div class="bar"><span class="bl">${x.no}. ${esc(x.name)}</span><span class="bt bad"><i style="width:${s.ncrByStage[x.no] / nmax * 100}%"></i></span><b>${s.ncrByStage[x.no]}</b></div>`).join('')}</section>
+    </div>
+    <div class="cols">
+      <section class="card"><h3>Calibration & testing due</h3>${due.length ? due.map((d) => `<div class="li"><span>${dot('nok')} ${esc(d.check.id)} ${esc(QI.steps[d.check.step].name)}<div class="muted sm">${esc(QI.PERIOD_LABEL[d.check.freq])} · last ${d.last ? fd(d.last) : 'never'}</div></span></div>`).join('') : '<div class="muted">All up to date ✔</div>'}
+        <a class="btn sm" href="#/logs">Open sand & calibration logs</a></section>
+      <section class="card"><h3>Needs attention</h3>${attention.length ? attention.map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} ${stateBadge(c)}</div>`).join('') : '<div class="muted">No failed checks waiting ✔</div>'}
+        ${st.ncrs.filter((n) => n.status === 'open').slice(-5).reverse().map((n) => `<div class="li sm"><b>${n.id}</b> ${esc(n.param)} – ${esc(n.found)}<div class="muted">${esc(n.action)}</div></div>`).join('')}
+        <a class="btn sm" href="#/ncr">NCR register</a></section>
+    </div>`;
+  };
+
+  /* ---- jobs ---- */
+  V.jobs = () => `<div class="hd"><h2>Work orders</h2><button class="btn primary" data-act="new-job">+ New work order</button></div>
+    ${S().jobs.length ? table(['Work order', 'Customer / PO', 'Part', 'Grade', 'Castings', 'Released', ''], S().jobs.slice().reverse().map((j) => {
+      const cs = QI.jobCastings(j.no);
+      return `<tr><td>${link('/job/' + j.no, j.no)}</td><td>${esc(j.customer)}<div class="muted sm">${esc(j.po)}</div></td><td>${esc(j.part)}<div class="muted sm">Dwg ${esc(j.drawing)} · Pattern ${esc(j.pattern)}</div></td><td>${esc(j.grade)}</td><td>${cs.length}${j.qty ? ' / ' + esc(j.qty) : ''}</td><td>${cs.filter((c) => c.status === 'released').length}</td><td>${link('/job/' + j.no, 'Open →')}</td></tr>`;
+    })) : empty('No work orders yet.')}`;
+
+  V.job = (no) => {
+    const j = QI.job(no); if (!j) return empty('Work order not found.');
+    const cs = QI.jobCastings(no);
+    const st1 = QI.stageOf[1];
+    const s1 = QI.stageOf[1].groups[0].steps.flatMap((s) => s.checks).map((c) => QI.status('job', no, c.id));
+    return `<div class="hd"><div><h2>${esc(j.no)} <small>${esc(j.part)}</small></h2><div class="muted">${esc(j.customer)} · PO ${esc(j.po)} · Drawing ${esc(j.drawing)} · Pattern ${esc(j.pattern)} · Grade ${esc(j.grade)}${j.qty ? ' · Order qty ' + esc(j.qty) : ''}</div></div>
+      <div class="row"><button class="btn" data-act="edit-job" data-no="${esc(no)}">Edit</button><button class="btn primary" data-act="add-castings" data-no="${esc(no)}">+ Add castings</button></div></div>
+    <section class="card"><h3>Inspection requirements for this order <small class="muted">(per PO / customer QAP)</small></h3>
+      <div class="chips">${Object.keys(j.applic).map((id) => `<label class="chip"><input type="checkbox" data-act="applic" data-no="${esc(no)}" data-step="${id}" ${j.applic[id] ? 'checked' : ''}> ${id} ${esc(QI.steps[id].name)}</label>`).join('')}</div>
+      <div class="muted sm">Unticked steps are skipped for every casting of this order. 3.2 and 8.3 are sampled (10 %) and never block a casting.</div></section>
+    <section class="card"><h3>Castings (${cs.length})</h3>${cs.length ? castingTable(cs) : empty('No castings yet – add the first one.')}</section>
+    <section class="card"><h3>Stage ${st1.no} · ${esc(st1.name)} ${stBadge(s1.every((x) => x === 'ok') ? 'done' : s1.some((x) => x === 'ok') ? 'progress' : 'open')}</h3>${stageBlock(st1, 'job', no)}</section>`;
+  };
+  function castingTable(cs) {
+    return table(['Serial no.', 'Heat', 'Progress', 'Status', ''], cs.map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${c.heatNo ? link('/heat/' + c.heatNo, c.heatNo) : '<span class="muted">–</span>'}</td><td>${progressBar(c)}</td><td>${stateBadge(c)}</td><td>${link('/casting/' + c.id, 'Open →')}</td></tr>`));
+  }
+
+  /* ---- castings ---- */
+  V.castings = () => {
+    const q = ui.filter.castings.toLowerCase();
+    const cs = S().castings.filter((c) => !q || (c.id + ' ' + (c.heatNo || '') + ' ' + QI.castingState(c).label).toLowerCase().includes(q));
+    return `<div class="hd"><h2>Castings</h2><input class="search" placeholder="Search serial, heat, status…" value="${esc(ui.filter.castings)}" data-act="filter-castings"></div>
+    ${cs.length ? table(['Serial no.', 'Work order', 'Heat', 'Progress (stages 1–10)', 'Status', ''], cs.slice().reverse().map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${link('/job/' + c.jobNo, c.jobNo)}</td><td>${c.heatNo ? link('/heat/' + c.heatNo, c.heatNo) : '<span class="muted">–</span>'}</td><td>${progressBar(c)}</td><td>${stateBadge(c)}</td><td>${link('/casting/' + c.id, 'Open →')}</td></tr>`)) : empty('No castings found. Create castings from a work order.')}`;
+  };
+
+  V.casting = (id) => {
+    const c = QI.casting(id); if (!c) return empty('Casting not found.');
+    const j = QI.job(c.jobNo) || {};
+    const t = QI.castingStages(c);
+    const s = QI.castingState(c);
+    const openN = S().ncrs.filter((n) => n.status === 'open' && n.castings.includes(c.id));
+    const heats = S().heats, logs = S().logs;
+    return `<div class="hd"><div><h2>${esc(c.id)} ${stateBadge(c)}</h2><div class="muted">${link('/job/' + c.jobNo, c.jobNo)} · ${esc(j.part)} · Dwg ${esc(j.drawing)} · Grade ${esc(j.grade)}</div></div>
+      <div class="row"><a class="btn" href="#/report/${esc(c.id)}">Inspection report</a>
+      ${c.status === 'active' ? `<button class="btn" data-act="reject-casting" data-id="${esc(c.id)}">Reject casting</button><button class="btn primary" data-act="release" data-id="${esc(c.id)}" ${t.allDone && !openN.length ? '' : 'disabled title="Complete all stages and close NCRs first"'}>Release casting</button>` : ''}</div></div>
+    ${c.status === 'rejected' ? `<div class="banner bad"><b>Rejected</b> at stage ${c.reject.stageNo || '–'} – ${esc(c.reject.reason)} · ${esc(c.reject.action)} · ${esc(c.reject.by)}, ${fdt(c.reject.ts)}</div>` : ''}
+    ${c.status === 'released' ? `<div class="banner ok"><b>Released</b> by ${esc(c.release.by)} on ${fdt(c.release.ts)} ${c.release.remarks ? '· ' + esc(c.release.remarks) : ''}</div>` : ''}
+    ${openN.length ? `<div class="banner warn"><b>${openN.length} open NCR(s):</b> ${openN.map((n) => `${n.id} (${esc(n.param)} – ${esc(n.action)})`).join('; ')}</div>` : ''}
+    <section class="card links"><div class="grid2">
+      <div><span class="lbl">Heat (melt)</span><div class="row">${c.status === 'active' || !c.heatNo ? `<select data-act="set-heat" data-id="${esc(c.id)}"><option value="">– select heat –</option>${heats.map((h) => `<option ${h.no === c.heatNo ? 'selected' : ''}>${esc(h.no)}</option>`).join('')}</select>` : esc(c.heatNo)}<button class="btn sm" data-act="new-heat" data-for="${esc(c.id)}">+ New heat</button></div></div>
+      <div><span class="lbl">Sand & calibration log (mould-making shift)</span><div class="row"><select data-act="set-log" data-id="${esc(c.id)}"><option value="">– select log –</option>${logs.map((l) => `<option value="${esc(l.id)}" ${l.id === c.logId ? 'selected' : ''}>${esc(l.date)} · shift ${esc(l.shift)}</option>`).join('')}</select><button class="btn sm" data-act="new-log" data-for="${esc(c.id)}">+ New log</button></div></div></div></section>
+    ${t.stages.map((x) => {
+      const no = x.stage.no;
+      const open = ui.stageOpen[c.id + no] != null ? ui.stageOpen[c.id + no] : (no === t.current || x.status === 'fail');
+      const sc = x.stage.scope;
+      const owner = QI.ownerOf(c, sc);
+      let body;
+      if (x.locked && c.status !== 'rejected') body = `<div class="muted pad">🔒 Locked – complete the previous stage first.</div>`;
+      else if (!owner) body = `<div class="warnBox">${sc === 'heat' ? 'Assign this casting to a heat (melt) to record this stage.' : 'Link the sand & calibration log for the shift in which the mould was made.'}</div>`;
+      else {
+        const note = sc !== 'casting' ? `<div class="muted sm pad">Recorded once for ${SCOPE_LABEL[sc].toLowerCase()} <b>${esc(owner)}</b> and shared by all castings of it${sc === 'heat' ? ` · ${link('/heat/' + owner, 'open heat record')}` : sc === 'log' ? ` · ${link('/log/' + owner, 'open log')}` : ''}.</div>` : '';
+        body = note + stageBlock(x.stage, sc, owner, { locked: x.locked || c.status !== 'active' && sc === 'casting', job: j });
+      }
+      return `<section class="card stage ${x.status}"><div class="sh" data-act="stage-toggle" data-k="${esc(c.id + no)}"><span class="sn">${no}</span><span class="sname">${esc(x.stage.name)}</span>${QI.mode === 'shared' ? badge(deptName(no), 'mute') : ''}${x.stage.optional ? badge('per PO / QAP', 'mute') : ''}${stBadge(x.status)}<span class="chev">${open ? '▾' : '▸'}</span></div>${open ? `<div class="sb">${body}</div>` : ''}</section>`;
+    }).join('')}`;
+  };
+
+  /* ---- heats ---- */
+  V.heats = () => `<div class="hd"><h2>Heats (melts)</h2><button class="btn primary" data-act="new-heat">+ New heat</button></div>
+    ${S().heats.length ? table(['Heat no.', 'Date', 'Furnace', 'Grade', 'Castings', 'Chemistry (4.2)', ''], S().heats.slice().reverse().map((h) => `<tr><td>${link('/heat/' + h.no, h.no)}</td><td>${esc(h.date)}</td><td>${esc(h.furnace)}</td><td>${esc(h.grade)}</td><td>${QI.heatCastings(h.no).length}</td><td>${stBadge(QI.status('heat', h.no, '4.2.1'))}</td><td>${link('/heat/' + h.no, 'Open →')}</td></tr>`)) : empty('No heats yet.')}`;
+
+  V.heat = (no) => {
+    const h = QI.heat(no); if (!h) return empty('Heat not found.');
+    const cs = QI.heatCastings(no);
+    const unassigned = S().castings.filter((c) => !c.heatNo && c.status === 'active');
+    const req = {};
+    cs.forEach((c) => QI.stageOf[8].groups[0].steps.forEach((sp) => { if (QI.required(QI.job(c.jobNo), sp.checks[0])) (req[sp.id] = req[sp.id] || new Set()).add(c.jobNo); }));
+    return `<div class="hd"><div><h2>Heat ${esc(h.no)}</h2><div class="muted">${esc(h.date)} · Furnace ${esc(h.furnace || '–')} · Grade ${esc(h.grade || '–')} · Tapping ${esc(QI.limText(num(h.tapMin), num(h.tapMax), '°C') || 'limits not set')} · Pouring ${esc(QI.limText(num(h.pourMin), num(h.pourMax), '°C') || 'limits not set')}</div></div>
+      <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
+    <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
+      ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
+    ${[4, 8].map((n) => {
+      const st = QI.stageOf[n];
+      const sts = st.groups[0].steps.flatMap((s) => s.checks).map((c) => QI.status('heat', no, c.id));
+      return `<section class="card"><h3>Stage ${n} · ${esc(st.name)} ${n === 8 ? '<small class="muted">test bars / samples from this heat – tests required depend on each casting’s PO / QAP</small>' : ''}</h3>
+        ${n === 8 && Object.keys(req).length ? `<div class="muted sm pad">Required by castings on this heat: ${Object.keys(req).map((k) => `${k} (${[...req[k]].join(', ')})`).join(' · ')}</div>` : ''}${stageBlock(st, 'heat', no)}</section>`;
+    }).join('')}`;
+  };
+
+  /* ---- logs ---- */
+  V.logs = () => {
+    const due = QI.due();
+    return `<div class="hd"><h2>Sand & calibration logs</h2><button class="btn primary" data-act="new-log">+ New shift log</button></div>
+    <section class="card"><h3>Due / overdue</h3>${due.length ? due.map((d) => `<div class="li">${dot('nok')} <b>${esc(d.check.id)}</b> ${esc(QI.steps[d.check.step].name)} – ${esc(d.check.param)} <span class="muted">(${esc(QI.PERIOD_LABEL[d.check.freq])}, last ${d.last ? fd(d.last) : 'never'})</span></div>`).join('') : '<div class="muted">All periodic calibrations and tests are up to date ✔</div>'}</section>
+    ${S().logs.length ? table(['Date', 'Shift', 'Checks recorded', 'Failed', 'Castings', ''], S().logs.slice().sort((a, b) => b.id.localeCompare(a.id)).map((l) => {
+      const ids = Object.keys(S().results).filter((k) => k.startsWith('log|' + l.id + '|'));
+      const bad = ids.filter((k) => QI.last('log', l.id, k.split('|')[2]).result === 'nok').length;
+      return `<tr><td>${link('/log/' + l.id, l.date)}</td><td>${esc(l.shift)}</td><td>${ids.length}</td><td>${bad ? badge(bad, 'bad') : '0'}</td><td>${QI.logCastings(l.id).length}</td><td>${link('/log/' + l.id, 'Open →')}</td></tr>`;
+    })) : empty('No logs yet.')}`;
+  };
+  V.log = (id) => {
+    const l = QI.log(id); if (!l) return empty('Log not found.');
+    return `<div class="hd"><div><h2>Sand & calibration log – ${esc(l.date)}, shift ${esc(l.shift)}</h2><div class="muted">${QI.logCastings(id).length} casting(s) linked · opened by ${esc(l.by || '–')}</div></div></div>
+      <section class="card">${stageBlock(QI.stageOf[2], 'log', id)}</section>`;
+  };
+
+  /* ---- NCR ---- */
+  V.ncr = () => {
+    const f = ui.filter.ncr;
+    const list = S().ncrs.filter((n) => f === 'all' || n.status === f).slice().reverse();
+    return `<div class="hd"><h2>Non-conformance register</h2><div class="seg">${['open', 'closed', 'all'].map((x) => `<button class="${f === x ? 'on' : ''}" data-act="ncr-filter" data-f="${x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join('')}</div></div>
+    ${list.length ? table(['NCR', 'Date', 'Stage / check', 'Found', 'Action / disposal', 'Affects', 'Status', ''], list.map((n) => `<tr><td><b>${n.id}</b></td><td>${fdt(n.ts)}<div class="muted sm">${esc(n.by)}</div></td><td>${n.stageNo || ''} ${esc(n.checkId || '')}<div class="muted sm">${esc(n.param)}</div></td><td>${esc(n.found)}</td><td>${esc(n.action)} ${badge(n.cls === 'reject' ? 'reject' : 'rework', n.cls === 'reject' ? 'bad' : 'warn')}</td>
+      <td>${esc(SCOPE_LABEL[n.scope])} ${esc(n.owner)}<div class="sm">${n.castings.slice(0, 4).map((c) => link('/casting/' + c, c)).join(', ')}${n.castings.length > 4 ? ' …' : ''}</div></td><td>${n.status === 'open' ? badge('Open', 'warn') : badge('Closed', 'ok')}<div class="muted sm">${esc(n.closeNote || '')}</div></td>
+      <td>${n.status === 'open' ? `<button class="btn sm" data-act="ncr-close" data-id="${n.id}">Close…</button>` : ''}</td></tr>`)) : empty('No NCRs in this view.')}`;
+  };
+
+  /* ---- plan ---- */
+  V.plan = () => {
+    const q = ui.filter.plan.toLowerCase();
+    return `<div class="hd"><h2>Inspection plan</h2><input class="search" placeholder="Filter by step, parameter, method…" value="${esc(ui.filter.plan)}" data-act="filter-plan"></div>
+    <p class="muted">Imported from <i>INS_Inspection_Flow.xlsx</i>. Numeric limits and the “to be confirmed” items can be edited here; edits apply to all new inspections. “If Not OK” actions drive the NCR disposition.</p>
+    ${QI.stages.map((st) => {
+      const rows = [];
+      st.groups.forEach((g) => g.steps.forEach((sp) => sp.checks.forEach((c0) => {
+        const c = QI.eff(c0.id);
+        const hay = `${sp.id} ${sp.name} ${c.param} ${c.method} ${c.criteria}`.toLowerCase();
+        if (q && !hay.includes(q)) return;
+        rows.push(`<tr><td><b>${c.id}</b></td><td>${esc(sp.name)}</td><td>${esc(c.sample)}</td><td>${esc(c.param)}</td><td>${esc(c.method)}</td><td>${esc(critText(c))} ${c.tbc ? badge('TBC', 'warn') : ''}${c.assumed && !c.tbc ? badge('assumed', 'warn') : ''}${S().settings.overrides[c.id] ? badge('edited', 'info') : ''}</td><td>${esc((c.actions || []).join(' / '))}</td><td><button class="btn sm ghost" data-act="edit-check" data-id="${c.id}">Edit</button></td></tr>`);
+      })));
+      return rows.length ? `<section class="card"><h3>Stage ${st.no} · ${esc(st.name)} <small class="muted">recorded per ${SCOPE_LABEL[st.scope].toLowerCase()}</small></h3>${table(['Check', 'Step', 'Sample / frequency', 'Parameter', 'Method / equipment', 'Acceptance', 'If Not OK', ''], rows)}</section>` : '';
+    }).join('')}`;
+  };
+
+  /* ---- settings ---- */
+  V.settings = () => `<h2>Settings & data</h2>
+    ${QI.mode === 'shared' ? `<section class="card"><h3>Departments using this app</h3>${Object.values(QI.people).length ? table(['Name', 'Department'], Object.values(QI.people).map((p) => `<tr><td>${esc(p.name)}</td><td>${esc((QI.DEPTS.find((d) => d.id === p.dept) || {}).name || '')}</td></tr>`)) : '<div class="muted">Nobody has chosen a department yet.</div>'}</section>` : ''}<section class="card"><h3>Inspector</h3><div class="row"><b>${esc(S().settings.inspector || 'not set')}</b><button class="btn" data-act="change-insp">Change / add inspector</button></div><div class="muted sm">Your name is stamped on every result you record. On a shared phone, switch inspector here.</div></section>
+    <section class="card"><h3>Dropdown lists</h3><div class="muted sm pad">Values typed under “Other (specify)…” are added to the dropdowns automatically. Tap × to remove a wrong entry.</div>${listsHtml()}</section>
+    <section class="card"><h3>Data</h3><div class="muted sm pad">Data is stored in this browser (works offline). ${QI.persistent ? '' : '<b class="badT">Browser storage is unavailable – export your data before closing!</b>'} Export a backup regularly, and import it to move data to another device.</div>
+      <div class="row"><button class="btn" data-act="export-json">Backup (JSON)</button><label class="btn">Restore backup<input type="file" accept="application/json" hidden data-act="import-json"></label><button class="btn" data-act="export-csv">Export all results (CSV)</button></div></section>
+    <section class="card"><h3>Demo</h3><div class="row"><button class="btn" data-act="demo">Load demo data</button><button class="btn danger" data-act="wipe">Erase everything</button></div></section>`;
+
+  const LIST_NAMES = { inspector: 'Inspectors', customer: 'Customers', part: 'Parts', grade: 'Material grades', furnace: 'Furnaces', remarks: 'Inspection remarks', rejectReason: 'Rejection reasons', closeNote: 'NCR closure notes', releaseRemarks: 'Release remarks' };
+  function listsHtml() {
+    const L = S().settings.lists || {};
+    const keys = Object.keys(L).filter((k) => L[k].length);
+    if (!keys.length) return '<div class="muted">Nothing added yet.</div>';
+    return keys.map((k) => `<div class="lbl pad">${esc(LIST_NAMES[k] || (k.startsWith('action:') ? 'Actions for check ' + k.slice(7) : k))}</div><div class="chips">${L[k].map((v) => `<span class="chip">${esc(v)} <button class="x" data-act="unlearn" data-list="${esc(k)}" data-v="${esc(v)}" aria-label="Remove">×</button></span>`).join('')}</div>`).join('');
+  }
+
+  /* ---- report ---- */
+  V.report = (id) => {
+    const c = QI.casting(id); if (!c) return empty('Casting not found.');
+    const j = QI.job(c.jobNo) || {}; const h = c.heatNo ? QI.heat(c.heatNo) : null;
+    const t = QI.castingStages(c);
+    const s = QI.castingState(c);
+    const rows = [];
+    t.stages.forEach((x) => {
+      const done = x.items.filter((i) => i.owner);
+      if (!done.length) { return; }
+      rows.push(`<tr class="rs"><td colspan="7">Stage ${x.stage.no} · ${esc(x.stage.name)}</td></tr>`);
+      x.items.forEach((i) => {
+        const a = i.owner ? QI.last(i.scope, i.owner, i.check.id) : null;
+        const ch = QI.eff(i.check.id);
+        rows.push(`<tr><td>${ch.id}</td><td>${esc(ch.param)}<div class="sm">${esc(QI.steps[ch.step].name)}</div></td><td>${esc(critText(ch))}</td><td>${a ? esc(a.summary) + (a.detail ? `<div class="sm">${esc(a.detail)}</div>` : '') : ''}</td>
+          <td>${a ? (a.result === 'ok' ? 'OK' : 'NOT OK') : i.required ? 'Pending' : '–'}</td><td>${a ? esc(a.by) + '<div class="sm">' + fdt(a.ts) + '</div>' : ''}</td><td>${a ? esc(a.ref) : ''}</td></tr>`);
+      });
+    });
+    const ncrs = S().ncrs.filter((n) => n.castings.includes(c.id));
+    return `<div class="noprint hd"><a class="btn" href="#/casting/${esc(c.id)}">← Back</a>${HOSTED ? '<button class="btn primary" data-act="report-dl" data-id="' + esc(c.id) + '">Download report</button>' : '<button class="btn primary" onclick="window.print()">Print / Save as PDF</button>'}</div>
+    <article class="report"><header><div><h1>${esc(QI.plan.company)}</h1><div>Casting Inspection Report</div></div><div class="rs-r"><b>${esc(c.id)}</b><div>${esc(s.label)}</div></div></header>
+      <table class="kv"><tr><th>Work order</th><td>${esc(j.no)}</td><th>Customer / PO</th><td>${esc(j.customer)} / ${esc(j.po)}</td></tr>
+      <tr><th>Part</th><td>${esc(j.part)}</td><th>Drawing / Pattern</th><td>${esc(j.drawing)} / ${esc(j.pattern)}</td></tr>
+      <tr><th>Material grade</th><td>${esc(j.grade)}</td><th>Heat no.</th><td>${esc(c.heatNo || '–')}${h ? ' (' + esc(h.date) + ')' : ''}</td></tr>
+      <tr><th>Sand log</th><td>${c.logId ? esc(c.logId) : '–'}</td><th>Report date</th><td>${fd(Date.now())}</td></tr></table>
+      <table class="rt"><thead><tr><th>Check</th><th>Parameter</th><th>Acceptance</th><th>Result / reading</th><th>Status</th><th>Inspected by</th><th>Ref</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+      ${ncrs.length ? `<h4>Non-conformances</h4><table class="rt"><tr><th>NCR</th><th>Check</th><th>Found</th><th>Action</th><th>Status</th></tr>${ncrs.map((n) => `<tr><td>${n.id}</td><td>${esc(n.param)}</td><td>${esc(n.found)}</td><td>${esc(n.action)}</td><td>${esc(n.status)} ${esc(n.closeNote || '')}</td></tr>`).join('')}</table>` : ''}
+      ${c.status === 'released' ? `<p><b>Released for dispatch</b> by ${esc(c.release.by)} on ${fdt(c.release.ts)}. ${esc(c.release.remarks)}</p>` : c.status === 'rejected' ? `<p><b>REJECTED:</b> ${esc(c.reject.reason)} (${esc(c.reject.action)})</p>` : '<p><b>Not yet released.</b></p>'}
+      <div class="sig"><div>Prepared By<br><br>Name / Sign / Date: ____________</div><div>Issued By<br><br>Name / Sign / Date: ____________</div><div>Approved By<br><br>Name / Sign / Date: ____________</div></div></article>`;
+  };
+
+  /* ================= actions ================= */
+  const toast = (msg, cls) => { const t = $('#toast'); t.textContent = msg; t.className = 'show ' + (cls || ''); clearTimeout(toast.t); toast.t = setTimeout(() => (t.className = ''), 3500); };
+  const jobForm = (j) => {
+    j = j || {};
+    return `<div class="grid2">${fld('Work order no.', 'no', j.no, j.no ? 'readonly' : 'required')}${combo('Customer', 'customer', 'customer', j.customer)}${fld('PO / order no.', 'po', j.po)}${fld('Order qty', 'qty', j.qty, 'type="number" min="1"')}
+      ${combo('Part name', 'part', 'part', j.part)}${fld('Drawing no.', 'drawing', j.drawing)}${fld('Pattern no.', 'pattern', j.pattern)}${combo('Material grade', 'grade', 'grade', j.grade)}</div>
+      ${ta('Drawing dimensions (optional – pre-fills dimension checks)', 'dims', j.dims, 'One per line: <i>feature, nominal, −tol, +tol</i> e.g. <i>Bore Ø, 100, 0.5, 0.5</i>')}`;
+  };
+  const readJob = (f) => ({ no: val(f, 'no'), customer: cval(f, 'customer', 'customer'), po: val(f, 'po'), qty: val(f, 'qty'), part: cval(f, 'part', 'part'), drawing: val(f, 'drawing'), pattern: val(f, 'pattern'), grade: cval(f, 'grade', 'grade'), dims: val(f, 'dims') });
+  const heatForm = (h) => {
+    h = h || {};
+    return `<div class="grid2">${fld('Heat no.', 'no', h.no, h.created ? 'readonly' : 'required')}${fld('Date', 'date', h.date || today(), 'type="date"')}${combo('Furnace', 'furnace', 'furnace', h.furnace)}${combo('Grade', 'grade', 'grade', h.grade)}
+      ${fld('Tapping temp min (°C)', 'tapMin', h.tapMin, 'type="number"')}${fld('Tapping temp max (°C)', 'tapMax', h.tapMax, 'type="number"')}${fld('Pouring temp min (°C)', 'pourMin', h.pourMin, 'type="number"')}${fld('Pouring temp max (°C)', 'pourMax', h.pourMax, 'type="number"')}</div>
+      <small class="muted">Temperature limits come from the method plan DCL/MTD/01.</small>`;
+  };
+  const specText = (rows) => rows.map((r) => [r.name, r.min, r.max].join(', ').replace(/(, )+$/, '')).join('\n');
+  const parseSpec = (t) => t.split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).map((p) => ({ name: p[0], min: p[1] || '', max: p[2] || '' }));
+
+  const ACT = {
+    toggle: (el) => { const k = el.dataset.key; ui.open[k] = !ui.open[k]; render(); },
+    'save-check': (el) => saveCheck(el.dataset.key),
+    'stage-toggle': (el) => { const k = el.dataset.k; const cur = ui.stageOpen[k]; const sec = el.closest('.stage'); const isOpen = !!$('.sb', sec); ui.stageOpen[k] = !isOpen; render(); },
+    'dim-add': (el) => { el.parentNode.querySelector('tbody').insertAdjacentHTML('beforeend', dimRow({})); },
+    'dim-del': (el) => { const tb = el.closest('tbody'); if (tb.rows.length > 1) el.closest('tr').remove(); liveEval(el.closest('form')); },
+    'report-dl': (el) => { const r = $('.report'); download(`inspection-report-${el.dataset.id}.html`, `<!doctype html><meta charset="utf-8"><title>Inspection report ${el.dataset.id}</title><style>body{font:13px system-ui;margin:16px}table{border-collapse:collapse;width:100%;margin-bottom:10px}th,td{border:1px solid #999;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eee}.sm{font-size:11px}.rs td{background:#d9ead3;font-weight:700}header{display:flex;justify-content:space-between;border-bottom:2px solid #000;margin-bottom:8px}.sig{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px}.sig div{border-top:1px solid #000}</style>${r.outerHTML}`, 'text/html'); },
+    'modal-cancel': () => $('#dlg').close(),
+    'filter-castings': (el) => { ui.filter.castings = el.value; render(); const i = $('.search'); i.focus(); i.setSelectionRange(99, 99); },
+    'filter-plan': (el) => { ui.filter.plan = el.value; render(); const i = $('.search'); i.focus(); i.setSelectionRange(99, 99); },
+    'ncr-filter': (el) => { ui.filter.ncr = el.dataset.f; render(); },
+    'change-insp': () => needInspector(true),
+    unlearn: (el) => { QI.unlearn(el.dataset.list, el.dataset.v); render(); },
+    'new-job': () => modal('New work order', jobForm(), (f) => { const r = QI.addJob(readJob(f)); if (r.error) return r.error; go('/job/' + val(f, 'no')); }),
+    'edit-job': (el) => { const j = QI.job(el.dataset.no); modal('Edit work order ' + j.no, jobForm(j), (f) => { Object.assign(j, readJob(f)); QI.save(); }); },
+    applic: (el) => { QI.job(el.dataset.no).applic[el.dataset.step] = el.checked; QI.save(); render(); },
+    'add-castings': (el) => modal('Add castings', `${fld('How many castings?', 'n', 1, 'type="number" min="1" max="200"')}<small class="muted">Serial numbers are assigned automatically (${esc(el.dataset.no)}-001, -002 …).</small>`, (f) => { const n = parseInt(val(f, 'n'), 10); if (!(n > 0)) return 'Enter a quantity.'; const cs = QI.addCastings(el.dataset.no, n); toast(`${cs.length} casting(s) created`, 'ok'); }),
+    'new-heat': (el) => modal('New heat', heatForm(), (f) => { const r = QI.addHeat({ no: val(f, 'no'), date: val(f, 'date'), furnace: cval(f, 'furnace', 'furnace'), grade: cval(f, 'grade', 'grade'), tapMin: val(f, 'tapMin'), tapMax: val(f, 'tapMax'), pourMin: val(f, 'pourMin'), pourMax: val(f, 'pourMax') }); if (r.error) return r.error; if (el.dataset.for) { QI.casting(el.dataset.for).heatNo = val(f, 'no'); QI.save(); } else go('/heat/' + val(f, 'no')); if (QI.can('spec')) setTimeout(() => ACT['heat-spec']({ dataset: { no: val(f, 'no') } }), 50); }),
+    'edit-heat': (el) => { const h = QI.heat(el.dataset.no); modal('Edit heat ' + h.no, heatForm(h), (f) => { Object.assign(h, { date: val(f, 'date'), furnace: cval(f, 'furnace', 'furnace'), grade: cval(f, 'grade', 'grade'), tapMin: val(f, 'tapMin'), tapMax: val(f, 'tapMax'), pourMin: val(f, 'pourMin'), pourMax: val(f, 'pourMax') }); QI.save(); }); },
+    'heat-spec': (el) => { const h = QI.heat(el.dataset.no); modal(`Specification – heat ${h.no}`, `${ta('Chemical composition (%) – checks 4.1 / 4.2', 'chem', specText(h.chemSpec), 'One per line: <i>element, min, max</i> — e.g. <i>C, 0.18, 0.25</i> · <i>Mn, 0.6, 1.0</i> · <i>S, , 0.035</i> (leave min or max blank for one-sided limits)', 8)}${ta('Mechanical properties – check 8.1', 'mech', specText(h.mechSpec), 'Same format, e.g. <i>UTS (MPa), 485, 655</i>. Remove lines you do not test.', 6)}`, (f) => { h.chemSpec = parseSpec(val(f, 'chem')); h.mechSpec = parseSpec(val(f, 'mech')); QI.save(); }); },
+    'heat-add': (el) => { const id = $('#addc').value; QI.casting(id).heatNo = el.dataset.no; QI.save(); render(); },
+    'set-heat': (el) => { QI.casting(el.dataset.id).heatNo = el.value || null; QI.save(); render(); },
+    'set-log': (el) => { QI.casting(el.dataset.id).logId = el.value || null; QI.save(); render(); },
+    'new-log': (el) => modal('New sand & calibration log', `${fld('Date', 'date', today(), 'type="date" required')}${sel('Shift', 'shift', ['A', 'B', 'C'], 'A')}`, (f) => { const r = QI.addLog(val(f, 'date'), val(f, 'shift')); if (r.error && !r.id) return r.error; if (el.dataset.for) { QI.casting(el.dataset.for).logId = r.id; QI.save(); } else go('/log/' + r.id); }),
+    release: (el) => { if (needInspector()) return; const c = QI.casting(el.dataset.id); modal('Release casting ' + c.id, `<p>Confirms that all inspection stages are complete and the casting conforms.</p>${fld('Released by', 'by', S().settings.inspector)}${combo('Remarks', 'remarks', 'releaseRemarks', '', QI.DEFAULTS.releaseRemarks, { blank: '– none –' })}`, (f) => { const r = QI.release(c, val(f, 'by'), cval(f, 'remarks', 'releaseRemarks')); if (r.error) return r.error; toast('Casting released', 'ok'); }, 'Release'); },
+    'reject-casting': (el) => { if (needInspector()) return; const c = QI.casting(el.dataset.id); modal('Reject casting ' + c.id, `${combo('Reason for rejection', 'reason', 'rejectReason', '', QI.DEFAULTS.rejectReason)}<small class="muted">The casting is stopped and goes back for melting. This cannot be undone.</small>`, (f) => { const rs = cval(f, 'reason', 'rejectReason'); if (!rs) return 'Choose or enter a reason.'; QI.manualReject(c, rs); }, 'Reject casting'); },
+    'ncr-close': (el) => modal('Close ' + el.dataset.id, combo('Closure note (action taken / verification)', 'note', 'closeNote', '', QI.DEFAULTS.closeNote), (f) => { const n = cval(f, 'note', 'closeNote'); if (!n) return 'Choose or enter a closure note.'; QI.closeNcr(el.dataset.id, n); }, 'Close NCR'),
+    'edit-check': (el) => {
+      const c = QI.eff(el.dataset.id);
+      const numeric = ['max', 'min', 'range'].includes(c.kind);
+      modal(`Edit ${c.id} – ${c.param}`, `${numeric ? `<div class="grid2">${fld('Min', 'min', c.min == null ? '' : c.min, 'type="number" step="any"')}${fld('Max', 'max', c.max == null ? '' : c.max, 'type="number" step="any"')}</div>` : ''}${fld('Acceptance criteria text', 'criteria', c.criteria)}${fld('If Not OK actions (separate with “/”)', 'actions', (c.actions || []).join(' / '))}
+        <label class="f"><span>Confirmation status</span><select name="tbc"><option value="1" ${c.tbc ? 'selected' : ''}>To be confirmed</option><option value="0" ${!c.tbc ? 'selected' : ''}>Confirmed</option></select></label>`, (f) => {
+        const o = { criteria: val(f, 'criteria'), actions: val(f, 'actions').split('/').map((x) => x.trim()).filter(Boolean), tbc: val(f, 'tbc') === '1', assumed: false };
+        if (numeric) { o.min = val(f, 'min') === '' ? undefined : parseFloat(val(f, 'min')); o.max = val(f, 'max') === '' ? undefined : parseFloat(val(f, 'max')); }
+        if (!o.actions.length) o.actions = ['Other'];
+        S().settings.overrides[c.id] = o; QI.save();
+      });
+    },
+    'export-json': () => download(`dcl-quality-backup-${today()}.json`, JSON.stringify(S(), null, 1), 'application/json'),
+    'export-csv': () => download(`dcl-inspection-results-${today()}.csv`, QI.csv(), 'text/csv'),
+    'import-json': (el) => { const file = el.files[0]; if (!file) return; const r = new FileReader(); r.onload = () => { let obj; try { obj = JSON.parse(r.result); if (!obj || !Array.isArray(obj.jobs)) throw 0; } catch (e) { toast('Not a valid backup file.', 'bad'); return; } ask('Replace ALL current data' + (QI.mode === 'shared' ? ' (shared with every department)' : '') + ' with this backup?', () => { QI.replace(obj); toast('Backup restored', 'ok'); }, 'Replace data'); }; r.readAsText(file); },
+    demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
+    wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
+  };
+  function download(name, text, type) {
+    if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+
+  document.addEventListener('click', (e) => {
+    const ln = e.target.closest('a[href^="#/"]'); if (ln) { e.preventDefault(); go(ln.getAttribute('href')); return; }
+    const el = e.target.closest('[data-act]'); if (!el) return;
+    if (el.tagName === 'INPUT' || el.tagName === 'SELECT') return;     // handled on change/input
+    if (el.tagName === 'LABEL') return;
+    const fn = ACT[el.dataset.act]; if (fn) { fn(el); }
+  });
+  document.addEventListener('change', (e) => {
+    const sl = e.target;
+    if (sl.matches && sl.matches('select[data-combo]')) {
+      const o = sl.form.elements[sl.name + '__o']; o.hidden = sl.value !== '__other'; if (!o.hidden) o.focus();
+      const w = sl.form.querySelector('.clsrow'); if (w && sl.name === 'action') w.hidden = sl.value !== '__other';
+      if (sl.form.classList.contains('chkform')) liveEval(sl.form);
+    }
+    const el = e.target; if (!el.dataset || !el.dataset.act) return;
+    if (['applic', 'set-heat', 'set-log', 'import-json'].includes(el.dataset.act)) ACT[el.dataset.act](el);
+  });
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.dataset && (el.dataset.act === 'filter-castings' || el.dataset.act === 'filter-plan')) return ACT[el.dataset.act](el);
+    const f = el.closest && el.closest('form.chkform'); if (f) liveEval(f);
+  });
+
+  /* ================= demo data ================= */
+  function demoData() {
+    const st = S();
+    st.settings.inspector = st.settings.inspector || 'Demo Inspector';
+    const suffix = String(Date.now()).slice(-4);
+    const no = 'WO-' + suffix;
+    QI.addJob({ no, customer: 'Sample Engineering Ltd', po: 'PO-' + suffix, qty: '6', part: 'Pump Casing', drawing: 'DWG-1042', pattern: 'PTN-77', grade: 'ASTM A216 WCB', dims: 'Bore Ø, 100, 0.5, 0.5\nFlange thickness, 25, 0.3, 0.3' });
+    const j = QI.job(no); j.applic['7.1'] = true; j.applic['7.2'] = false; j.applic['7.3'] = false; j.applic['8.4'] = false;
+    const ok = (scope, owner, id, input) => QI.record(scope, owner, id, Object.assign({ action: '' }, input));
+    const ynOk = { result: 'ok' };
+    ['1.1.1', '1.3.1', '1.4.1'].forEach((id) => ok('job', no, id, { rows: [{ name: 'Overall length', nominal: 450, tm: 1, tp: 1, actual: 450.4 }] }));
+    ['1.2.1', '1.3.2'].forEach((id) => ok('job', no, id, ynOk));
+    const log = QI.addLog(today(), 'A').id;
+    const logVals = { '2.1.1': ynOk, '2.2.1': { value: 3.1 }, '2.2.2': { value: 0.6 }, '2.3.1': { value: 3.8 }, '2.3.2': { value: 0.7 }, '2.4.1': { value: 1.9 }, '2.5.1': { value: 19.5 }, '2.10.1': { value: 8.2 }, '2.10.2': { value: 4.1 }, '2.10.3': { value: 2.2 } };
+    Object.keys(logVals).forEach((id) => ok('log', log, id, logVals[id]));
+    ok('log', log, '2.3.3', { value: 2.8 });
+    QI.addHeat({ no: 'H-' + suffix, date: today(), furnace: 'IF-1', grade: 'WCB', tapMin: '1620', tapMax: '1660', pourMin: '1560', pourMax: '1600' });
+    const h = QI.heat('H-' + suffix);
+    h.chemSpec = parseSpec('C, 0.18, 0.25\nSi, , 0.6\nMn, 0.6, 1.0\nP, , 0.035\nS, , 0.035');
+    h.mechSpec = parseSpec('UTS (MPa), 485, 655\nYS (MPa), 250,\nElongation (%), 22,\nRA (%), 35,');
+    const ch = { C: 0.21, Si: 0.45, Mn: 0.82, P: 0.02, S: 0.015 };
+    ok('heat', h.no, '4.1.1', { vals: ch }); ok('heat', h.no, '4.2.1', { vals: ch });
+    ok('heat', h.no, '4.3.1', { value: 1645, min: '1620', max: '1660' }); ok('heat', h.no, '4.4.1', { value: 1585, min: '1560', max: '1600' });
+    const cs = QI.addCastings(no, 4);
+    cs.forEach((c) => { c.logId = log; c.heatNo = h.no; });
+    const casting = (c, ids) => ids.forEach((id) => {
+      const ch0 = QI.checks[id];
+      const inp = ch0.kind === 'dim' ? { rows: [{ name: 'Bore Ø', nominal: 100, tm: 0.5, tp: 0.5, actual: 100.1 }] } : ch0.kind === 'range' ? { value: (ch0.min + ch0.max) / 2 } : ch0.kind === 'min' ? { value: ch0.min + 5 } : ynOk;
+      ok('casting', c.id, id, inp);
+    });
+    casting(cs[0], ['3.1.1', '3.1.2', '3.2.1', '3.3.1', '3.4.1', '5.1.1', '5.2.1', '5.2.2', '6.1.1', '7.1.1', '9.1.1', '10.1.1', '10.1.2', '10.2.1'].filter((x) => x !== '9.1.1'));
+    casting(cs[1], ['3.1.1', '3.1.2', '3.3.1', '3.4.1', '5.1.1']);
+    casting(cs[2], ['3.1.1']);
+    QI.record('casting', cs[2].id, '3.1.2', { result: 'nok', action: 'Repainting' });
+    ok('heat', h.no, '8.1.1', { vals: { 'UTS (MPa)': 520, 'YS (MPa)': 290, 'Elongation (%)': 26, 'RA (%)': 45 } });
+    ok('heat', h.no, '8.2.1', ynOk); ok('heat', h.no, '8.3.1', { value: 165, min: '137', max: '207' });
+    QI.save();
+  }
+
+  /* ================= router ================= */
+  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['logs', 'Sand & calibration'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
+  const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
+    'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
+    'ncr-close': ['ncr'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+  function applyPerms(root) {
+    root.querySelectorAll('[data-act]').forEach((el) => {
+      const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
+      if (el.tagName === 'SELECT' || el.tagName === 'INPUT' && el.type === 'checkbox') el.disabled = true;
+      else if (el.tagName === 'INPUT') el.closest('label').remove();
+      else el.remove();
+    });
+    if (QI.mode === 'shared' && QI.ready && !QI.me.canWrite) root.insertAdjacentHTML('afterbegin', '<div class="banner warn">You have view-only access. Ask the owner for Contributor access to record inspections.</div>');
+    else if (QI.mode === 'shared' && QI.ready && !QI.me.dept) root.insertAdjacentHTML('afterbegin', '<div class="banner warn">Choose your department to start recording. <button class="btn sm" data-act="change-insp">Choose department</button></div>');
+  }
+  function render() {
+    const parts = (route || 'dashboard').split('/');
+    const view = parts[0]; const arg = decodeURIComponent(parts.slice(1).join('/'));
+    const fn = booting || (QI.mode === 'shared' && !QI.ready) ? () => empty('Connecting to shared inspection data…') : (V[view] || V.dashboard);
+    const open = $('#dlg').open;
+    const active = view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
+    $('#nav').innerHTML = NAV.map(([k, t]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${t}</a>`).join('');
+    $('#who').textContent = QI.mode === 'shared' ? (QI.me.dept ? `👤 ${QI.me.name || 'You'} · ${QI.dept().name.split(' ')[0]}` : 'Choose department') : (S().settings.inspector ? '👤 ' + S().settings.inspector : 'Set inspector');
+    $('#back').hidden = !hist.length;
+    $('#stale').hidden = true; ui.stale = false;
+    const sy = $('#sync'); sy.textContent = QI.mode === 'shared' ? (QI.ready ? '● Shared · live' : '○ Connecting…') : (HOSTED ? '○ Local only (sign in to share)' : '○ This device only'); sy.className = 'sync ' + (QI.mode === 'shared' && QI.ready ? 'on' : '');
+    const y = window.scrollY;
+    $('#main').innerHTML = fn(arg);
+    applyPerms($('#main'));
+    document.body.classList.toggle('printing', view === 'report');
+    if (!open) $('#main').dataset.view = view;
+    window.scrollTo(0, y);
+    document.title = 'DCL Quality Inspection';
+  }
+  $('#who').addEventListener('click', () => go('settings'));
+  $('#back').addEventListener('click', () => { if (hist.length) { route = hist.pop(); window.scrollTo(0, 0); render(); } });
+  $('#stale').addEventListener('click', () => render());
+  QI.onChange = (first) => {
+    if (first) { booting = false; render(); if (!QI.me.dept || !QI.me.name) profileModal(); return; }
+    if ($('#dlg').open || $('form.chkform')) { ui.stale = true; $('#stale').hidden = false; } else render();
+  };
+  QI.onError = (e) => toast('Not saved: ' + ((e && e.code === 'not_writer') || (e && /permission|writer|denied/i.test(e.message || '')) ? 'you have view-only access.' : (e && e.message) || 'connection problem.'), 'bad');
+  render();
+  if (HOSTED) {
+    Promise.all([window.claude.use('db'), window.claude.use('user'), window.claude.use('downloads')]).then(([db, user, dl]) => {
+      DL = dl;
+      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; render(); QI.onError(e); }); else { booting = false; render(); }
+    }).catch(() => { booting = false; render(); });
+  }
+  if (!QI.persistent) toast('Browser storage unavailable – data will not be saved. Use Settings → Backup.', 'bad');
+  window.QIApp = { render, demoData };
+})();
+
+</script>

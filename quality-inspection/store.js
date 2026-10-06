@@ -32,9 +32,123 @@
     if (raw) S = Object.assign(blank(), JSON.parse(raw));
   } catch (e) { QI.persistent = false; }
   QI.S = () => S;
-  QI.save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); QI.persistent = true; } catch (e) { QI.persistent = false; } };
-  QI.replace = (obj) => { S = Object.assign(blank(), obj); QI.save(); };
-  QI.reset = () => { S = blank(); QI.save(); };
+  QI.mode = 'local';                       // 'shared' once attached to the artifact database
+  QI.save = () => {
+    if (QI.mode === 'shared') return pushDiff();
+    try { localStorage.setItem(KEY, JSON.stringify(S)); QI.persistent = true; } catch (e) { QI.persistent = false; }
+  };
+  QI.replace = (obj) => { const keep = S.settings.inspector; S = Object.assign(blank(), obj); S.settings = Object.assign({ overrides: {} }, S.settings, { inspector: keep }); QI.save(); };
+  QI.reset = () => { const keep = S.settings.inspector; S = blank(); S.settings.inspector = keep; QI.save(); };
+  QI.ncrId = () => {
+    const d = new Date(); const base = `NCR-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-`;
+    let id; do { id = base + Math.random().toString(36).slice(2, 5).toUpperCase(); } while (S.ncrs.some((n) => n.id === id));
+    return id;
+  };
+
+  /* ---------- departments & permissions (shared mode only; local mode = everything allowed) ---------- */
+  QI.DEPTS = [
+    { id: 'planning', name: 'Planning / PPC', stages: [], create: ['job', 'casting'], about: 'Creates work orders and castings' },
+    { id: 'pattern', name: 'Pattern shop', stages: [1], about: 'Stage 1' },
+    { id: 'sand', name: 'Sand lab & moulding', stages: [2, 3], create: ['log'], link: ['log'], about: 'Stages 2–3, sand logs' },
+    { id: 'melt', name: 'Melting & pouring', stages: [4], create: ['heat'], link: ['heat'], about: 'Stage 4, heats' },
+    { id: 'fettle', name: 'Shot blasting, fettling & heat treatment', stages: [5, 6], about: 'Stages 5–6' },
+    { id: 'lab', name: 'NDT & mechanical / metallurgical lab', stages: [7, 8], about: 'Stages 7–8' },
+    { id: 'mach', name: 'Machining', stages: [9], about: 'Stage 9' },
+    { id: 'qa', name: 'Quality assurance & final inspection', stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], all: true, about: 'Stage 10, release, rejection, NCR closure, everything else' },
+    { id: 'mgmt', name: 'Management (view only)', stages: [], about: 'Dashboards and reports' },
+  ];
+  QI.me = { uid: null, name: '', dept: null, canWrite: true };
+  QI.people = {};
+  QI.dept = () => QI.DEPTS.find((d) => d.id === QI.me.dept) || null;
+  QI.can = (action, arg) => {
+    if (QI.mode === 'local') return true;
+    const d = QI.dept(); if (!QI.me.canWrite || !d) return false;
+    if (d.all) return true;
+    if (action === 'record') return d.stages.includes(arg);
+    if (action === 'create') return (d.create || []).includes(arg);
+    if (action === 'link') return (d.link || []).includes(arg);
+    if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
+    return false;                                 // release, reject, ncr, plan, admin: quality only
+  };
+
+  /* ---------- shared backend: one db document per job / casting / heat / log / NCR / result ---------- */
+  let DB = null, ready = true, synced = {}, queue = Promise.resolve();
+  QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
+  const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
+  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id' };
+  const cfgForm = () => ({ lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const desired = () => {
+    const m = {};
+    Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
+    Object.keys(S.results).forEach((k) => (m['results/' + enc(k)] = { key: k, attempts: S.results[k].attempts }));
+    m['meta/config'] = cfgForm();
+    return m;
+  };
+  function pushDiff() {
+    if (!DB || !ready) return;
+    const d = desired(), ops = [];
+    Object.keys(d).forEach((p) => { const j = JSON.stringify(d[p]); if (synced[p] !== j) { synced[p] = j; ops.push([p, () => DB.doc(p).set(JSON.parse(j))]); } });
+    Object.keys(synced).forEach((p) => { if (!(p in d)) { delete synced[p]; ops.push([p, () => DB.doc(p).delete()]); } });
+    ops.forEach(([p, op]) => { queue = queue.then(op).catch((e) => { delete synced[p]; QI.onError(e); }); });
+  }
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  function putInPlace(arr, keyName, body) {
+    const i = arr.findIndex((x) => x[keyName] === body[keyName]);
+    if (i < 0) { arr.push(body); return { item: body, changed: true }; }
+    const cur = arr[i];
+    if (JSON.stringify(cur) === JSON.stringify(body)) return { item: cur, changed: false };
+    Object.keys(cur).forEach((k) => delete cur[k]); Object.assign(cur, body);
+    return { item: cur, changed: true };
+  }
+  function listen(path, handler, firstDone) {
+    let first = true;
+    DB.collection(path).onSnapshot((snap) => {
+      let changed = false;
+      snap.docChanges().forEach((ch) => { if (handler(ch)) changed = true; });
+      if (first) { first = false; firstDone(); } else if (changed) QI.onChange();
+    }, (e) => QI.onError(e));
+  }
+  QI.attach = async (db, user) => {
+    DB = db; QI.mode = 'shared'; ready = false; QI.ready = false; S = blank(); synced = {};
+    if (user) {
+      try { QI.me.uid = await user.id(); const m = await user.me(); QI.me.name = (m && m.name) || ''; } catch (e) {}
+      const w = user.can ? user.can('data.write') : null; QI.me.canWrite = w !== false;
+    }
+    let pending = 0;
+    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; pushDiff(); QI.onChange(true); } };
+    const reg = (path, handler) => { pending++; listen(path, handler, done); };
+    Object.keys(COLS).forEach((col) => reg(col, (ch) => {
+      const body = clone(ch.doc.data() || {}), p = col + '/' + ch.doc.id;
+      if (ch.type === 'removed') { const i = S[col].findIndex((x) => x[COLS[col]] === body[COLS[col]]); if (i >= 0) S[col].splice(i, 1); delete synced[p]; return true; }
+      const r = putInPlace(S[col], COLS[col], body); synced[p] = JSON.stringify(r.item); return r.changed;
+    }));
+    reg('results', (ch) => {
+      const body = clone(ch.doc.data() || {}), p = 'results/' + ch.doc.id;
+      if (ch.type === 'removed') { delete S.results[body.key]; delete synced[p]; return true; }
+      const cur = S.results[body.key];
+      const same = cur && JSON.stringify(cur.attempts) === JSON.stringify(body.attempts);
+      if (!cur) S.results[body.key] = { attempts: body.attempts }; else if (!same) cur.attempts = body.attempts;
+      synced[p] = JSON.stringify({ key: body.key, attempts: S.results[body.key].attempts });
+      return !same;
+    });
+    reg('meta', (ch) => {
+      if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
+      const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
+      S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
+    });
+    reg('people', (ch) => {
+      if (ch.type === 'removed') { delete QI.people[ch.doc.id]; return true; }
+      QI.people[ch.doc.id] = clone(ch.doc.data() || {});
+      if (QI.me.uid && ch.doc.id === enc(QI.me.uid)) { QI.me.dept = QI.people[ch.doc.id].dept || null; if (QI.people[ch.doc.id].name) QI.me.name = QI.people[ch.doc.id].name; S.settings.inspector = QI.me.name; }
+      return true;
+    });
+  };
+  QI.setPerson = (name, dept) => {
+    QI.me.name = name; QI.me.dept = dept; S.settings.inspector = name;
+    if (DB && QI.me.uid) DB.doc('people/' + enc(QI.me.uid)).set({ name, dept, ts: Date.now() }).catch((e) => QI.onError(e));
+    QI.people[enc(QI.me.uid || 'local')] = { name, dept };
+  };
 
   /* ---------- helpers ---------- */
   const num = (v) => { if (v === '' || v == null) return null; const n = parseFloat(v); return isFinite(n) ? n : null; };
@@ -47,8 +161,31 @@
     if (max != null) return `≤ ${max}${u}`;
     return '';
   };
+  /* ---- dropdown lists: defaults + values users typed under "Other" (learned automatically) ---- */
+  QI.opts = (key, defs) => {
+    const l = (S.settings.lists && S.settings.lists[key]) || [];
+    return [...new Set([...(defs || []), ...l])];
+  };
+  QI.learn = (key, v) => {
+    v = (v || '').trim(); if (!v) return;
+    const L = S.settings.lists || (S.settings.lists = {});
+    const a = L[key] || (L[key] = []);
+    if (!a.some((x) => x.toLowerCase() === v.toLowerCase())) { a.push(v); QI.save(); }
+  };
+  QI.unlearn = (key, v) => { const a = S.settings.lists && S.settings.lists[key]; if (a) { S.settings.lists[key] = a.filter((x) => x !== v); QI.save(); } };
+  QI.learnAction = (checkId, text, cls) => {
+    QI.learn('action:' + checkId, text);
+    (S.settings.actionCls || (S.settings.actionCls = {}))[text] = cls || 'rework'; QI.save();
+  };
+  QI.DEFAULTS = {
+    rejectReason: ['Shrinkage', 'Gas porosity / blow hole', 'Sand inclusion', 'Crack', 'Misrun / cold shut', 'Dimensional out of tolerance', 'Chemistry out of spec', 'Surface defect', 'Mould / core damage'],
+    remarks: ['Re-tested', 'Sample taken from ladle', 'Customer witnessed', 'Instrument re-calibrated', 'Repeat reading confirmed'],
+    closeNote: ['Reworked and re-inspected OK', 'Sand corrected and re-tested', 'Machine re-adjusted and re-calibrated', 'Material disposed / scrapped', 'Accepted as per customer concession'],
+    releaseRemarks: ['Dispatch as per PO', 'Customer inspection pending', 'Hold for customer witness'],
+  };
   QI.classify = (action) => {
     const a = action || '';
+    if (S.settings.actionCls && S.settings.actionCls[a]) return S.settings.actionCls[a];
     if (/re-?heat|re-?machin|rework|repair|re-?close|repaint|re-?mix|re-?adjust|adjust|rectif|salvag|re-?shot|re-?pack|addition|increase|wait|back to furnace|pig the melt|re-?make|remaking|re-?work/i.test(a)) return 'rework';
     if (/reject|destroy|remelt|scrap|dispos|return to supplier/i.test(a)) return 'reject';
     return 'rework';
@@ -141,22 +278,24 @@
 
   /* ---------- creating records ---------- */
   QI.addJob = (d) => {
+    if (!QI.can('create', 'job')) return { error: 'Your department cannot create work orders.' };
     if (!d.no) return { error: 'Work order number is required.' };
     if (QI.job(d.no)) return { error: 'A work order with this number already exists.' };
     S.jobs.push(Object.assign({ created: Date.now(), applic: QI.defaultApplic(), counter: 0 }, d));
     QI.save(); return { ok: true };
   };
   QI.addCastings = (jobNo, n, extra) => {
-    const j = QI.job(jobNo); if (!j) return [];
+    const j = QI.job(jobNo); if (!j || !QI.can('create', 'casting')) return [];
     const out = [];
     for (let i = 0; i < n; i++) {
-      j.counter = (j.counter || 0) + 1;
+      do { j.counter = (j.counter || 0) + 1; } while (QI.casting(`${j.no}-${String(j.counter).padStart(3, '0')}`));
       const c = Object.assign({ id: `${j.no}-${String(j.counter).padStart(3, '0')}`, jobNo: j.no, heatNo: null, logId: null, status: 'active', created: Date.now() }, extra || {});
       S.castings.push(c); out.push(c);
     }
     QI.save(); return out;
   };
   QI.addHeat = (d) => {
+    if (!QI.can('create', 'heat')) return { error: 'Your department cannot create heats.' };
     if (!d.no) return { error: 'Heat number is required.' };
     if (QI.heat(d.no)) return { error: 'A heat with this number already exists.' };
     S.heats.push(Object.assign({ created: Date.now(), chemSpec: [], mechSpec: defaultMech() }, d));
@@ -166,6 +305,7 @@
     { name: 'UTS (MPa)', min: '', max: '' }, { name: 'YS (MPa)', min: '', max: '' },
     { name: 'Elongation (%)', min: '', max: '' }, { name: 'RA (%)', min: '', max: '' }, { name: 'Impact (J)', min: '', max: '' }];
   QI.addLog = (date, shift) => {
+    if (!QI.can('create', 'log')) return { error: 'Your department cannot create sand logs.' };
     const id = `SL-${date.replace(/-/g, '')}-${shift}`;
     if (QI.log(id)) return { error: 'A log for this date and shift already exists.', id };
     S.logs.push({ id, date, shift, created: Date.now(), by: S.settings.inspector });
@@ -186,6 +326,7 @@
   QI.record = (scope, owner, checkId, input) => {
     if (!S.settings.inspector) return { error: 'Set the inspector name first (Settings).' };
     const check = QI.eff(checkId);
+    if (!QI.can('record', check.stageNo)) return { error: `Stage ${check.stageNo} is recorded by ${(QI.DEPTS.filter((d) => d.stages.includes(check.stageNo) && !d.all)[0] || { name: 'another department' }).name}.` };
     const ev = QI.evaluate(check, input, ctxFor(scope, owner));
     if (ev.error) return { error: ev.error };
     const key = rkey(scope, owner, checkId);
@@ -199,7 +340,7 @@
       S.ncrs.forEach((n) => { if (n.key === key && n.status === 'open') { n.status = 'closed'; n.closedTs = att.ts; n.closeNote = `Re-inspected OK (attempt ${att.n}) by ${att.by}`; } });
     } else {
       const cls = QI.classify(action);
-      const ncr = { id: `NCR-${String(++S.seq.ncr).padStart(4, '0')}`, ts: att.ts, key, scope, owner, checkId, stageNo: check.stageNo,
+      const ncr = { id: QI.ncrId(), ts: att.ts, key, scope, owner, checkId, stageNo: check.stageNo,
         param: check.param, found: ev.summary, by: att.by, action, cls, castings: QI.affected(scope, owner), status: 'open', remarks: att.remarks };
       const tg = QI.rejectTargets(scope, owner, checkId, action);
       if (tg.length) {
@@ -254,6 +395,7 @@
     return { label: `Stage ${t.current}: ${QI.stageOf[t.current].name}`, cls: failing ? 'warn' : 'info', stageNo: t.current, failing };
   };
   QI.release = (c, by, remarks) => {
+    if (!QI.can('release')) return { error: 'Only Quality can release castings.' };
     const t = QI.castingStages(c);
     if (c.status !== 'active') return { error: 'Casting is not active.' };
     if (!t.allDone) return { error: 'All applicable stages must be completed before release.' };
@@ -264,7 +406,7 @@
   QI.manualReject = (c, reason) => {
     c.status = 'rejected';
     c.reject = { checkId: null, stageNo: (QI.castingState(Object.assign({}, c, { status: 'active' })).stageNo) || null, reason, action: 'Rejected by inspector', by: S.settings.inspector, ts: Date.now() };
-    const ncr = { id: `NCR-${String(++S.seq.ncr).padStart(4, '0')}`, ts: Date.now(), key: `casting|${c.id}|manual`, scope: 'casting', owner: c.id, checkId: null, stageNo: c.reject.stageNo,
+    const ncr = { id: QI.ncrId(), ts: Date.now(), key: `casting|${c.id}|manual`, scope: 'casting', owner: c.id, checkId: null, stageNo: c.reject.stageNo,
       param: 'Manual rejection', found: reason, by: S.settings.inspector, action: 'Rejected by inspector', cls: 'reject', castings: [c.id], status: 'closed', closedTs: Date.now(), closeNote: 'Rejected', remarks: '' };
     S.ncrs.push(ncr); QI.save();
   };

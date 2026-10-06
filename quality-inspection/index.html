@@ -4,11 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DCL Quality Inspection</title>
+<meta name="theme-color" content="#1f5fbf">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand"><b>DATRE</b> <span>Quality Inspection · Casting process</span></div>
+  <div class="brandrow"><button id="back" class="back" hidden aria-label="Back">←</button><div class="brand"><b>DATRE</b> <span>Quality Inspection · Casting process</span></div></div>
+  <span id="sync" class="sync"></span>
+  <button id="stale" class="stale" hidden>Updates available – tap to refresh</button>
   <button id="who" class="who" title="Inspector"></button>
 </header>
 <nav id="nav" class="nav"></nav>
@@ -18,5 +24,6 @@
 <script src="plan.js"></script>
 <script src="store.js"></script>
 <script src="app.js"></script>
+<script>if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
 </html>
