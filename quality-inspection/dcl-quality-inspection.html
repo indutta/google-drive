@@ -2043,7 +2043,7 @@ window.PLAN = {
     o = o || {};
     const opts = QI.opts(listKey, defs);
     if (cur && !opts.includes(cur)) opts.unshift(cur);
-    return `<label class="f"><span>${label}</span><select name="${name}" data-combo>${o.noBlank ? '' : `<option value="">${esc(o.blank || '– select –')}</option>`}${opts.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option></select>
+    return `<label class="f"><span>${label}</span><select name="${name}" data-combo>${o.noBlank ? '' : `<option value="">${esc(o.blank || '– select –')}</option>`}${o.group ? `<optgroup label="${esc(o.group)}">` : ''}${opts.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}${o.group ? '</optgroup>' : ''}<option value="__other">＋ Other (specify)…</option></select>
       <input name="${name}__o" class="other" placeholder="Type new value – saved for next time" hidden></label>`;
   };
   const cval = (form, name, listKey) => {
@@ -2462,7 +2462,7 @@ window.PLAN = {
   const jobForm = (j) => {
     j = j || {};
     return `<div class="grid2">${fld('Work order no.', 'no', j.no, j.no ? 'readonly' : 'required')}${combo('Customer', 'customer', 'customer', j.customer)}${fld('PO / order no.', 'po', j.po)}${fld('Order qty', 'qty', j.qty, 'type="number" min="1"')}
-      ${combo('Item / part', 'part', 'part:' + (j.customer || ''), j.part)}${fld('Drawing no.', 'drawing', j.drawing)}${fld('Pattern no.', 'pattern', j.pattern)}${combo('Material grade', 'grade', 'grade', j.grade)}</div>
+      ${combo('Item / part', 'part', 'part:' + (j.customer || ''), j.part, [], { group: 'Castings' })}${fld('Drawing no.', 'drawing', j.drawing)}${fld('Pattern no.', 'pattern', j.pattern)}${combo('Material grade', 'grade', 'grade', j.grade)}</div>
       ${ta('Drawing dimensions (optional – pre-fills dimension checks)', 'dims', j.dims, 'One per line: <i>feature, nominal, −tol, +tol</i> e.g. <i>Bore Ø, 100, 0.5, 0.5</i>')}`;
   };
   const readJob = (f) => { const customer = cval(f, 'customer', 'customer'); return ({ no: val(f, 'no'), customer, po: val(f, 'po'), qty: val(f, 'qty'), part: cval(f, 'part', 'part:' + customer), drawing: val(f, 'drawing'), pattern: val(f, 'pattern'), grade: cval(f, 'grade', 'grade'), dims: val(f, 'dims') }); };
@@ -2543,7 +2543,7 @@ window.PLAN = {
     if (sl.matches && sl.matches('select[name=customer]') && sl.form && sl.form.elements.part) {
       const ps = sl.form.elements.part, cur = ps.value;
       const opts = sl.value && sl.value !== '__other' ? QI.opts('part:' + sl.value) : [];
-      ps.innerHTML = `<option value="">– select –</option>${opts.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option>`;
+      ps.innerHTML = `<option value="">– select –</option><optgroup label="Castings">${opts.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}</optgroup><option value="__other">＋ Other (specify)…</option>`;
       if (opts.includes(cur)) ps.value = cur;
       const po = sl.form.elements.part__o; if (po) po.hidden = true;
     }
