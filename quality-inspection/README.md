@@ -42,4 +42,4 @@ Customer, part, grade, furnace, remarks, rejection reason, NCR closure note, rel
 Each stage is signed three times: **Inspector → QC Manager → Factory Head**. Checks lock when the inspector signs; the QC Manager or Factory Head can *Return* the stage (with a reason) or later *Reopen* it. The next stage opens only after the Factory Head approves, and a casting can be released only when every applicable stage is fully approved. Each step must be a different person. Pick the QC Manager / Factory Head role on first open. The **Approvals** page and the dashboard list what is waiting for you.
 
 ## Customers and items
-Dropdowns start with Tega, Thejo, Komatsu, BEML and Sona, each with the items Knuckle and Main Body. Choosing a customer shows that customer's items; a new item typed under *Other* is saved for that customer only.
+Dropdowns start with Escorts (Main Body, Knuckle), Tega (Tega Small Casting, Tega Big Casting), Thejo (Thejo Lifter Bar), plus Komatsu, BEML and Sona (items to be added). Choosing a customer shows that customer's items; a new item typed under *Other* is saved for that customer only.

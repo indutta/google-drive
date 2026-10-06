@@ -1499,7 +1499,7 @@ window.PLAN = {
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
   const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id' };
-  const cfgForm = () => ({ seeded: !!S.settings.seeded, lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const cfgForm = () => ({ seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
     Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
@@ -1567,7 +1567,7 @@ window.PLAN = {
     reg('meta', (ch) => {
       if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
       const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
-      S.settings.seeded = !!b.seeded; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
       synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
     });
     reg('people', (ch) => {
@@ -1607,12 +1607,18 @@ window.PLAN = {
   };
   QI.unlearn = (key, v) => { const a = S.settings.lists && S.settings.lists[key]; if (a) { S.settings.lists[key] = a.filter((x) => x !== v); QI.save(); } };
   /* first-run dropdown content: customers and the items cast for each (editable under Settings -> Dropdown lists) */
-  QI.SEED_CUSTOMERS = ['Tega', 'Thejo', 'Komatsu', 'BEML', 'Sona'];
-  QI.SEED_PARTS = ['Knuckle', 'Main Body'];
+  /* first-run dropdown content (source: Contribution of Escorts, Tega, Thejo 2020-21 to 2025-26). Editable in Settings. */
+  QI.SEED_ITEMS = { Escorts: ['Main Body', 'Knuckle'], Tega: ['Tega Small Casting', 'Tega Big Casting'], Thejo: ['Thejo Lifter Bar'], Komatsu: [], BEML: [], Sona: [] };
   QI.seed = () => {
-    if (S.settings.seeded) return;
-    QI.SEED_CUSTOMERS.forEach((c) => { QI.learn('customer', c); QI.SEED_PARTS.forEach((p) => QI.learn('part:' + c, p)); });
-    S.settings.seeded = true; QI.save();
+    if ((+S.settings.seeded || 0) >= 2) return;
+    const L = S.settings.lists || (S.settings.lists = {});
+    const guess = (a) => a && a.length === 2 && a.includes('Knuckle') && a.includes('Main Body');
+    Object.keys(QI.SEED_ITEMS).forEach((c) => {
+      QI.learn('customer', c);
+      if (guess(L['part:' + c])) L['part:' + c] = [];           // v1 placeholder items, replaced by the real list
+      QI.SEED_ITEMS[c].forEach((p) => QI.learn('part:' + c, p));
+    });
+    S.settings.seeded = 2; QI.save();
   };
   QI.learnAction = (checkId, text, cls) => {
     QI.learn('action:' + checkId, text);
