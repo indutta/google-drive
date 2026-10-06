@@ -1616,17 +1616,18 @@ window.PLAN = {
   QI.unlearn = (key, v) => { const a = S.settings.lists && S.settings.lists[key]; if (a) { S.settings.lists[key] = a.filter((x) => x !== v); QI.save(); } };
   /* first-run dropdown content: customers and the items cast for each (editable under Settings -> Dropdown lists) */
   /* first-run dropdown content (source: Contribution of Escorts, Tega, Thejo 2020-21 to 2025-26). Editable in Settings. */
-  QI.SEED_ITEMS = { Escorts: ['Main Body', 'Knuckle'], Tega: ['Tega Small Casting', 'Tega Big Casting'], Thejo: ['Thejo Lifter Bar'], Komatsu: ['Idler'], BEML: [], Sona: [] };
+  QI.SEED_ITEMS = { Escorts: ['Main Body', 'Knuckle'], Tega: ['Tega Small Casting', 'Tega Big Casting'], Thejo: ['Thejo Lifter Bar'], Komatsu: ['17M Idler', '195 Idler', '21 N Idler', '154 Idler'], BEML: [], Sona: [] };
   QI.seed = () => {
-    if ((+S.settings.seeded || 0) >= 3) return;
+    if ((+S.settings.seeded || 0) >= 4) return;
     const L = S.settings.lists || (S.settings.lists = {});
     const guess = (a) => a && a.length === 2 && a.includes('Knuckle') && a.includes('Main Body');
     Object.keys(QI.SEED_ITEMS).forEach((c) => {
       QI.learn('customer', c);
       if (guess(L['part:' + c])) L['part:' + c] = [];           // v1 placeholder items, replaced by the real list
+      if (L['part:' + c]) L['part:' + c] = L['part:' + c].filter((p) => p !== 'Idler');   // v3 placeholder
       QI.SEED_ITEMS[c].forEach((p) => QI.learn('part:' + c, p));
     });
-    S.settings.seeded = 3; QI.save();
+    S.settings.seeded = 4; QI.save();
   };
   QI.learnAction = (checkId, text, cls) => {
     QI.learn('action:' + checkId, text);
