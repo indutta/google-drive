@@ -17,14 +17,14 @@
   /* ================= small components ================= */
   const badge = (t, cls) => `<span class="badge ${cls || ''}">${esc(t)}</span>`;
   const stBadge = (s) => ({ ok: badge('OK', 'ok'), nok: badge('Not OK', 'bad'), none: badge('Pending', 'mute'), done: badge('Complete', 'ok'), fail: badge('Failed – action needed', 'bad'),
-    progress: badge('In progress', 'info'), open: badge('Not started', 'mute'), na: badge('Not applicable', 'mute') }[s] || '');
-  const dot = (s) => `<span class="dot ${s === 'ok' || s === 'done' ? 'ok' : s === 'nok' || s === 'fail' ? 'bad' : s === 'progress' ? 'info' : ''}"></span>`;
+    progress: badge('In progress', 'info'), review: badge('Awaiting inspector sign-off', 'info'), qc: badge('Awaiting QC Manager', 'warn'), head: badge('Awaiting Factory Head', 'warn'), open: badge('Not started', 'mute'), na: badge('Not applicable', 'mute') }[s] || '');
+  const dot = (s) => `<span class="dot ${s === 'ok' || s === 'done' ? 'ok' : s === 'nok' || s === 'fail' ? 'bad' : ['progress', 'review', 'qc', 'head'].includes(s) ? 'info' : ''}"></span>`;
   const link = (href, t) => `<a href="#${href}">${esc(t)}</a>`;
   const empty = (msg, extra) => `<div class="empty">${msg}${extra || ''}</div>`;
   const table = (head, rows) => `<div class="tw"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   const progressBar = (c) => {
     const t = QI.castingStages(c);
-    return `<span class="pbar" title="Stage progress">${t.stages.map((s) => `<i class="${s.status === 'done' ? 'ok' : s.status === 'fail' ? 'bad' : s.status === 'progress' ? 'info' : s.status === 'na' ? 'na' : ''}" title="${s.stage.no}. ${esc(s.stage.name)}"></i>`).join('')}</span>`;
+    return `<span class="pbar" title="Stage progress">${t.stages.map((s) => `<i class="${s.status === 'done' ? 'ok' : s.status === 'fail' ? 'bad' : ['progress', 'review', 'qc', 'head'].includes(s.status) ? 'info' : s.status === 'na' ? 'na' : ''}" title="${s.stage.no}. ${esc(s.stage.name)}"></i>`).join('')}</span>`;
   };
   const deptName = (no) => ((QI.DEPTS.find((d) => d.stages.includes(no) && !d.all) || { name: 'Quality' }).name);
   const stateBadge = (c) => { const s = QI.castingState(c); return badge(s.label, s.cls); };
@@ -101,10 +101,11 @@
     const rec = owner ? QI.rec(scope, owner, id) : null;
     const open = ui.open[key];
     const perm = QI.can('record', ch.stageNo);
-    const canRecord = owner && !o.locked && !o.readonly && perm;
+    const signedOff = owner && QI.signed(scope, owner, ch.stageNo);
+    const canRecord = owner && !o.locked && !o.readonly && perm && !signedOff;
     const pending = last && last.result === 'nok' && QI.classify(last.action) === 'rework';
     const tags = [ch.tbc || ch.assumed ? badge(ch.assumed && !ch.tbc ? 'criteria assumed – confirm' : 'to be confirmed', 'warn') : '',
-      o.required === false ? badge('sampled / optional', 'mute') : '', owner && !o.locked && !perm ? badge('view only · ' + deptName(ch.stageNo), 'mute') : '', ch.freq ? badge(QI.PERIOD_LABEL[ch.freq], 'mute') : ''].join('');
+      o.required === false ? badge('sampled / optional', 'mute') : '', owner && !o.locked && signedOff ? badge('signed off – locked', 'ok') : '', owner && !o.locked && !perm && !signedOff ? badge('view only · ' + deptName(ch.stageNo), 'mute') : '', ch.freq ? badge(QI.PERIOD_LABEL[ch.freq], 'mute') : ''].join('');
     return `<div class="chk ${st}" data-key="${esc(key)}">
       <div class="chk-h">${dot(st)}<div class="chk-t"><b>${esc(ch.id)}</b> ${esc(ch.param)} ${tags}
         <div class="muted sm">Sample: ${esc(ch.sample || '–')} · Method: ${esc(ch.method || '–')} · Accept: <b>${esc(critText(ch))}</b></div>
@@ -203,6 +204,29 @@
     if (r.ncr) toast(`${r.ncr.id} raised – ${ch.param}${r.rejected.length ? ` · ${r.rejected.length} casting(s) rejected` : ''}`, 'bad'); else toast('Saved – OK', 'ok');
   }
 
+  /* ---- Inspector -> QC Manager -> Factory Head approval strip ---- */
+  const STEPS = [['inspector', 'Inspector', 'review'], ['qc', 'QC Manager', 'qc'], ['head', 'Factory Head', 'head']];
+  function approvalStrip(scope, owner, no, jobs, jobNo) {
+    if (!owner) return '';
+    const os = QI.ownerStage(no, scope, owner, jobs);
+    const a = os.approval;
+    if (os.checks !== 'done' && !(a && a.log && a.log.length)) return '';
+    const cur = os.status;
+    const data = `data-scope="${scope}" data-owner="${esc(owner)}" data-no="${no}" data-job="${esc(jobNo || '')}"`;
+    const boxes = STEPS.map(([k, label, role]) => {
+      const s = a && a.steps && a.steps[k];
+      const mine = cur === role && (role === 'review' ? QI.can('record', no) : QI.can('approve', role));
+      return `<div class="ap ${s ? 'done' : cur === role ? 'now' : ''}"><div class="apl">${label}</div>${s ? `<div><b>${esc(s.by)}</b></div><div class="muted sm">${fdt(s.ts)}${s.note ? ' · ' + esc(s.note) : ''}</div>`
+        : cur === role ? (mine ? `<button class="btn primary sm" data-act="sign" data-role="${role}" ${data}>${role === 'review' ? 'Sign off checks' : 'Approve'}</button>${role !== 'review' ? `<button class="btn sm" data-act="return-stage" ${data}>Return</button>` : ''}` : '<div class="muted sm">Waiting…</div>')
+        : '<div class="muted sm">–</div>'}</div>`;
+    }).join('<span class="apa">›</span>');
+    const last = a && a.log && a.log[a.log.length - 1];
+    return `<div class="appr"><div class="aph">Stage ${no} approval ${cur === 'done' ? badge('Fully approved', 'ok') : os.checks === 'done' ? badge('Awaiting ' + QI.ROLE_LABEL[cur], 'warn') : badge('Checks reopened', 'mute')}</div><div class="aps">${boxes}</div>
+      ${cur === 'done' && QI.can('reopen') ? `<button class="btn sm ghost" data-act="reopen-stage" ${data}>Reopen stage…</button>` : ''}
+      ${last && /Returned|reopened/.test(last.action) && cur !== 'done' ? `<div class="sm warnT">↩ ${esc(last.action)}${last.note ? ': ' + esc(last.note) : ''} – ${esc(last.by)}</div>` : ''}
+      ${a && a.log && a.log.length ? `<details class="hist"><summary>Approval history (${a.log.length})</summary>${a.log.map((l) => `<div class="hrow">${fdt(l.ts)} · ${esc(l.by)} · ${esc(l.action)}${l.note ? ' – ' + esc(l.note) : ''}</div>`).join('')}</details>` : ''}</div>`;
+  }
+
   /* stage block */
   function stageBlock(st, scope, owner, o) {
     o = o || {};
@@ -224,6 +248,8 @@
     const s = QI.stats(); const st = S();
     const intro = st.jobs.length ? '' : `<div class="empty intro"><b>Welcome to the DCL Quality Inspection app.</b><br>No work orders yet. Create a work order, add castings, and follow each one through the 10 inspection stages.${QI.can('create', 'job') ? `<div class="row c"><a class="btn primary" href="#/jobs">Create first work order</a><button class="btn" data-act="demo">Load sample data</button></div>` : '<div class="muted pad">Planning or Quality will create the first work order.</div>'}</div>`;
     const dp = QI.dept();
+    const role = QI.mode === 'shared' && dp && dp.approver;
+    const toApprove = role ? QI.pending().filter((p) => p.status === role) : null;
     const mine = QI.mode === 'shared' && dp && dp.stages.length && !dp.all ? st.castings.filter((c) => { if (c.status !== 'active') return false; const x = QI.castingState(c); return x.stageNo && dp.stages.includes(x.stageNo) && x.label.startsWith('Stage'); }) : null;
     const max = Math.max(1, ...Object.values(s.wip));
     const nmax = Math.max(1, ...Object.values(s.ncrByStage));
@@ -231,11 +257,13 @@
     const attention = st.castings.filter((c) => c.status === 'active' && QI.castingState(c).failing);
     const pct = (v) => v == null ? '–' : Math.round(v * 100) + '%';
     return `<h2>Dashboard</h2>${intro}
+    ${toApprove ? `<section class="card"><h3>Waiting for your approval <span class="badge warn">${toApprove.length}</span></h3>${toApprove.length ? toApprove.slice(0, 12).map((p) => `<div class="li">${link('/casting/' + p.castings[0], 'Stage ' + p.stageNo + ' · ' + QI.stageOf[p.stageNo].name)} <span class="muted sm">${esc(SCOPE_LABEL[p.scope])} ${esc(p.owner)} · ${p.castings.length} casting(s)</span></div>`).join('') : '<div class="muted">Nothing waiting for you ✔</div>'}</section>` : ''}
     ${mine ? `<section class="card"><h3>Waiting for ${esc(dp.name)} <span class="badge info">${mine.length}</span></h3>${mine.length ? mine.slice(0, 12).map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} <span class="muted sm">${esc(QI.castingState(c).label)}</span></div>`).join('') : '<div class="muted">Nothing waiting for your department ✔</div>'}</section>` : ''}
     <div class="kpis">
       <div class="kpi"><b>${s.active}</b><span>Castings in process</span></div>
       <div class="kpi"><b>${s.released}</b><span>Released</span></div>
       <div class="kpi"><b class="${s.rejected ? 'badT' : ''}">${s.rejected}</b><span>Rejected</span></div>
+      <div class="kpi"><b class="${s.awaiting ? 'warnT' : ''}">${s.awaiting}</b><span>Awaiting QC / Factory Head</span></div>
       <div class="kpi"><b class="${s.openNcr ? 'warnT' : ''}">${s.openNcr}</b><span>Open NCRs</span></div>
       <div class="kpi"><b>${pct(s.fpy)}</b><span>First-time-OK rate (checks)</span></div>
       <div class="kpi"><b>${pct(s.yield)}</b><span>Casting yield (released ÷ finished)</span></div>
@@ -271,7 +299,7 @@
       <div class="chips">${Object.keys(j.applic).map((id) => `<label class="chip"><input type="checkbox" data-act="applic" data-no="${esc(no)}" data-step="${id}" ${j.applic[id] ? 'checked' : ''}> ${id} ${esc(QI.steps[id].name)}</label>`).join('')}</div>
       <div class="muted sm">Unticked steps are skipped for every casting of this order. 3.2 and 8.3 are sampled (10 %) and never block a casting.</div></section>
     <section class="card"><h3>Castings (${cs.length})</h3>${cs.length ? castingTable(cs) : empty('No castings yet – add the first one.')}</section>
-    <section class="card"><h3>Stage ${st1.no} · ${esc(st1.name)} ${stBadge(s1.every((x) => x === 'ok') ? 'done' : s1.some((x) => x === 'ok') ? 'progress' : 'open')}</h3>${stageBlock(st1, 'job', no)}</section>`;
+    <section class="card"><h3>Stage ${st1.no} · ${esc(st1.name)} ${stBadge(s1.every((x) => x === 'ok') ? 'done' : s1.some((x) => x === 'ok') ? 'progress' : 'open')}</h3>${stageBlock(st1, 'job', no)}${approvalStrip('job', no, 1, [j])}</section>`;
   };
   function castingTable(cs) {
     return table(['Serial no.', 'Heat', 'Progress', 'Status', ''], cs.map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${c.heatNo ? link('/heat/' + c.heatNo, c.heatNo) : '<span class="muted">–</span>'}</td><td>${progressBar(c)}</td><td>${stateBadge(c)}</td><td>${link('/casting/' + c.id, 'Open →')}</td></tr>`));
@@ -311,7 +339,7 @@
       else if (!owner) body = `<div class="warnBox">${sc === 'heat' ? 'Assign this casting to a heat (melt) to record this stage.' : 'Link the sand & calibration log for the shift in which the mould was made.'}</div>`;
       else {
         const note = sc !== 'casting' ? `<div class="muted sm pad">Recorded once for ${SCOPE_LABEL[sc].toLowerCase()} <b>${esc(owner)}</b> and shared by all castings of it${sc === 'heat' ? ` · ${link('/heat/' + owner, 'open heat record')}` : sc === 'log' ? ` · ${link('/log/' + owner, 'open log')}` : ''}.</div>` : '';
-        body = note + stageBlock(x.stage, sc, owner, { locked: x.locked || c.status !== 'active' && sc === 'casting', job: j });
+        body = note + stageBlock(x.stage, sc, owner, { locked: x.locked || c.status !== 'active' && sc === 'casting', job: j }) + (c.status === 'rejected' ? '' : approvalStrip(sc, owner, no, [j], c.jobNo));
       }
       return `<section class="card stage ${x.status}"><div class="sh" data-act="stage-toggle" data-k="${esc(c.id + no)}"><span class="sn">${no}</span><span class="sname">${esc(x.stage.name)}</span>${QI.mode === 'shared' ? badge(deptName(no), 'mute') : ''}${x.stage.optional ? badge('per PO / QAP', 'mute') : ''}${stBadge(x.status)}<span class="chev">${open ? '▾' : '▸'}</span></div>${open ? `<div class="sb">${body}</div>` : ''}</section>`;
     }).join('')}`;
@@ -335,7 +363,7 @@
       const st = QI.stageOf[n];
       const sts = st.groups[0].steps.flatMap((s) => s.checks).map((c) => QI.status('heat', no, c.id));
       return `<section class="card"><h3>Stage ${n} · ${esc(st.name)} ${n === 8 ? '<small class="muted">test bars / samples from this heat – tests required depend on each casting’s PO / QAP</small>' : ''}</h3>
-        ${n === 8 && Object.keys(req).length ? `<div class="muted sm pad">Required by castings on this heat: ${Object.keys(req).map((k) => `${k} (${[...req[k]].join(', ')})`).join(' · ')}</div>` : ''}${stageBlock(st, 'heat', no)}</section>`;
+        ${n === 8 && Object.keys(req).length ? `<div class="muted sm pad">Required by castings on this heat: ${Object.keys(req).map((k) => `${k} (${[...req[k]].join(', ')})`).join(' · ')}</div>` : ''}${stageBlock(st, 'heat', no)}${approvalStrip('heat', no, n, QI.jobsOf('heat', no))}</section>`;
     }).join('')}`;
   };
 
@@ -353,7 +381,17 @@
   V.log = (id) => {
     const l = QI.log(id); if (!l) return empty('Log not found.');
     return `<div class="hd"><div><h2>Sand & calibration log – ${esc(l.date)}, shift ${esc(l.shift)}</h2><div class="muted">${QI.logCastings(id).length} casting(s) linked · opened by ${esc(l.by || '–')}</div></div></div>
-      <section class="card">${stageBlock(QI.stageOf[2], 'log', id)}</section>`;
+      <section class="card">${stageBlock(QI.stageOf[2], 'log', id)}${approvalStrip('log', id, 2, QI.jobsOf('log', id))}</section>`;
+  };
+
+  /* ---- approvals queue ---- */
+  V.approvals = () => {
+    const list = QI.pending();
+    const order = { qc: 0, head: 1, review: 2 };
+    list.sort((x, y) => order[x.status] - order[y.status] || x.stageNo - y.stageNo);
+    const mineRole = (p) => p.status === 'review' ? QI.can('record', p.stageNo) : QI.can('approve', p.status);
+    return `<div class="hd"><h2>Approvals</h2></div><p class="muted">Every stage is signed three times: <b>Inspector → QC Manager → Factory Head</b>. The next stage opens only after the Factory Head approves.</p>
+    ${list.length ? table(['Stage', 'Record', 'Castings', 'Waiting for', ''], list.map((p) => `<tr><td>${p.stageNo} · ${esc(QI.stageOf[p.stageNo].name)}</td><td>${esc(SCOPE_LABEL[p.scope])} <b>${esc(p.owner)}</b></td><td>${p.castings.slice(0, 3).map((c) => link('/casting/' + c, c)).join(', ')}${p.castings.length > 3 ? ' +' + (p.castings.length - 3) : ''}</td><td>${stBadge(p.status)}</td><td>${mineRole(p) ? `<a class="btn sm primary" href="#/casting/${esc(p.castings[0])}">Open →</a>` : ''}</td></tr>`)) : empty('Nothing is waiting for sign-off or approval.')}`;
   };
 
   /* ---- NCR ---- */
@@ -391,12 +429,12 @@
       <div class="row"><button class="btn" data-act="export-json">Backup (JSON)</button><label class="btn">Restore backup<input type="file" accept="application/json" hidden data-act="import-json"></label><button class="btn" data-act="export-csv">Export all results (CSV)</button></div></section>
     <section class="card"><h3>Demo</h3><div class="row"><button class="btn" data-act="demo">Load demo data</button><button class="btn danger" data-act="wipe">Erase everything</button></div></section>`;
 
-  const LIST_NAMES = { inspector: 'Inspectors', customer: 'Customers', part: 'Parts', grade: 'Material grades', furnace: 'Furnaces', remarks: 'Inspection remarks', rejectReason: 'Rejection reasons', closeNote: 'NCR closure notes', releaseRemarks: 'Release remarks' };
+  const LIST_NAMES = { signNote: 'Sign-off remarks', returnReason: 'Return / reopen reasons', inspector: 'Inspectors', customer: 'Customers', part: 'Parts', grade: 'Material grades', furnace: 'Furnaces', remarks: 'Inspection remarks', rejectReason: 'Rejection reasons', closeNote: 'NCR closure notes', releaseRemarks: 'Release remarks' };
   function listsHtml() {
     const L = S().settings.lists || {};
     const keys = Object.keys(L).filter((k) => L[k].length);
     if (!keys.length) return '<div class="muted">Nothing added yet.</div>';
-    return keys.map((k) => `<div class="lbl pad">${esc(LIST_NAMES[k] || (k.startsWith('action:') ? 'Actions for check ' + k.slice(7) : k))}</div><div class="chips">${L[k].map((v) => `<span class="chip">${esc(v)} <button class="x" data-act="unlearn" data-list="${esc(k)}" data-v="${esc(v)}" aria-label="Remove">×</button></span>`).join('')}</div>`).join('');
+    return keys.map((k) => `<div class="lbl pad">${esc(LIST_NAMES[k] || (k.startsWith('part:') ? 'Items – ' + k.slice(5) : k.startsWith('action:') ? 'Actions for check ' + k.slice(7) : k))}</div><div class="chips">${L[k].map((v) => `<span class="chip">${esc(v)} <button class="x" data-act="unlearn" data-list="${esc(k)}" data-v="${esc(v)}" aria-label="Remove">×</button></span>`).join('')}</div>`).join('');
   }
 
   /* ---- report ---- */
@@ -409,7 +447,8 @@
     t.stages.forEach((x) => {
       const done = x.items.filter((i) => i.owner);
       if (!done.length) { return; }
-      rows.push(`<tr class="rs"><td colspan="7">Stage ${x.stage.no} · ${esc(x.stage.name)}</td></tr>`);
+      const ap = x.approval && x.approval.steps || {};
+      rows.push(`<tr class="rs"><td colspan="7">Stage ${x.stage.no} · ${esc(x.stage.name)}<div class="sm">Inspector: ${ap.inspector ? esc(ap.inspector.by) + ', ' + fd(ap.inspector.ts) : '–'} · QC Manager: ${ap.qc ? esc(ap.qc.by) + ', ' + fd(ap.qc.ts) : '–'} · Factory Head: ${ap.head ? esc(ap.head.by) + ', ' + fd(ap.head.ts) : '–'}</div></td></tr>`);
       x.items.forEach((i) => {
         const a = i.owner ? QI.last(i.scope, i.owner, i.check.id) : null;
         const ch = QI.eff(i.check.id);
@@ -435,10 +474,10 @@
   const jobForm = (j) => {
     j = j || {};
     return `<div class="grid2">${fld('Work order no.', 'no', j.no, j.no ? 'readonly' : 'required')}${combo('Customer', 'customer', 'customer', j.customer)}${fld('PO / order no.', 'po', j.po)}${fld('Order qty', 'qty', j.qty, 'type="number" min="1"')}
-      ${combo('Part name', 'part', 'part', j.part)}${fld('Drawing no.', 'drawing', j.drawing)}${fld('Pattern no.', 'pattern', j.pattern)}${combo('Material grade', 'grade', 'grade', j.grade)}</div>
+      ${combo('Item / part', 'part', 'part:' + (j.customer || ''), j.part)}${fld('Drawing no.', 'drawing', j.drawing)}${fld('Pattern no.', 'pattern', j.pattern)}${combo('Material grade', 'grade', 'grade', j.grade)}</div>
       ${ta('Drawing dimensions (optional – pre-fills dimension checks)', 'dims', j.dims, 'One per line: <i>feature, nominal, −tol, +tol</i> e.g. <i>Bore Ø, 100, 0.5, 0.5</i>')}`;
   };
-  const readJob = (f) => ({ no: val(f, 'no'), customer: cval(f, 'customer', 'customer'), po: val(f, 'po'), qty: val(f, 'qty'), part: cval(f, 'part', 'part'), drawing: val(f, 'drawing'), pattern: val(f, 'pattern'), grade: cval(f, 'grade', 'grade'), dims: val(f, 'dims') });
+  const readJob = (f) => { const customer = cval(f, 'customer', 'customer'); return ({ no: val(f, 'no'), customer, po: val(f, 'po'), qty: val(f, 'qty'), part: cval(f, 'part', 'part:' + customer), drawing: val(f, 'drawing'), pattern: val(f, 'pattern'), grade: cval(f, 'grade', 'grade'), dims: val(f, 'dims') }); };
   const heatForm = (h) => {
     h = h || {};
     return `<div class="grid2">${fld('Heat no.', 'no', h.no, h.created ? 'readonly' : 'required')}${fld('Date', 'date', h.date || today(), 'type="date"')}${combo('Furnace', 'furnace', 'furnace', h.furnace)}${combo('Grade', 'grade', 'grade', h.grade)}
@@ -455,6 +494,14 @@
     'dim-add': (el) => { el.parentNode.querySelector('tbody').insertAdjacentHTML('beforeend', dimRow({})); },
     'dim-del': (el) => { const tb = el.closest('tbody'); if (tb.rows.length > 1) el.closest('tr').remove(); liveEval(el.closest('form')); },
     'report-dl': (el) => { const r = $('.report'); download(`inspection-report-${el.dataset.id}.html`, `<!doctype html><meta charset="utf-8"><title>Inspection report ${el.dataset.id}</title><style>body{font:13px system-ui;margin:16px}table{border-collapse:collapse;width:100%;margin-bottom:10px}th,td{border:1px solid #999;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eee}.sm{font-size:11px}.rs td{background:#d9ead3;font-weight:700}header{display:flex;justify-content:space-between;border-bottom:2px solid #000;margin-bottom:8px}.sig{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px}.sig div{border-top:1px solid #000}</style>${r.outerHTML}`, 'text/html'); },
+    sign: (el) => {
+      if (needInspector()) return; const d = el.dataset; const role = d.role;
+      const title = role === 'review' ? 'Inspector sign-off' : role === 'qc' ? 'QC Manager approval' : 'Factory Head approval';
+      modal(`${title} – stage ${d.no}`, `<p>${role === 'review' ? 'Confirms every check in this stage has been inspected and recorded. The checks lock after sign-off.' : 'Confirms you have reviewed this stage’s results.'}</p>${fld('Signing as', 'by', S().settings.inspector, QI.mode === 'shared' ? 'readonly' : '')}${combo('Remarks (optional)', 'note', 'signNote', '', [], { blank: '– none –' })}`,
+        (f) => { const r = QI.signoff(d.scope, d.owner, +d.no, role, val(f, 'by'), cval(f, 'note', 'signNote'), d.job || null); if (r.error) return r.error; toast(r.done ? 'Stage fully approved' : 'Signed – passed to the next approver', 'ok'); }, role === 'review' ? 'Sign off' : 'Approve');
+    },
+    'return-stage': (el) => { if (needInspector()) return; const d = el.dataset; modal(`Return stage ${d.no} for rework`, `${combo('Reason', 'reason', 'returnReason', '', ['Re-measure and re-record', 'Reading doubtful – repeat the test', 'Records or reference numbers missing', 'Defect to be corrected first'])}<small class="muted">All sign-offs on this stage are cleared; the inspector re-records and signs again.</small>`, (f) => { const rs = cval(f, 'reason', 'returnReason'); if (!rs) return 'Choose or enter a reason.'; const r = QI.returnStage(d.scope, d.owner, +d.no, rs, d.job || null); if (r.error) return r.error; }, 'Return stage'); },
+    'reopen-stage': (el) => { const d = el.dataset; modal(`Reopen stage ${d.no}`, `${combo('Reason', 'reason', 'returnReason', '', ['Re-measure and re-record', 'Reading doubtful – repeat the test', 'Customer / PO change'])}<small class="muted">Clears all three approvals so the checks can be re-recorded.</small>`, (f) => { const rs = cval(f, 'reason', 'returnReason'); if (!rs) return 'Choose or enter a reason.'; const r = QI.reopenStage(d.scope, d.owner, +d.no, rs); if (r.error) return r.error; }, 'Reopen'); },
     'modal-cancel': () => $('#dlg').close(),
     'filter-castings': (el) => { ui.filter.castings = el.value; render(); const i = $('.search'); i.focus(); i.setSelectionRange(99, 99); },
     'filter-plan': (el) => { ui.filter.plan = el.value; render(); const i = $('.search'); i.focus(); i.setSelectionRange(99, 99); },
@@ -505,6 +552,13 @@
   });
   document.addEventListener('change', (e) => {
     const sl = e.target;
+    if (sl.matches && sl.matches('select[name=customer]') && sl.form && sl.form.elements.part) {
+      const ps = sl.form.elements.part, cur = ps.value;
+      const opts = sl.value && sl.value !== '__other' ? QI.opts('part:' + sl.value) : [];
+      ps.innerHTML = `<option value="">– select –</option>${opts.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option>`;
+      if (opts.includes(cur)) ps.value = cur;
+      const po = sl.form.elements.part__o; if (po) po.hidden = true;
+    }
     if (sl.matches && sl.matches('select[data-combo]')) {
       const o = sl.form.elements[sl.name + '__o']; o.hidden = sl.value !== '__other'; if (!o.hidden) o.focus();
       const w = sl.form.querySelector('.clsrow'); if (w && sl.name === 'action') w.hidden = sl.value !== '__other';
@@ -555,11 +609,15 @@
     QI.record('casting', cs[2].id, '3.1.2', { result: 'nok', action: 'Repainting' });
     ok('heat', h.no, '8.1.1', { vals: { 'UTS (MPa)': 520, 'YS (MPa)': 290, 'Elongation (%)': 26, 'RA (%)': 45 } });
     ok('heat', h.no, '8.2.1', ynOk); ok('heat', h.no, '8.3.1', { value: 165, min: '137', max: '207' });
+    if (QI.mode === 'local') {
+      const sg = (scope, owner, no, jobNo) => [['review', 'Demo Inspector'], ['qc', 'Demo QC Manager'], ['head', 'Demo Factory Head']].forEach(([r, n]) => QI.signoff(scope, owner, no, r, n, '', jobNo));
+      sg('job', no, 1, no); sg('log', log, 2, no); sg('casting', cs[0].id, 3, no); sg('heat', h.no, 4, no);
+    }
     QI.save();
   }
 
   /* ================= router ================= */
-  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['logs', 'Sand & calibration'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
+  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
     'ncr-close': ['ncr'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
@@ -600,12 +658,13 @@
     if ($('#dlg').open || $('form.chkform')) { ui.stale = true; $('#stale').hidden = false; } else render();
   };
   QI.onError = (e) => toast('Not saved: ' + ((e && e.code === 'not_writer') || (e && /permission|writer|denied/i.test(e.message || '')) ? 'you have view-only access.' : (e && e.message) || 'connection problem.'), 'bad');
+  if (!HOSTED) QI.seed();
   render();
   if (HOSTED) {
     Promise.all([window.claude.use('db'), window.claude.use('user'), window.claude.use('downloads')]).then(([db, user, dl]) => {
       DL = dl;
-      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; render(); QI.onError(e); }); else { booting = false; render(); }
-    }).catch(() => { booting = false; render(); });
+      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; QI.seed(); render(); QI.onError(e); }); else { booting = false; QI.seed(); render(); }
+    }).catch(() => { booting = false; QI.seed(); render(); });
   }
   if (!QI.persistent) toast('Browser storage unavailable – data will not be saved. Use Settings → Backup.', 'bad');
   window.QIApp = { render, demoData };

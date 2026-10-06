@@ -24,7 +24,7 @@
 
   /* ---------- state ---------- */
   const blank = () => ({ v: 1, seq: { ncr: 0, log: 0 }, settings: { inspector: '', overrides: {} },
-    jobs: [], castings: [], heats: [], logs: [], results: {}, ncrs: [] });
+    jobs: [], castings: [], heats: [], logs: [], results: {}, approvals: {}, ncrs: [] });
   let S = blank();
   QI.persistent = true;
   try {
@@ -55,6 +55,8 @@
     { id: 'lab', name: 'NDT & mechanical / metallurgical lab', stages: [7, 8], about: 'Stages 7–8' },
     { id: 'mach', name: 'Machining', stages: [9], about: 'Stage 9' },
     { id: 'qa', name: 'Quality assurance & final inspection', stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], all: true, about: 'Stage 10, release, rejection, NCR closure, everything else' },
+    { id: 'qcm', name: 'QC Manager', stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], all: true, approver: 'qc', about: 'Second approval on every stage, plus release / reject / NCR closure' },
+    { id: 'head', name: 'Factory Head', stages: [], approver: 'head', extra: ['release', 'reject'], about: 'Final approval on every stage' },
     { id: 'mgmt', name: 'Management (view only)', stages: [], about: 'Dashboards and reports' },
   ];
   QI.me = { uid: null, name: '', dept: null, canWrite: true };
@@ -63,6 +65,9 @@
   QI.can = (action, arg) => {
     if (QI.mode === 'local') return true;
     const d = QI.dept(); if (!QI.me.canWrite || !d) return false;
+    if (action === 'approve') return d.approver === arg;
+    if (action === 'reopen') return !!d.approver;
+    if (d.extra && d.extra.includes(action)) return true;
     if (d.all) return true;
     if (action === 'record') return d.stages.includes(arg);
     if (action === 'create') return (d.create || []).includes(arg);
@@ -76,11 +81,12 @@
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
   const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id' };
-  const cfgForm = () => ({ lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const cfgForm = () => ({ seeded: !!S.settings.seeded, lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
     Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
     Object.keys(S.results).forEach((k) => (m['results/' + enc(k)] = { key: k, attempts: S.results[k].attempts }));
+    Object.keys(S.approvals).forEach((k) => (m['approvals/' + enc(k)] = { key: k, steps: S.approvals[k].steps || {}, log: S.approvals[k].log || [] }));
     m['meta/config'] = cfgForm();
     return m;
   };
@@ -115,7 +121,7 @@
       const w = user.can ? user.can('data.write') : null; QI.me.canWrite = w !== false;
     }
     let pending = 0;
-    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; pushDiff(); QI.onChange(true); } };
+    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; QI.seed(); pushDiff(); QI.onChange(true); } };
     const reg = (path, handler) => { pending++; listen(path, handler, done); };
     Object.keys(COLS).forEach((col) => reg(col, (ch) => {
       const body = clone(ch.doc.data() || {}), p = col + '/' + ch.doc.id;
@@ -131,10 +137,19 @@
       synced[p] = JSON.stringify({ key: body.key, attempts: S.results[body.key].attempts });
       return !same;
     });
+    reg('approvals', (ch) => {
+      const body = clone(ch.doc.data() || {}), p = 'approvals/' + ch.doc.id;
+      if (ch.type === 'removed') { delete S.approvals[body.key]; delete synced[p]; return true; }
+      const cur = S.approvals[body.key], nu = { steps: body.steps || {}, log: body.log || [] };
+      const same = cur && JSON.stringify(cur) === JSON.stringify(nu);
+      if (!cur) S.approvals[body.key] = nu; else if (!same) { cur.steps = nu.steps; cur.log = nu.log; }
+      synced[p] = JSON.stringify({ key: body.key, steps: S.approvals[body.key].steps, log: S.approvals[body.key].log });
+      return !same;
+    });
     reg('meta', (ch) => {
       if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
       const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
-      S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      S.settings.seeded = !!b.seeded; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
       synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
     });
     reg('people', (ch) => {
@@ -173,6 +188,14 @@
     if (!a.some((x) => x.toLowerCase() === v.toLowerCase())) { a.push(v); QI.save(); }
   };
   QI.unlearn = (key, v) => { const a = S.settings.lists && S.settings.lists[key]; if (a) { S.settings.lists[key] = a.filter((x) => x !== v); QI.save(); } };
+  /* first-run dropdown content: customers and the items cast for each (editable under Settings -> Dropdown lists) */
+  QI.SEED_CUSTOMERS = ['Tega', 'Thejo', 'Komatsu', 'BEML', 'Sona'];
+  QI.SEED_PARTS = ['Knuckle', 'Main Body'];
+  QI.seed = () => {
+    if (S.settings.seeded) return;
+    QI.SEED_CUSTOMERS.forEach((c) => { QI.learn('customer', c); QI.SEED_PARTS.forEach((p) => QI.learn('part:' + c, p)); });
+    S.settings.seeded = true; QI.save();
+  };
   QI.learnAction = (checkId, text, cls) => {
     QI.learn('action:' + checkId, text);
     (S.settings.actionCls || (S.settings.actionCls = {}))[text] = cls || 'rework'; QI.save();
@@ -327,6 +350,7 @@
     if (!S.settings.inspector) return { error: 'Set the inspector name first (Settings).' };
     const check = QI.eff(checkId);
     if (!QI.can('record', check.stageNo)) return { error: `Stage ${check.stageNo} is recorded by ${(QI.DEPTS.filter((d) => d.stages.includes(check.stageNo) && !d.all)[0] || { name: 'another department' }).name}.` };
+    if (QI.signed(scope, owner, check.stageNo)) return { error: 'This stage is signed off. Ask the QC Manager or Factory Head to return it for rework first.' };
     const ev = QI.evaluate(check, input, ctxFor(scope, owner));
     if (ev.error) return { error: ev.error };
     const key = rkey(scope, owner, checkId);
@@ -356,34 +380,108 @@
 
   /* ---------- casting traveller ---------- */
   const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const ROLE_LABEL = { review: 'inspector sign-off', qc: 'QC Manager approval', head: 'Factory Head approval' };
+  QI.ROLE_LABEL = ROLE_LABEL;
+
+  /* ---- three-step approval per stage: Inspector -> QC Manager -> Factory Head ---- */
+  const akey = (scope, owner, no) => `${scope}|${owner}|${no}`;
+  QI.approval = (scope, owner, no) => (owner && S.approvals[akey(scope, owner, no)]) || null;
+  QI.signed = (scope, owner, no) => { const a = QI.approval(scope, owner, no); return !!(a && a.steps && a.steps.inspector); };
+  const apprStatus = (a) => !a || !a.steps || !a.steps.inspector ? 'review' : !a.steps.qc ? 'qc' : !a.steps.head ? 'head' : 'done';
+  QI.apprStatus = apprStatus;
+
+  /* checks of one stage for one owner, across the work orders it serves */
+  const buildItems = (no, scope, owner, jobs) => {
+    const st = QI.stageOf[no], items = [];
+    st.groups.forEach((g) => g.steps.forEach((sp) => sp.checks.forEach((ch) => {
+      const app = jobs.length ? jobs.some((j) => QI.applicable(j, ch)) : !QI.steps[ch.step].optional;
+      if (!app) return;
+      const req = jobs.length ? jobs.some((j) => QI.required(j, ch)) : QI.required(null, ch);
+      items.push({ check: ch, scope, owner, required: req, status: owner ? QI.status(scope, owner, ch.id) : 'none' });
+    })));
+    return items;
+  };
+  const checkStatus = (no, items, owner) => {
+    if (no === 2) {
+      if (!owner) return 'open';
+      if (items.some((i) => i.status === 'nok')) return 'fail';
+      return items.some((i) => i.status === 'ok') ? 'done' : 'open';
+    }
+    if (!items.length) return 'na';
+    const req = items.filter((i) => i.required);
+    if (req.some((i) => i.status === 'nok')) return 'fail';
+    if (!req.length || req.every((i) => i.status === 'ok')) return req.length ? 'done' : 'na';
+    return req.some((i) => i.status === 'ok') ? 'progress' : 'open';
+  };
+  /* status of a stage for one owner, including approvals: open | progress | fail | review | qc | head | done | na */
+  QI.ownerStage = (no, scope, owner, jobs) => {
+    const items = buildItems(no, scope, owner, jobs);
+    const cs = checkStatus(no, items, owner);
+    const a = QI.approval(scope, owner, no);
+    return { items, checks: cs, approval: a, status: cs === 'done' ? apprStatus(a) : cs };
+  };
+  QI.jobsOf = (scope, owner) => {
+    if (scope === 'job') return QI.job(owner) ? [QI.job(owner)] : [];
+    const cs = scope === 'heat' ? QI.heatCastings(owner) : scope === 'log' ? QI.logCastings(owner) : [];
+    return [...new Set(cs.map((c) => c.jobNo))].map((n) => QI.job(n)).filter(Boolean);
+  };
+  const who = () => ({ by: S.settings.inspector || QI.me.name || 'Unknown', uid: QI.me.uid || null, ts: Date.now() });
+  QI.signoff = (scope, owner, no, role, by, note, jobNo) => {
+    const step = role === 'review' ? 'inspector' : role;
+    const os = QI.ownerStage(no, scope, owner, jobNo ? [QI.job(jobNo)] : QI.jobsOf(scope, owner));
+    if (os.status !== role) return { error: `This stage is awaiting ${ROLE_LABEL[os.status] || 'its checks'}.` };
+    if (role === 'review' ? !QI.can('record', no) : !QI.can('approve', role)) return { error: role === 'review' ? 'Only the department that records this stage can sign it off.' : `Only the ${role === 'qc' ? 'QC Manager' : 'Factory Head'} can give this approval.` };
+    const key = akey(scope, owner, no);
+    const a = S.approvals[key] || (S.approvals[key] = { steps: {}, log: [] });
+    const w = who(); if (by) w.by = by;
+    if (w.uid && Object.values(a.steps).some((x) => x && x.uid === w.uid)) return { error: 'Each approval step must be signed by a different person.' };
+    a.steps[step] = { by: w.by, uid: w.uid, ts: w.ts, note: note || '' };
+    a.log.push({ ts: w.ts, by: w.by, action: step === 'inspector' ? 'Inspector sign-off' : step === 'qc' ? 'QC Manager approved' : 'Factory Head approved', note: note || '' });
+    QI.save(); return { ok: true, done: step === 'head' };
+  };
+  QI.returnStage = (scope, owner, no, reason, jobNo) => {
+    const os = QI.ownerStage(no, scope, owner, jobNo ? [QI.job(jobNo)] : QI.jobsOf(scope, owner));
+    if (os.status !== 'qc' && os.status !== 'head') return { error: 'Nothing to return at this step.' };
+    if (!QI.can('approve', os.status)) return { error: 'Only the approver for this step can return a stage.' };
+    const a = S.approvals[akey(scope, owner, no)]; a.steps = {};
+    a.log.push({ ts: Date.now(), by: who().by, action: `Returned for rework by ${os.status === 'qc' ? 'QC Manager' : 'Factory Head'}`, note: reason || '' });
+    QI.save(); return { ok: true };
+  };
+  QI.reopenStage = (scope, owner, no, reason) => {
+    const a = QI.approval(scope, owner, no);
+    if (!a || !QI.can('reopen')) return { error: 'Only the QC Manager or Factory Head can reopen a stage.' };
+    a.steps = {}; a.log.push({ ts: Date.now(), by: who().by, action: 'Stage reopened', note: reason || '' });
+    QI.save(); return { ok: true };
+  };
+
   QI.castingStages = (c) => {
     const job = QI.job(c.jobNo);
     let prevOk = true, current = null;
     const out = ORDER.map((no) => {
       const st = QI.stageOf[no];
-      const items = [];
-      st.groups.forEach((g) => g.steps.forEach((sp) => sp.checks.forEach((ch) => {
-        if (!QI.applicable(job, ch)) return;
-        const owner = QI.ownerOf(c, st.scope);
-        items.push({ check: ch, scope: st.scope, owner, required: QI.required(job, ch), status: owner ? QI.status(st.scope, owner, ch.id) : 'none' });
-      })));
-      const req = items.filter((i) => i.required);
-      let status;
-      if (no === 2) {
-        const l = c.logId;
-        const bad = l ? items.some((i) => i.status === 'nok') : false;
-        status = !l ? 'open' : bad ? 'fail' : 'done';
-      } else if (!items.length) status = 'na';
-      else if (req.some((i) => i.status === 'nok')) status = 'fail';
-      else if (req.every((i) => i.status === 'ok')) status = 'done';
-      else if (req.some((i) => i.status === 'ok')) status = 'progress';
-      else status = 'open';
+      const owner = QI.ownerOf(c, st.scope);
+      const items = buildItems(no, st.scope, owner, job ? [job] : []);
+      const cs = checkStatus(no, items, owner);
+      const a = QI.approval(st.scope, owner, no);
+      const status = cs === 'done' ? apprStatus(a) : cs;
       const locked = !prevOk || c.status === 'rejected';
       if (!locked && !current && status !== 'done' && status !== 'na') current = no;
       if (status !== 'done' && status !== 'na') prevOk = false;
-      return { stage: st, status, locked, items };
+      return { stage: st, status, checks: cs, approval: a, owner, locked, items };
     });
     return { stages: out, current, allDone: out.every((s) => s.status === 'done' || s.status === 'na') };
+  };
+  /* stages waiting on someone, de-duplicated across the castings that share them */
+  QI.pending = () => {
+    const m = {};
+    S.castings.filter((c) => c.status === 'active').forEach((c) => {
+      QI.castingStages(c).stages.forEach((x) => {
+        if (x.locked || !x.owner || !['review', 'qc', 'head'].includes(x.status)) return;
+        const k = akey(x.stage.scope, x.owner, x.stage.no);
+        (m[k] || (m[k] = { scope: x.stage.scope, owner: x.owner, stageNo: x.stage.no, status: x.status, castings: [] })).castings.push(c.id);
+      });
+    });
+    return Object.values(m);
   };
   QI.castingState = (c) => {
     if (c.status === 'rejected') return { label: 'Rejected', cls: 'bad', stageNo: c.reject ? c.reject.stageNo : null };
@@ -392,7 +490,9 @@
     if (t.allDone) return { label: 'Ready for release', cls: 'ok', stageNo: 10 };
     const st = t.stages.find((s) => s.stage.no === t.current);
     const failing = t.stages.some((s) => s.status === 'fail');
-    return { label: `Stage ${t.current}: ${QI.stageOf[t.current].name}`, cls: failing ? 'warn' : 'info', stageNo: t.current, failing };
+    const cur = t.stages.find((x) => x.stage.no === t.current);
+    const wait = cur && ROLE_LABEL[cur.status];
+    return { label: wait ? `Stage ${t.current}: awaiting ${wait}` : `Stage ${t.current}: ${QI.stageOf[t.current].name}`, waiting: cur && cur.status, cls: failing ? 'warn' : 'info', stageNo: t.current, failing };
   };
   QI.release = (c, by, remarks) => {
     if (!QI.can('release')) return { error: 'Only Quality can release castings.' };
@@ -442,7 +542,8 @@
     let first = 0, total = 0;
     Object.values(S.results).forEach((r) => { total++; if (r.attempts[0].result === 'ok') first++; });
     const released = cs.filter((c) => c.status === 'released').length, rejected = cs.filter((c) => c.status === 'rejected').length;
-    return { total: cs.length, active: active.length, released, rejected, openNcr: S.ncrs.filter((n) => n.status === 'open').length,
+    const awaiting = QI.pending().filter((p) => p.status !== 'review').length;
+    return { awaiting, total: cs.length, active: active.length, released, rejected, openNcr: S.ncrs.filter((n) => n.status === 'open').length,
       wip, ncrByStage, fpy: total ? first / total : null, yield: released + rejected ? released / (released + rejected) : null, checksDone: total };
   };
 
@@ -453,6 +554,7 @@
       const [scope, owner, id] = k.split('|'); const ch = QI.checks[id];
       S.results[k].attempts.forEach((a) => rows.push([scope, owner, id, ch ? ch.stageNo : '', ch ? ch.param : '', a.n, new Date(a.ts).toISOString(), a.by, a.result === 'ok' ? 'OK' : 'NOT OK', a.summary, a.detail, a.ref, a.action || '', a.remarks]));
     });
+    Object.keys(S.approvals).forEach((k) => { const [scope, owner, no] = k.split('|'); (S.approvals[k].log || []).forEach((l, i) => rows.push(['approval-' + scope, owner, 'Stage ' + no, no, l.action, i + 1, new Date(l.ts).toISOString(), l.by, '', '', '', '', '', l.note])); });
     return rows.map((r) => r.map((v) => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }).join(',')).join('\n');
   };
 })();

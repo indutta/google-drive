@@ -77,3 +77,8 @@ dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface)
 .top{gap:.6rem;flex-wrap:wrap}.sync{font-size:.78rem;color:var(--mut);margin-left:auto}.sync.on{color:var(--ok)}
 .stale{border:0;background:var(--warnbg);color:var(--warn);border-radius:99px;padding:.3rem .8rem;cursor:pointer;font:inherit;font-size:.82rem}
 .pre{white-space:pre-line}
+
+.appr{margin-top:1rem;padding:.8rem;border:1px solid var(--line);border-radius:10px;background:var(--s2)}.aph{font-weight:700;margin-bottom:.5rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.aps{display:flex;gap:.4rem;align-items:stretch;flex-wrap:wrap}.ap{flex:1;min-width:140px;padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface)}.ap.done{border-color:var(--ok);background:var(--okbg)}.ap.now{border-color:var(--warn)}
+.apl{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin-bottom:.2rem}.apa{align-self:center;color:var(--mut)}.ap .btn{margin:.2rem .3rem 0 0}
+@media(max-width:700px){.apa{display:none}.ap{min-width:100%}}
