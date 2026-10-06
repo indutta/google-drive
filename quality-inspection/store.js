@@ -65,6 +65,7 @@
   QI.can = (action, arg) => {
     if (QI.mode === 'local') return true;
     const d = QI.dept(); if (!QI.me.canWrite || !d) return false;
+    if (action === 'master') return d.all || d.id === 'planning';
     if (action === 'approve') return d.approver === arg;
     if (action === 'reopen') return !!d.approver;
     if (d.extra && d.extra.includes(action)) return true;
