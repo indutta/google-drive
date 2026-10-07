@@ -91,6 +91,10 @@ dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface)
 .apl{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin-bottom:.2rem}.apa{align-self:center;color:var(--mut)}.ap .btn{margin:.2rem .3rem 0 0}
 @media(max-width:700px){.apa{display:none}.ap{min-width:100%}}
 
+.cmt{min-width:560px}.cmt input{width:100%;min-width:58px;padding:.25rem .35rem;min-height:36px}.cmt th{white-space:nowrap}.cmt .tot th,.cmt .tot td{background:var(--s2)}.cmt td[data-c]{font-variant-numeric:tabular-nums;text-align:right}
+.kv2{max-width:520px}.kv2 td:last-child{text-align:right;font-variant-numeric:tabular-nums}.kv2 .tot td{border-top:2px solid var(--line)}
+.cmt td:first-child input{min-width:150px}.cmt td:first-child{white-space:nowrap}
+
 </style>
 </head>
 <body>
@@ -1996,110 +2000,151 @@ window.PLAN = {
 </script>
 <script>
 /* DCL Quality Inspection – charge-mix calculator.
-   Given a grade (target chemistry), total charge weight and the base charge (returns / scrap / pig iron),
-   it solves the ferro-alloy and recarburiser additions that bring the predicted melt to the grade aim,
-   allowing for element recoveries, and checks the result against the grade limits. */
+   Implements the method of the "Charge Calculation" sheets in the QC n Design folder (Tega T1, Thejo CrMo, Escorts M201,
+   HT Bar, Vedanta 4%Ni, BEML Idler):
+     contribution = Wt x analysis / 100;  total % = sum(Wt x analysis) / sum(Wt)  (+ lining pick-up);
+     after loss = total x (1 - element loss %);  kg charged = Wt / sum(non-return Wt) x (liquid metal - foundry return);
+     cost block = per-kg cost of casting after yield, rejection and lining. */
 (function () {
   'use strict';
   const QI = window.QI;
-  const EL = ['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Ni', 'Mo', 'Cu'];
-  QI.EL = EL;
-  QI.DEF_REC = { C: 95, Si: 90, Mn: 85, P: 100, S: 100, Cr: 95, Ni: 100, Mo: 97, Cu: 100 };      // % of the element charged that reaches the melt
-  QI.DEF_ADJ = { C: 'Recarburiser (graphite)', Si: 'FeSi 75', Mn: 'FeMn HC', Cr: 'FeCr HC', Ni: 'Nickel', Mo: 'FeMo', Cu: 'Copper' };
   const S = () => QI.S();
-  QI.cm = () => (S().settings.charge || (S().settings.charge = { materials: [], grades: [] }));
-  QI.cmMat = (n) => QI.cm().materials.find((m) => m.name === n);
-  QI.cmGrade = (n) => QI.cm().grades.find((g) => g.name === n);
+  const EL_ALL = ['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Mo', 'Ni', 'Cu', 'Ti', 'Al'];
+  QI.EL = EL_ALL;
+  const has = (v) => v !== undefined && v !== null && v !== '' && isFinite(+v);
+  const n = (v) => (has(v) ? +v : 0);
 
-  /* Starter data: typical handbook values so the calculator works on day one.
-     CONFIRM every value against your material certificates and customer / standard specification. */
-  QI.seedCharge = () => {
-    const c = QI.cm(); if (c.seeded) return;
-    c.materials = [
-      { name: 'Steel scrap (MS)', comp: { C: 0.2, Si: 0.25, Mn: 0.5, P: 0.025, S: 0.025 } },
-      { name: 'Pig iron', comp: { C: 4.0, Si: 1.5, Mn: 0.4, P: 0.04, S: 0.02 } },
-      { name: 'Returns – carbon steel', comp: { C: 0.25, Si: 0.45, Mn: 0.8, P: 0.02, S: 0.02 } },
-      { name: 'Returns – SG iron', comp: { C: 3.6, Si: 2.4, Mn: 0.3, P: 0.04, S: 0.01 } },
-      { name: 'Recarburiser (graphite)', comp: { C: 98 } },
-      { name: 'FeSi 75', comp: { Si: 75, C: 0.2 } },
-      { name: 'FeMn HC', comp: { Mn: 75, C: 7, Si: 1, P: 0.3 } },
-      { name: 'FeCr HC', comp: { Cr: 60, C: 8, Si: 2 } },
-      { name: 'FeMo', comp: { Mo: 65 } },
-      { name: 'Nickel', comp: { Ni: 99 } },
-      { name: 'Copper', comp: { Cu: 99 } },
-    ];
-    c.grades = [
-      { name: 'Carbon steel ASTM A216 WCB', note: 'Typical limits – confirm with the standard / PO',
-        spec: { C: { max: 0.3, aim: 0.24 }, Si: { max: 0.6, aim: 0.45 }, Mn: { max: 1.0, aim: 0.8 }, P: { max: 0.035 }, S: { max: 0.035 } },
-        base: [{ mat: 'Returns – carbon steel', pct: 40 }, { mat: 'Steel scrap (MS)', pct: 60 }] },
-      { name: 'SG iron EN-GJS-500-7', note: 'Typical base-iron chemistry before Mg treatment – confirm with your metallurgist',
-        spec: { C: { min: 3.5, max: 3.9 }, Si: { min: 2.2, max: 2.8 }, Mn: { max: 0.4 }, P: { max: 0.05 }, S: { max: 0.02 } },
-        base: [{ mat: 'Returns – SG iron', pct: 40 }, { mat: 'Pig iron', pct: 30 }, { mat: 'Steel scrap (MS)', pct: 30 }] },
-    ];
-    c.seeded = 1; QI.save();
-  };
+  QI.cm = () => { const s = S().settings; if (!s.charge || !s.charge.recipes) s.charge = { v: 2, recipes: [] }; return s.charge; };
+  QI.cmRecipe = (name) => QI.cm().recipes.find((r) => r.name === name);
 
-  /* p: { grade:{spec}, weight (kg), loss (%), base:[{mat,pct}], adj:{El:material}, rec:{El:%} } */
-  QI.chargeCalc = (p) => {
-    const W = +p.weight;
-    if (!(W > 0)) return { error: 'Enter the total charge weight.' };
-    const loss = +p.loss || 0, liquid = W * (1 - loss / 100);
-    const rec = Object.assign({}, QI.DEF_REC, p.rec || {});
-    const base = (p.base || []).filter((b) => b.mat && +b.pct > 0).map((b) => ({ mat: b.mat, pct: +b.pct }));
-    const pctSum = base.reduce((a, b) => a + b.pct, 0);
-    if (!pctSum) return { error: 'Choose the base charge materials (returns, scrap, pig iron) and their %.' };
-    const comp = (name, e) => { const m = QI.cmMat(name); return (m && m.comp && +m.comp[e]) || 0; };
-    const spec = (p.grade && p.grade.spec) || {};
-    const has = (v) => v !== undefined && v !== null && v !== '';
-    const aim = (e) => { const s = spec[e]; if (!s) return null; if (has(s.aim)) return +s.aim; if (has(s.min) && has(s.max)) return (+s.min + +s.max) / 2; if (has(s.min)) return +s.min; return null; };
-    const alloys = {};
-    const predict = () => {
-      const aTot = Object.values(alloys).reduce((a, b) => a + b, 0), baseKg = Math.max(W - aTot, 0), out = {};
-      EL.forEach((e) => {
-        let mass = 0;
-        base.forEach((b) => { mass += baseKg * b.pct / pctSum * comp(b.mat, e) / 100 * rec[e] / 100; });
-        Object.keys(alloys).forEach((n) => { mass += alloys[n] * comp(n, e) / 100 * rec[e] / 100; });
-        out[e] = mass / liquid * 100;
-      });
-      return out;
-    };
-    for (let it = 0; it < 400; it++) {
-      const pr = predict(); let moved = 0;
-      EL.forEach((e) => {
-        const a = aim(e), adj = p.adj && p.adj[e]; if (a == null || !adj) return;
-        const c = comp(adj, e); if (!c) return;
-        const delta = (a - pr[e]) / 100 * liquid / (c / 100 * rec[e] / 100);
-        const cur = alloys[adj] || 0, nk = Math.max(cur + delta * 0.5, 0);
-        moved += Math.abs(nk - cur); alloys[adj] = nk;
-      });
-      if (moved < 1e-5) break;
-    }
-    const pred = predict();
-    const aTot = Object.values(alloys).reduce((a, b) => a + b, 0), baseKg = Math.max(W - aTot, 0);
-    const rows = base.map((b) => ({ name: b.mat, kg: baseKg * b.pct / pctSum, kind: 'base' }))
-      .concat(Object.keys(alloys).filter((n) => alloys[n] > 0.005).map((n) => ({ name: n, kg: alloys[n], kind: 'alloy' })));
-    rows.forEach((r) => { r.pct = r.kg / W * 100; const m = QI.cmMat(r.name); r.cost = m && +m.cost > 0 ? r.kg * +m.cost : null; });
-    const status = {};
-    EL.forEach((e) => {
-      const s = spec[e]; if (!s || (!has(s.min) && !has(s.max))) { status[e] = 'na'; return; }
-      status[e] = has(s.min) && pred[e] < +s.min - 1e-9 ? 'low' : has(s.max) && pred[e] > +s.max + 1e-9 ? 'high' : 'ok';
+  /* ---------- the sheet's calculation ---------- */
+  QI.sheetCalc = (r) => {
+    const els = r.els || [];
+    const mats = r.mats || [];
+    const sumAll = mats.reduce((a, m) => a + n(m.wt), 0);
+    const sumNon = mats.filter((m) => !m.fr).reduce((a, m) => a + n(m.wt), 0);
+    const out = { sumAll, sumNon, contrib: [], kg: [], rs: [], total: {}, after: {}, status: {} };
+    if (!(sumAll > 0)) return Object.assign(out, { error: 'Enter the charge weights (Wt) for the materials.' });
+    const lm = n(r.lm), fr = n(r.fr), rest = Math.max(lm - fr, 0);
+    mats.forEach((m) => {
+      out.contrib.push(Object.fromEntries(els.map((e) => [e, n(m.wt) * n(m.comp && m.comp[e]) / 100])));
+      out.kg.push(m.fr ? fr : (sumNon > 0 ? n(m.wt) / sumNon * rest : 0));
+      out.rs.push(n(m.wt) * n(m.rate));
     });
-    const costed = rows.length && rows.every((r) => r.cost != null);
-    const cost = costed ? rows.reduce((a, r) => a + r.cost, 0) : null;
-    return { rows, pred, status, aim: Object.fromEntries(EL.map((e) => [e, aim(e)])), liquid, total: W, cost, perKg: cost != null ? cost / liquid : null, ok: EL.every((e) => status[e] !== 'low' && status[e] !== 'high') };
+    els.forEach((e) => {
+      const base = out.contrib.reduce((a, c) => a + c[e], 0) / (sumAll / 100) + n(r.lin && r.lin[e]);
+      out.total[e] = base;
+      out.after[e] = base * (1 - n(r.loss && r.loss[e]) / 100);
+      const t = (r.tg && r.tg[e]) || {};
+      const v = Math.round(out.after[e] * 100) / 100;   // the sheets compare at 2 decimals
+      out.status[e] = !has(t.min) && !has(t.max) ? 'na' : has(t.min) && +t.min > 0 && v < +t.min - 1e-9 ? 'low' : has(t.max) && +t.max > 0 && v > +t.max + 1e-9 ? 'high' : 'ok';
+    });
+    out.ok = els.every((e) => out.status[e] !== 'low' && out.status[e] !== 'high');
+    const cost = out.rs.reduce((a, b) => a + b, 0), y = n(r.yield) || 65, rej = n(r.rej) / 100;
+    const retVal = sumNon > 0 ? (100 - y) * cost / sumNon : 0;
+    const perKg = (cost - retVal) / y;
+    const perKgRej = perKg / (1 - rej);
+    const credit = cost / sumAll * rej * (1 - rej);
+    out.cost = { total: cost, retKg: 100 - y, retVal, perKg, perKgRej, credit, net: perKgRej - credit, final: perKgRej - credit + n(r.other) };
+    return out;
   };
-  QI.saveCharge = (heatNo, params, res) => {
+
+  QI.cmNewRecipe = () => ({ customer: '', grade: '', name: '', els: ['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Mo', 'Ni'], tg: {}, loss: {}, lin: {}, lm: 2000, fr: 0, yield: 65, rej: 5, other: 1.75, meltLoss: 5, mats: [] });
+  QI.cmSaveRecipe = (r) => {
+    const C = QI.cm(); r.name = (r.customer ? r.customer + ' – ' : '') + (r.grade || 'grade');
+    const i = C.recipes.findIndex((x) => x.id === r.id); const copy = JSON.parse(JSON.stringify(r));
+    if (i >= 0) C.recipes[i] = copy; else { copy.id = 'r' + Date.now().toString(36); r.id = copy.id; C.recipes.push(copy); }
+    QI.learn('grade', r.grade); QI.save(); return copy;
+  };
+  QI.cmDelete = (id) => { const C = QI.cm(); C.recipes = C.recipes.filter((x) => x.id !== id); QI.save(); };
+
+  /* ---------- save to heat / apply grade limits ---------- */
+  QI.saveCharge = (heatNo, r) => {
     const h = QI.heat(heatNo); if (!h) return { error: 'Heat not found.' };
-    h.charge = { grade: params.gradeName, weight: params.weight, loss: params.loss, base: params.base, adj: params.adj, rec: params.rec,
-      rows: res.rows.map((r) => ({ name: r.name, kg: +r.kg.toFixed(2), kind: r.kind })), pred: Object.fromEntries(Object.keys(res.pred).map((e) => [e, +res.pred[e].toFixed(3)])), ok: res.ok, by: S().settings.inspector || QI.me.name || '', ts: Date.now() };
+    const c = QI.sheetCalc(r); if (c.error) return { error: c.error };
+    h.charge = { recipe: r.name, lm: r.lm, fr: r.fr, rows: r.mats.map((m, i) => ({ name: m.name, wt: n(m.wt), kg: +c.kg[i].toFixed(2) })).filter((x) => x.wt > 0),
+      expected: Object.fromEntries(r.els.map((e) => [e, +c.after[e].toFixed(3)])), ok: c.ok, finalCost: +c.cost.final.toFixed(2), by: S().settings.inspector || QI.me.name || '', ts: Date.now() };
     QI.save(); return { ok: true };
   };
-  QI.applyGradeSpec = (heatNo, gradeName) => {
-    const h = QI.heat(heatNo), g = QI.cmGrade(gradeName); if (!h || !g) return;
-    h.chemSpec = EL.filter((e) => g.spec[e] && (g.spec[e].min !== undefined && g.spec[e].min !== '' || g.spec[e].max !== undefined && g.spec[e].max !== ''))
-      .map((e) => ({ name: e, min: g.spec[e].min === undefined ? '' : String(g.spec[e].min), max: g.spec[e].max === undefined ? '' : String(g.spec[e].max) }));
-    if (!h.grade) h.grade = gradeName;
-    QI.save();
+  QI.applyGradeSpec = (heatNo, r) => {
+    const h = QI.heat(heatNo); if (!h) return;
+    h.chemSpec = r.els.filter((e) => r.tg[e] && (has(r.tg[e].min) || has(r.tg[e].max))).map((e) => ({ name: e, min: has(r.tg[e].min) && +r.tg[e].min > 0 ? String(r.tg[e].min) : '', max: has(r.tg[e].max) && +r.tg[e].max > 0 ? String(r.tg[e].max) : '' }));
+    if (!h.grade) h.grade = r.grade; QI.save();
+  };
+
+  /* ---------- seed: the six sheets in "QC n Design / Charge Calculation" ---------- */
+  const COLS = ['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Mo', 'Ni', 'Ti'];
+  const M = (name, comp, rate, wt, fr) => ({ name, mrn: '', comp: Object.fromEntries(comp.map((v, i) => [COLS[i], v]).filter(([, v]) => v !== '' && v !== null && v !== undefined)), rate: rate === '' ? '' : rate, wt: wt === '' ? '' : wt, fr: !!fr });
+  const common = (o) => {   // ferro-alloy / stainless rows shared by the sheets (analysis as per each sheet)
+    return [
+      M('SS304', [0.06, 0.9, 1, 0.01, 0.04, 18, 0, 8], 155, o.ss304 || ''),
+      M('SS310/HK40', [0.2, 0.85, 1.1, 0.02, 0.04, 24.1, 0.13, 19], 405, ''),
+      M('SS 410', [0.02, 0.52, 1.21, 0.015, 0.005, 11.27, '', 0.17], o.ss410rate || 60, ''),
+    ];
+  };
+  const fe = (o) => [
+    M('HcFeCr', o.hcfecr || [6.66, 2.5, '', '', '', 59.56], o.hcfecrRate || 131, o.hcfecrWt || ''),
+    M('LCFeCr', [0.2, '', '', '', '', 63], o.lcfecrRate || '', o.lcfecrWt || ''),
+    M('HcFeMn', [6.5, '', 70], o.hcfemnRate || 85, o.hcfemnWt || ''),
+    M('MCFeMn', [2.5, '', 65], '', ''),
+    M('Mn Metal', [0, '', 90], '', o.mnmetalWt || ''),
+    M('FeMo', [0, 0, 0, 0, 0, 0, 60], o.femoRate || 3200, o.femoWt || ''),
+    M('FeSiMn', [2.5, 14, 60, 0.03, 0.03], 80, o.fesimnWt || ''),
+    M('FeSi', [o.fesiC || '', 70], o.fesiRate || 131, o.fesiWt || ''),
+    M('CPC (carbon)', [95], 80, o.cpcWt || ''),
+  ];
+  const T = (arr) => Object.fromEntries(['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Mo', 'Ni', 'Ti', 'Al'].map((e, i) => [e, { min: arr[i * 3], max: arr[i * 3 + 1], aim: arr[i * 3 + 2] }]).filter(([, v]) => v.min !== undefined || v.max !== undefined));
+  QI.seedCharge = () => {
+    const C = QI.cm(); if (C.recipes.length && C.v === 2 && C.seeded === 2) return;
+    if (C.seeded === 2) return;
+    const base = { yield: 65, rej: 5, other: 1.75, meltLoss: 5, els: ['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Mo', 'Ni'] };
+    const R = [];
+    R.push(Object.assign({}, base, { customer: 'Tega', grade: 'T1', lm: 2000, fr: 0,
+      tg: T([2.4, 2.5, 2.4, 1.25, 1.35, 1.25, 0.7, 0.8, 0.7, 0, 0.1, 0.1, 0, 0.06, 0.06, 21, 21.5, 21, 1.53, 1.56, 1.53, 0, 0.5, 0.5]),
+      loss: { C: 5, Mn: 4, Cr: 3.15 }, lin: { Si: 0.06 }, bath: {},
+      mats: [M('Foundry Return', [2.5, 1.15, 0.75, 0.04, 0.02, 21.2, 1.52, 0.2], '', 0, true), M('MS Scrap 1', [0.087, 0.11, 0.0315, 0.022, 0.013, 0, 0, 0.01], 46, 20.15),
+        M('WI Scrap (2% MO)', [2.97, 0.41, 1.3, 0.026, 0.005, 28.41, 0.81, 0.41], 88, 40), M('WI Scrap (1.2% MO)', [3, 0.39, 1.26, 0.03, 0.01, 26, 1.8, 1], 92, ''), M('WI Scrap 3', [], 47, ''),
+        M('SS304', [0.06, 0.9, 1, 0.01, 0.04, 18, 0, 8], 155, ''), M('SS310/HK40', [0.2, 0.85, 1.1, 0.02, 0.04, 24.1, 0.13, 19], 405, ''), M('SS 410', [0, 0.52, 1.21, 0.015, 0.005, 11.27, '', 0.17], 60, ''),
+        M('SS430', [0.03, 0.51, 0.17, 0.03, 0.01, 19.01, '', 0.23], 73, 30)].concat(fe({ hcfecr: [7.98, 3.95, '', 0.04, 0.04, 59.56], hcfecrWt: 9, femoWt: 2.1, fesimnWt: 0.3, fesiWt: 0.7, fesiRate: 131, cpcWt: 0.75, hcfemnRate: 81, femoRate: 3200 })).map((m) => m.name === 'FeSi' ? M('FeSi', ['', 70.51], 131, 0.7) : m) }));
+    R.push(Object.assign({}, base, { customer: 'Thejo', grade: 'AS2074/L2B Mod (0.85C CrMo)', lm: 3000, fr: 1000, els: ['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Mo', 'Ni', 'Ti'],
+      tg: T([0.8, 0.88, 0.85, 0.4, 0.5, 0.45, 0.65, 0.75, 0.7, 0, 0.03, 0.03, 0, 0.03, 0.03, 1.8, 1.9, 1.85, 0.25, 0.35, 0.3, 0, 0.5, 0.5, 0.01, 0.02, 0.015]),
+      loss: {}, lin: { Si: 0.06 }, bath: {},
+      mats: [M('Foundry Return', [0.85, 0.45, 0.7, 0.02, 0.02, 1.85, 0.3, 0.2, 0.015], '', 33.33, true), M('MS Scrap 1', [0.05, 0.02, 0.182, 0.01, 0.005, 0.05, '', 0.01], 46, 34.67),
+        M('WI Scrap (2% MO)', [3, 0.7, 1.2, 0.05, 0.02, 24, 0.8, 0.8], 88, ''), M('WI Scrap (1.2% MO)', [3, 0.39, 1.26, 0.03, 0.01, 26, 1.8, 0.32], 92, ''), M('Hardox', [0.25, 0.22, 0.9, 0.01, 0.01, 0.8, 0.18, 0], 47, 65),
+        M('SS304', [0.06, 0.9, 1, 0.01, 0.04, 18, 0, 8], 155, ''), M('SS310/HK40', [0.2, 0.85, 1.1, 0.02, 0.04, 24.1, 0.13, 19], 405, ''), M('SS 410', [0.02, 0.52, 1.21, 0.015, 0.005, 11.27, '', 0.17], 60, ''), M('SS430', [0.02, 0.4, 0.2, 0.02, 0.01, 17.7, 0.12, 0.25], 73, '')]
+        .concat(fe({ hcfecrWt: 2.2, femoWt: 0.25, fesiWt: 0.35, cpcWt: 0.5, hcfemnRate: 81 }), [M('FeTi', [1, '', '', '', '', '', '', '', 45], '', 0.04)]) }));
+    R.push(Object.assign({}, base, { customer: 'Escorts', grade: 'M201 Gr E', lm: 2000, fr: 0,
+      tg: T([0.27, 0.3, 0.27, 1, 1.1, 1, 1.7, 1.8, 1.75, 0, 0.035, 0.035, 0, 0.035, 0.035, 0, 0.16, 0.16, 0, 0.05, 0.05, 0, 0.1, 0.1]),
+      loss: { Mn: 20 }, lin: { Si: 0.06 }, bath: {},
+      mats: [M('Foundry Return', [0.28, 1.05, 1.75, 0.03, 0.03, 0.17, 0.01, 0.05], '', 0, true), M('MS Scrap 1', [0.05, 0.02, 0.182, 0.01, 0.005, 0.05, '', 0.01], 47, 98.77),
+        M('Scrap Type -2', [0.25, 0.46, 1.03, 0.024, 0.008, 0.49, 0, 0], 88, ''), M('WI Scrap (1.2% MO)', [3, 0.39, 1.26, 0.03, 0.01, 26, 1.8, 0.32], 92, ''), M('Hardox', [0.25, 0.22, 0.9, 0.01, 0.01, 0.8, 0.18, 0], 47, ''),
+        M('SS304', [0.06, 0.9, 1, 0.01, 0.04, 18, 0, 8], 155, ''), M('SS310/HK40', [0.2, 0.85, 1.1, 0.02, 0.04, 24.1, 0.13, 19], 405, ''), M('SS 410', [0.02, 0.52, 1.21, 0.015, 0.005, 11.27, '', 0.17], 60, ''), M('SS430', [0.02, 0.4, 0.2, 0.02, 0.01, 17.7, 0.12, 0.25], 73, '')]
+        .concat(fe({ hcfecr: [7.98, 3.95, '', 0.04, 0.04, 59.56], hcfemnRate: 81, hcfemnWt: 1.23, mnmetalWt: 0.14, fesimnWt: 1.67, fesiWt: 1.1, fesiC: 0.15, cpcWt: 0.1, femoRate: 3200 })) }));
+    R.push(Object.assign({}, base, { customer: 'HT BAR', grade: 'HT BAR', lm: 4000, fr: 1000, note: 'As per design sheet: 3000 kg of other materials + 1000 kg foundry return. 200 kg foundry return to be added at the end.',
+      tg: T([2.45, 2.55, 2.37, 1.1, 1.2, 1.14, 0.7, 0.8, 0.7, 0, 0.1, 0.1, 0, 0.06, 0.06, 21, 21.5, 12.43, 1.52, 1.57, 0.55, 0, 0.5, 2.53]),
+      loss: { C: 2, Si: 10, Cr: 2 }, lin: {}, bath: {},
+      mats: [M('Foundry Return', [2.5, 1.15, 0.75, 0.04, 0.02, 21.2, 1.52, 0.2], '', 33.33, true), M('MS Scrap 1', [0.05, 0.02, 0.182, 0.01, 0.005, 0.05, '', 0.01], 48, 26.15),
+        M('WI Scrap (2% MO)', [2.85, 0.574, 0.875, 0.037, 0.04, 19.8, 2, 0.823], 125, 0), M('WI Scrap (1.2% MO)', [2.994, 0.583, 1.06, 0.04, 0.02, 23.76, 1.6, 0.14], 120, 23),
+        M('ROLLER BEAM F/R', [0.39, 1.16, 0.86, 0, 0, 20.04, 0.04, 3.6], '', 6), M('HT BAR F/R', [2.37, 1.14, 0.54, 0.01, 0.02, 9, 0.5, 2.5], '', 26), M('Hardox', [0.25, 0.22, 0.9, 0.01, 0.01, 0.8, 0.18, 0], 47, ''),
+        M('SS304', [0.06, 0.9, 1, 0.01, 0.04, 18, 0, 8], 155, 20), M('SS310/HK40', [0.2, 0.85, 1.1, 0.02, 0.04, 24.1, 0.13, 19], 405, ''), M('SS 410', [0.02, 0.52, 1.21, 0.015, 0.005, 11.27, '', 0.17], 60, ''), M('SS430', [0.02, 0.4, 0.2, 0.02, 0.01, 19, 0.12, 0.25], 75, '')]
+        .concat(fe({ hcfecrRate: 115, fesiWt: 0.8, cpcWt: 1.05, femoRate: 4250 })) }));
+    R.push(Object.assign({}, base, { customer: 'Vedanta', grade: '4%Ni (Roller Skid & Beam ECL)', lm: 3000, fr: 1000,
+      tg: T([0.35, 0.4, 0.36, 1.3, 1.5, 1.35, 0.8, 1, 0.8, 0, 0.035, 0.035, 0, 0.03, 0.03, 24.5, 25.5, 24.5, 0, 0, 0, 3.6, 3.75, 3.6]),
+      loss: { C: 2, Si: 5, Mn: 5, Cr: 2 }, lin: {}, bath: {},
+      mats: [M('Foundry Return', [0.36, 1.4, 0.9, 0.02, 0.02, 26, 0.1, 3.2], '', 33.33, true), M('MS Scrap 1', [0.05, 0.02, 0.182, 0.01, 0.005, 0.05, '', 0.01], 48, 0),
+        M('WI Scrap (2% MO)', [3, 0.7, 1.2, 0.05, 0.02, 25, 2, 0.8], 125, ''), M('WI Scrap (1.2% MO)', [3, 0.07, 1.5, 0.05, 0.02, 25, 1.2, 0.7], 120, ''), M('Hardox', [0.25, 0.22, 0.9, 0.01, 0.01, 0.8, 0.18, 0], 47, ''),
+        M('SS304', [0.05, 0.42, 1.28, 0.01, 0.04, 18, 0, 8], 155, 44), M('SS310/HK40', [0.24, 0.95, 0.89, 0.02, 0.02, 24, 0.13, 19], 405, ''), M('SS 410', [0.02, 0.52, 1.21, 0.015, 0.005, 24.45, 0.247, 19], 60, ''), M('SS430', [0.02, 0.4, 0.2, 0.02, 0.01, 17.7, 0.12, 0.25], 75, 41.47)]
+        .concat(fe({ hcfecrRate: 115, hcfecrWt: 4.5, lcfecrWt: 11.5, mnmetalWt: 0.23, fesiWt: 1.3, femoRate: 4250 })).map((m) => m.name === 'LCFeCr' ? M('LCFeCr', [0.1, '', '', '', '', 61], '', 11.5) : m) }));
+    R.push(Object.assign({}, base, { customer: 'BEML (Wilson)', grade: 'IDLER', lm: 3000, fr: 0,
+      tg: T([0.39, 0.42, 0.4, 0.55, 0.65, 0.55, 1.1, 1.2, 1.1, 0, 0.04, 0.04, 0, 0.04, 0.04, 0, 0.2, 0.2, 0, 0.15, 0.15, 0, 0.3, 0.3]),
+      loss: { Cr: 5, Si: 10, Mn: 10 }, lin: { Si: 0.06 }, bath: {},
+      mats: [M('Foundry Return', [0.4, 0.55, 1.1, 0.03, 0.03, 0.2, 0.007, 0.01], '', 0, true), M('MS Scrap 1', [0.067, 0.02, 0.196, 0.015, 0.005, 0.045, 0.007, 0.01], 48, 101.1),
+        M('CrMoNi Scrap', [0.135, 0.25, 0.47, 0.022, 0.015, 1.867, 0.9, 0.12], 46, ''), M('MS Scrap 3', [0.096, 0.07, 0.063, 0.039, 0.017], '', ''), M('SS 410', [0.02, 0.52, 1.21, 0.015, 0.005, 11.27, '', 0.17], 45, ''),
+        M('HcFeCr', [6.66, 2.5, '', '', '', 59.56], 91, ''), M('LCFeCr', [0.2, '', '', '', '', 63], '', ''), M('HcFeMn', [6.5, '', 70], 85, 0.87), M('FeMo', [0, 0, 0, 0, 0, 0, 60], 1370, ''),
+        M('FeSiMn', [2.5, 14, 60, 0.03, 0.03], 80, 0.5), M('FeSi', ['', 70], 131, 0.44), M('CPC (carbon)', [95], 80, 0.09), M('Cu', [], 550, ''), M('Al', [], 225, 0.1)] }));
+    const C2 = QI.cm();
+    R.forEach((r) => { r.name = r.customer + ' – ' + r.grade; r.id = 'seed-' + r.customer.toLowerCase().replace(/[^a-z0-9]/g, ''); });
+    C2.recipes = R; C2.v = 2; C2.seeded = 2; QI.save();
   };
 })();
 
@@ -2466,8 +2511,8 @@ window.PLAN = {
       <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
-    ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.grade)} · ${esc(h.charge.weight)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
-      <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Predicted: ${Object.keys(h.charge.pred).filter((e) => h.charge.pred[e] > 0.005).map((e) => e + ' ' + h.charge.pred[e]).join(' · ')} ${h.charge.ok ? badge('within limits', 'ok') : badge('outside limits', 'bad')}</div>
+    ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.recipe)} · LM ${esc(h.charge.lm)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
+      <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Expected: ${Object.keys(h.charge.expected).map((e) => e + ' ' + h.charge.expected[e]).join(' · ')} ${h.charge.ok ? badge('within target', 'ok') : badge('outside target', 'warn')} · Final cost Rs ${h.charge.finalCost}/kg</div>
       <button class="btn sm" data-act="cm-load" data-no="${esc(no)}">Open in calculator</button></section>` : `<section class="card"><h3>Charge mix</h3><div class="muted sm pad">No charge calculated for this heat yet.</div><button class="btn sm" data-act="cm-plan">Plan charge mix</button></section>`}
     ${[4, 8].map((n) => {
       const st = QI.stageOf[n];
@@ -2495,97 +2540,97 @@ window.PLAN = {
   };
 
 
-  /* ---- charge mix calculator ---- */
-  const cmFromGrade = (g) => ({ grade: g ? g.name : '', weight: 1000, loss: 3, base: g && g.base && g.base.length ? g.base.map((b) => Object.assign({}, b)) : [{ mat: '', pct: '' }], adj: Object.assign({}, QI.DEF_ADJ), rec: {} });
-  const cmParams = () => { const s = ui.cm; return { grade: QI.cmGrade(s.grade), gradeName: s.grade, weight: s.weight, loss: s.loss, base: s.base, adj: s.adj, rec: s.rec }; };
-  const fnum = (v, d) => (v == null || !isFinite(v)) ? '–' : Number(v).toFixed(d == null ? 2 : d);
-  function cmResultHtml(p, r) {
-    if (r.error) return `<div class="warnBox">${esc(r.error)}</div>`;
-    const spec = (p.grade && p.grade.spec) || {};
-    const kg = r.rows.reduce((x, y) => x + y.kg, 0);
-    return `<div class="banner ${r.ok ? 'ok' : 'warn'}">${r.ok ? '✔ Predicted chemistry is within the grade limits.' : '⚠ Predicted chemistry is outside the grade limits – change the base charge or the additions.'}</div>
-      ${table(['Charge material', 'Kg', '% of charge'].concat(r.cost != null ? ['Cost'] : []), r.rows.map((x) => `<tr><td>${esc(x.name)} ${x.kind === 'alloy' ? badge('addition', 'info') : ''}</td><td><b>${fnum(x.kg, 1)}</b></td><td>${fnum(x.pct, 1)}</td>${r.cost != null ? `<td>${fnum(x.cost, 0)}</td>` : ''}</tr>`).concat([`<tr><td><b>Total charge</b></td><td><b>${fnum(kg, 1)}</b></td><td>100</td>${r.cost != null ? `<td><b>${fnum(r.cost, 0)}</b></td>` : ''}</tr>`]))}
-      ${r.cost != null ? `<div class="muted sm pad">Charge cost ≈ ${fnum(r.perKg, 2)} per kg of liquid metal.</div>` : ''}
-      <h4>Predicted chemistry (after recoveries)</h4>
-      ${table(['Element', 'Grade limit', 'Aim', 'Predicted %', ''], QI.EL.filter((e) => spec[e] || r.pred[e] > 0.005).map((e) => `<tr><td><b>${e}</b></td><td>${esc(QI.limText(spec[e] && spec[e].min !== undefined && spec[e].min !== '' ? +spec[e].min : null, spec[e] && spec[e].max !== undefined && spec[e].max !== '' ? +spec[e].max : null, '%') || '–')}</td><td>${r.aim[e] == null ? '–' : fnum(r.aim[e], 3)}</td><td><b>${fnum(r.pred[e], 3)}</b></td><td>${r.status[e] === 'ok' ? badge('OK', 'ok') : r.status[e] === 'na' ? '' : badge(r.status[e] === 'low' ? 'Low' : 'High', 'bad')}</td></tr>`))}`;
+  /* ---- charge mix calculator (method of the "Charge Calculation" design sheets) ---- */
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const f2 = (v, d) => (v == null || !isFinite(v)) ? '–' : Number(v).toFixed(d == null ? 2 : d);
+  const cmEls = () => ui.cm.r.els;
+  const setPath = (obj, path, v) => { const k = path.split('.'); let o = obj; for (let i = 0; i < k.length - 1; i++) { if (o[k[i]] == null) o[k[i]] = {}; o = o[k[i]]; } o[k[k.length - 1]] = v; };
+  const cmOpen = (rec) => { ui.cm = { id: rec ? rec.id : null, r: rec ? clone(rec) : null, dirty: false }; };
+  const cmIn = (p, v, extra) => `<input data-p="${p}" value="${esc(v == null ? '' : v)}" type="number" step="any" inputmode="decimal" ${extra || ''}>`;
+  const cmBadge = (s) => s === 'ok' ? badge('OK', 'ok') : s === 'low' ? badge('Low', 'bad') : s === 'high' ? badge('High', 'bad') : '';
+  function cmValues() {      // every computed cell, keyed by its data-c attribute
+    const r = ui.cm.r, c = QI.sheetCalc(r), m = {};
+    if (c.error) return { err: c.error };
+    r.mats.forEach((mt, i) => { m['kg.' + i] = f2(c.kg[i], 1); m['rs.' + i] = f2(c.rs[i], 0); r.els.forEach((e) => (m[`ct.${i}.${e}`] = c.contrib[i][e] ? f2(c.contrib[i][e], 3) : '')); });
+    r.els.forEach((e) => { m['tot.' + e] = f2(c.total[e], 2); m['aft.' + e] = f2(c.after[e], 2); m['st.' + e] = cmBadge(c.status[e]); });
+    m.sumwt = f2(c.sumAll, 2); m.sumrs = f2(c.cost.total, 0); m.sumkg = f2(c.kg.reduce((a, b) => a + b, 0), 1);
+    m.verdict = c.ok ? '<div class="banner ok">✔ Expected composition (after loss) is within the target limits.</div>' : `<div class="banner warn">⚠ Outside target: ${r.els.filter((e) => c.status[e] === 'low' || c.status[e] === 'high').map((e) => e + ' ' + c.status[e]).join(', ')} – adjust the charge weights.</div>`;
+    const k = c.cost; m['cost.total'] = f2(k.total, 0); m['cost.retkg'] = f2(k.retKg, 0); m['cost.retval'] = f2(k.retVal, 0); m['cost.perkg'] = f2(k.perKg); m['cost.rej'] = f2(k.perKgRej); m['cost.credit'] = f2(k.credit); m['cost.net'] = f2(k.net); m['cost.final'] = f2(k.final);
+    return m;
+  }
+  function cmUpdate() {
+    const m = cmValues();
+    document.querySelectorAll('#cm [data-c]').forEach((el) => { const k = el.dataset.c; if (m.err) { el.innerHTML = k === 'verdict' ? `<div class="warnBox">${esc(m.err)}</div>` : ''; } else if (m[k] != null) el.innerHTML = m[k]; });
+    const d = $('#cm-dirty'); if (d) d.hidden = !ui.cm.dirty;
   }
   V.charge = () => {
     const C = QI.cm();
-    if (!ui.cm) ui.cm = cmFromGrade(C.grades[0]);
-    const s = ui.cm;
-    const matOpts = (cur) => `<option value="">– select –</option>${C.materials.map((m) => `<option value="${esc(m.name)}" ${m.name === cur ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}`;
-    const rows = s.base.length < 3 ? s.base.concat(Array.from({ length: 3 - s.base.length }, () => ({ mat: '', pct: '' }))) : s.base;
-    const per = C.grades.map((g) => { const p = { grade: g, weight: 1000, loss: 3, base: g.base || [], adj: QI.DEF_ADJ, rec: {} }; const r = QI.chargeCalc(p); return { g, r }; });
-    return `<div class="hd"><h2>Charge mix</h2><div class="row"><button class="btn" data-act="cm-mats">Materials…</button><button class="btn" data-act="cm-grade" data-g="">+ New grade</button></div></div>
-    <div class="banner warn">Starter materials and grade limits are typical handbook values. Confirm them against your material certificates, the customer specification and your metallurgist before melting.</div>
-    <section class="card"><h3>Calculate a charge</h3>
-      <form id="cmform" onsubmit="return false">
-        <div class="grid3"><label class="f"><span>Grade</span><select name="grade">${C.grades.map((g) => `<option ${g.name === s.grade ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label>
-          ${fld('Total charge weight (kg)', 'weight', s.weight, 'type="number" min="1" step="any" inputmode="decimal"')}${fld('Melt loss (%)', 'loss', s.loss, 'type="number" min="0" max="20" step="any" inputmode="decimal"')}</div>
-        <div class="lbl">Base charge (returns / scrap / pig iron) – % of the base, normalised automatically</div>
-        ${rows.map((b, i) => `<div class="grid2"><label class="f"><select name="mat${i}">${matOpts(b.mat)}</select></label>${fld('', 'pct' + i, b.pct, 'type="number" min="0" step="any" placeholder="%" inputmode="decimal"')}</div>`).join('')}
-        <button type="button" class="btn sm ghost" data-act="cm-add-row">+ Add base material</button>
-        <details class="hist"><summary>Alloy additions and recoveries</summary>
-          <div class="muted sm pad">Each element with a grade aim is trimmed with the addition chosen here. Recovery = % of the element charged that reaches the melt.</div>
-          <div class="specgrid">${QI.EL.map((e) => `<div><span>${e}</span><select name="adj_${e}"><option value="">no addition</option>${C.materials.filter((m) => m.comp && +m.comp[e] > 20).map((m) => `<option value="${esc(m.name)}" ${s.adj[e] === m.name ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select><input name="rec_${e}" type="number" step="any" value="${esc(s.rec[e] != null ? s.rec[e] : QI.DEF_REC[e])}" title="Recovery %"></div>`).join('')}</div></details>
-      </form>
-      <div id="cm-out">${cmResultHtml(cmParams(), QI.chargeCalc(cmParams()))}</div>
-      <div class="row pad"><button class="btn primary" data-act="cm-save">Save to a heat…</button></div></section>
-    <section class="card"><h3>Standard charge for each grade <small class="muted">per 1000 kg charge, 3 % melt loss</small></h3>
-      ${per.length ? per.map(({ g, r }) => `<div class="li"><div class="row"><b>${esc(g.name)}</b>${r.error ? '' : r.ok ? badge('within limits', 'ok') : badge('check chemistry', 'bad')}<button class="btn sm ghost" data-act="cm-grade" data-g="${esc(g.name)}">Edit</button><button class="btn sm ghost" data-act="cm-del-grade" data-g="${esc(g.name)}">Delete</button></div>
-        ${g.note ? `<div class="muted sm">${esc(g.note)}</div>` : ''}
-        ${r.error ? `<div class="muted sm">${esc(r.error)}</div>` : `<div class="sm pad">${r.rows.map((x) => `${esc(x.name)} <b>${fnum(x.kg, 1)} kg</b>`).join(' · ')}</div><div class="muted sm">Predicted: ${QI.EL.filter((e) => g.spec[e]).map((e) => e + ' ' + fnum(r.pred[e], 2)).join(' · ')}</div>`}</div>`).join('') : '<div class="muted">No grades yet – add one.</div>'}</section>`;
+    if (!ui.cm || !ui.cm.r) cmOpen(C.recipes[0]);
+    if (!ui.cm.r) return `<div class="hd"><h2>Charge mix</h2></div>${empty('No charge recipes yet.')}`;
+    const r = ui.cm.r, els = r.els, w = (e) => 'style="min-width:62px"';
+    const th = els.map((e) => `<th>${e}%</th>`).join('');
+    const per = C.recipes.map((x) => ({ x, c: QI.sheetCalc(x) }));
+    return `<div id="cm"><div class="hd"><h2>Charge mix</h2><div class="row"><select id="cm-pick" aria-label="Recipe">${C.recipes.map((x) => `<option value="${esc(x.id)}" ${x.id === ui.cm.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+      <button class="btn" data-act="cm-dup">Copy as new grade…</button></div></div>
+    <div class="banner warn" id="cm-dirty" ${ui.cm.dirty ? '' : 'hidden'}>Unsaved changes – <button class="btn sm primary" data-act="cm-save">Save recipe</button> <button class="btn sm" data-act="cm-reset">Discard</button></div>
+    ${r.note ? `<div class="banner">${esc(r.note)}</div>` : ''}
+    <div class="muted sm pad">Method as per the “Charge Calculation” sheets in the QC n Design folder. Edit any number; results update as you type. Saved recipes are shared with every department.</div>
+    <section class="card"><h3>${esc(r.customer)} · ${esc(r.grade)}</h3>
+      <div class="grid3"><label class="f"><span>Liquid metal to tap, LM (kg)</span>${cmIn('lm', r.lm)}</label><label class="f"><span>Foundry return in charge, FR (kg)</span>${cmIn('fr', r.fr)}</label><label class="f"><span>Melt loss (%)</span>${cmIn('meltLoss', r.meltLoss)}</label>
+      <label class="f"><span>Yield (%)</span>${cmIn('yield', r.yield)}</label><label class="f"><span>Rejection (%)</span>${cmIn('rej', r.rej)}</label><label class="f"><span>Lining & other cost (Rs/kg)</span>${cmIn('other', r.other)}</label></div></section>
+    <section class="card"><h3>Target composition <button class="btn sm ghost" data-act="cm-cols">Columns…</button></h3><div class="tw"><table class="cmt"><thead><tr><th></th>${th}</tr></thead><tbody>
+      ${['min', 'max', 'aim'].map((k) => `<tr><th>${k === 'min' ? 'Min' : k === 'max' ? 'Max' : 'Aim at'}</th>${els.map((e) => `<td>${cmIn(`tg.${e}.${k}`, r.tg[e] && r.tg[e][k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>
+    <section class="card"><h3>Raw materials – chemical analysis as per report</h3><div class="tw"><table class="cmt"><thead><tr><th>Material</th><th>FR</th><th>MRN</th>${th}<th>Rs/kg</th><th></th></tr></thead><tbody>
+      ${r.mats.map((m, i) => `<tr><td><input data-p="mats.${i}.name" value="${esc(m.name)}"></td><td><input type="checkbox" data-p="mats.${i}.fr" ${m.fr ? 'checked' : ''} title="Foundry return (fixed kg)"></td><td><input data-p="mats.${i}.mrn" value="${esc(m.mrn)}" style="min-width:70px"></td>${els.map((e) => `<td>${cmIn(`mats.${i}.comp.${e}`, m.comp && m.comp[e])}</td>`).join('')}<td>${cmIn(`mats.${i}.rate`, m.rate)}</td><td><button class="x" data-act="cm-delmat" data-i="${i}" title="Remove">×</button></td></tr>`).join('')}</tbody></table></div>
+      <button class="btn sm ghost" data-act="cm-addmat">+ Add material</button></section>
+    <section class="card"><h3>Charging</h3><div data-c="verdict"></div><div class="tw"><table class="cmt"><thead><tr><th>Material</th><th>Wt</th><th>Charge kg</th><th>Rs</th>${th}</tr></thead><tbody>
+      ${r.mats.map((m, i) => `<tr><td>${esc(m.name)}${m.fr ? ' ' + badge('FR', 'mute') : ''}</td><td>${cmIn(`mats.${i}.wt`, m.wt)}</td><td data-c="kg.${i}"></td><td data-c="rs.${i}"></td>${els.map((e) => `<td class="muted" data-c="ct.${i}.${e}"></td>`).join('')}</tr>`).join('')}
+      <tr class="tot"><th>Total</th><th data-c="sumwt"></th><th data-c="sumkg"></th><th data-c="sumrs"></th>${els.map((e) => `<th data-c="tot.${e}"></th>`).join('')}</tr>
+      <tr><th>Loss % of element</th><td colspan="4"></td>${els.map((e) => `<td>${cmIn('loss.' + e, r.loss[e])}</td>`).join('')}</tr>
+      <tr><th>From lining (added)</th><td colspan="4"></td>${els.map((e) => `<td>${cmIn('lin.' + e, r.lin[e])}</td>`).join('')}</tr>
+      <tr class="tot"><th>Expected composition (after loss)</th><td colspan="4"></td>${els.map((e) => `<th data-c="aft.${e}"></th>`).join('')}</tr>
+      <tr><th>Check vs target</th><td colspan="4"></td>${els.map((e) => `<td data-c="st.${e}"></td>`).join('')}</tr>
+      <tr><th>Actual bath report</th><td colspan="4"></td>${els.map((e) => `<td>${cmIn('bath.' + e, r.bath && r.bath[e])}</td>`).join('')}</tr></tbody></table></div></section>
+    <section class="card"><h3>Cost per kg</h3><table class="kv2"><tbody>
+      <tr><td>Cost of charge (Rs)</td><td data-c="cost.total"></td></tr><tr><td>Less: value of returns (<span data-c="cost.retkg"></span> kg)</td><td data-c="cost.retval"></td></tr>
+      <tr><td>Cost per kg</td><td data-c="cost.perkg"></td></tr><tr><td>Cost per kg after rejection (${esc(r.rej)} %)</td><td data-c="cost.rej"></td></tr>
+      <tr><td>Less: material cost of rejected material</td><td data-c="cost.credit"></td></tr><tr><td>Net cost per kg</td><td data-c="cost.net"></td></tr>
+      <tr><td>Lining and other cost</td><td>${f2(r.other)}</td></tr><tr class="tot"><td><b>Final cost per kg (Rs)</b></td><td><b data-c="cost.final"></b></td></tr></tbody></table>
+      <div class="row pad"><button class="btn primary" data-act="cm-save">Save recipe</button><button class="btn" data-act="cm-toheat">Use for a heat…</button><button class="btn danger" data-act="cm-del">Delete recipe</button></div></section>
+    <section class="card"><h3>Charge mix of each grade</h3>${table(['Customer · grade', 'LM kg', 'Charge (kg)', 'Expected vs target', 'Final Rs/kg', ''], per.map(({ x, c }) => `<tr><td>${esc(x.name)}</td><td>${esc(x.lm)}</td><td class="sm">${c.error ? '–' : x.mats.map((m, i) => n0(m.wt) > 0 ? `${esc(m.name)} <b>${f2(c.kg[i], 0)}</b>` : '').filter(Boolean).join(' · ')}</td><td>${c.error ? '' : c.ok ? badge('within target', 'ok') : badge('check', 'warn')}</td><td>${c.error ? '–' : f2(c.cost.final)}</td><td><button class="btn sm ghost" data-act="cm-open" data-id="${esc(x.id)}">Open</button></td></tr>`))}</section></div>`;
   };
-  function cmRead(f) {
-    const s = ui.cm; const g = (n) => (f.elements[n] ? f.elements[n].value : '');
-    s.weight = g('weight'); s.loss = g('loss'); s.base = [];
-    for (let i = 0; f.elements['mat' + i]; i++) s.base.push({ mat: g('mat' + i), pct: g('pct' + i) });
-    QI.EL.forEach((e) => { s.adj[e] = g('adj_' + e); s.rec[e] = g('rec_' + e); });
-  }
-  const fmtMats = (ms) => ms.map((m) => `${m.name} | ${Object.keys(m.comp).map((e) => e + ' ' + m.comp[e]).join(', ')}${m.cost ? ' | ' + m.cost : ''}`).join('\n');
-  const parseMats = (t) => t.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
-    const [name, comps = '', cost = ''] = l.split('|').map((x) => x.trim()); const comp = {};
-    comps.split(',').forEach((c) => { const m = c.trim().match(/^([A-Za-z]{1,2})\s+([\d.]+)$/); if (m) { const e = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase(); if (QI.EL.includes(e)) comp[e] = +m[2]; } });
-    const o = { name, comp }; if (cost && +cost > 0) o.cost = +cost; return o;
-  }).filter((m) => m.name);
-  const gradeBase = (t) => t.split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).map((p) => ({ mat: p[0], pct: parseFloat(p[1]) || 0 }));
+  const n0 = (v) => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
   const CHARGE_ACTS = {
-    'cm-add-row': () => { cmRead($('#cmform')); ui.cm.base.push({ mat: '', pct: '' }); render(); },
-    'cm-mats': () => modal('Charge materials', ta('One per line: name | element %, … | cost per kg (optional)', 'mats', fmtMats(QI.cm().materials), 'e.g. FeMn HC | Mn 75, C 7, Si 1, P 0.3 | 95  — elements: ' + QI.EL.join(', '), 14), (f) => { const ms = parseMats(val(f, 'mats')); if (!ms.length) return 'Add at least one material.'; QI.cm().materials = ms; QI.save(); }),
-    'cm-grade': (el) => {
-      const g = el.dataset.g ? QI.cmGrade(el.dataset.g) : { name: '', note: '', spec: {}, base: [] };
-      const specTxt = QI.EL.filter((e) => g.spec[e]).map((e) => [e, g.spec[e].min === undefined ? '' : g.spec[e].min, g.spec[e].max === undefined ? '' : g.spec[e].max, g.spec[e].aim === undefined ? '' : g.spec[e].aim].join(', ')).join('\n');
-      modal(g.name ? 'Edit grade' : 'New grade', `${fld('Grade name', 'name', g.name, 'required')}${fld('Note (standard / source)', 'note', g.note)}${ta('Chemistry – element, min, max, aim (leave blank if none)', 'spec', specTxt, 'e.g. <i>C, 3.5, 3.9, 3.7</i> · <i>Mn, , 0.4,</i> · aim defaults to the mid-point of min–max', 7)}${ta('Standard base charge – material, % (must match a material name)', 'base', (g.base || []).map((b) => b.mat + ', ' + b.pct).join('\n'), '', 5)}`, (f) => {
-        const name = val(f, 'name'); if (!name) return 'Enter the grade name.';
-        const spec = {}; val(f, 'spec').split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).forEach((p) => {
-          const e = p[0][0].toUpperCase() + p[0].slice(1).toLowerCase(); if (!QI.EL.includes(e)) return;
-          const o = {}; ['min', 'max', 'aim'].forEach((k, i) => { if (p[i + 1] !== undefined && p[i + 1] !== '' && isFinite(+p[i + 1])) o[k] = +p[i + 1]; }); if (Object.keys(o).length) spec[e] = o;
-        });
-        const base = gradeBase(val(f, 'base')); const bad = base.find((b) => !QI.cmMat(b.mat)); if (bad) return `“${bad.mat}” is not in the materials list.`;
-        const C = QI.cm(); const i = g.name ? C.grades.findIndex((x) => x.name === g.name) : -1; const ng = { name, note: val(f, 'note'), spec, base };
-        if (i >= 0) C.grades[i] = ng; else if (C.grades.some((x) => x.name === name)) return 'A grade with this name exists.'; else C.grades.push(ng);
-        QI.learn('grade', name); ui.cm = null; QI.save();
-      });
-    },
-    'cm-del-grade': (el) => ask(`Delete grade “${el.dataset.g}”?`, () => { const C = QI.cm(); C.grades = C.grades.filter((x) => x.name !== el.dataset.g); ui.cm = null; QI.save(); }, 'Delete'),
-    'cm-save': () => {
-      const p = cmParams(), r = QI.chargeCalc(p); if (r.error) { toast(r.error, 'bad'); return; }
+    'cm-open': (el) => { cmOpen(QI.cm().recipes.find((x) => x.id === el.dataset.id)); render(); window.scrollTo(0, 0); },
+    'cm-reset': () => { cmOpen(QI.cm().recipes.find((x) => x.id === ui.cm.id)); render(); },
+    'cm-save': () => { const r = ui.cm.r; const rec = QI.cmSaveRecipe(r); cmOpen(rec); render(); toast('Recipe saved', 'ok'); },
+    'cm-del': () => ask(`Delete the recipe “${ui.cm.r.name}”?`, () => { QI.cmDelete(ui.cm.id); ui.cm = null; }, 'Delete'),
+    'cm-addmat': () => { ui.cm.r.mats.push({ name: 'New material', mrn: '', comp: {}, rate: '', wt: '', fr: false }); ui.cm.dirty = true; render(); },
+    'cm-delmat': (el) => { ui.cm.r.mats.splice(+el.dataset.i, 1); ui.cm.dirty = true; render(); },
+    'cm-cols': () => modal('Element columns', `<div class="chips">${QI.EL.map((e) => `<label class="chip"><input type="checkbox" name="el_${e}" ${ui.cm.r.els.includes(e) ? 'checked' : ''}> ${e}</label>`).join('')}</div>`, (f) => { const els = QI.EL.filter((e) => f.elements['el_' + e].checked); if (!els.length) return 'Choose at least one element.'; ui.cm.r.els = els; ui.cm.dirty = true; }),
+    'cm-dup': () => modal('Copy as a new grade', `${combo('Customer', 'customer', 'customer', ui.cm.r.customer)}${fld('Grade', 'grade', '', 'required')}<label class="chip"><input type="checkbox" name="keep" checked> Keep target, weights and losses (untick to start with empty weights)</label>`, (f) => {
+      const grade = val(f, 'grade'); if (!grade) return 'Enter the grade.'; const r = clone(ui.cm.r); delete r.id; r.customer = cval(f, 'customer', 'customer'); r.grade = grade; r.note = '';
+      if (!f.elements.keep.checked) { r.mats.forEach((m) => { m.wt = ''; }); r.tg = {}; r.loss = {}; r.lin = {}; r.bath = {}; }
+      const rec = QI.cmSaveRecipe(r); cmOpen(rec); }, 'Create'),
+    'cm-toheat': () => {
       if (!S().heats.length) { toast('Create a heat first (Heats page).', 'bad'); return; }
-      modal('Save charge to a heat', `${sel('Heat', 'heat', S().heats.map((h) => h.no), '')}<label class="chip"><input type="checkbox" name="spec" checked> Also set this grade’s limits as the heat’s chemistry specification (checks 4.1 / 4.2)</label>`, (f) => {
-        const h = val(f, 'heat'); const res = QI.saveCharge(h, p, r); if (res.error) return res.error; if (f.elements.spec.checked) QI.applyGradeSpec(h, p.gradeName); toast('Charge saved to heat ' + h, 'ok');
-      }, 'Save');
+      const r = ui.cm.r; if (QI.sheetCalc(r).error) { toast('Enter the charge weights first.', 'bad'); return; }
+      modal('Use this charge for a heat', `${sel('Heat', 'heat', S().heats.map((h) => h.no), '')}<label class="chip"><input type="checkbox" name="spec" checked> Also set the target limits as the heat’s chemistry specification (checks 4.1 / 4.2)</label>`, (f) => {
+        const h = val(f, 'heat'); const res = QI.saveCharge(h, r); if (res.error) return res.error; if (f.elements.spec.checked) QI.applyGradeSpec(h, r); toast('Charge saved to heat ' + h, 'ok'); }, 'Save to heat');
     },
-    'cm-load': (el) => { const h = QI.heat(el.dataset.no); if (!h || !h.charge) return; const c = h.charge; ui.cm = { grade: c.grade, weight: c.weight, loss: c.loss, base: c.base.map((b) => Object.assign({}, b)), adj: Object.assign({}, c.adj), rec: Object.assign({}, c.rec) }; go('charge'); },
-    'cm-plan': () => { ui.cm = null; go('charge'); },
+    'cm-load': (el) => { const h = QI.heat(el.dataset.no); const rec = h && h.charge && QI.cm().recipes.find((x) => x.name === h.charge.recipe); cmOpen(rec || QI.cm().recipes[0]); go('charge'); },
+    'cm-plan': () => { go('charge'); },
   };
   document.addEventListener('input', (e) => {
-    const f = e.target.closest && e.target.closest('#cmform'); if (!f || e.target.name === 'grade') return;
-    cmRead(f); const p = cmParams(); $('#cm-out').innerHTML = cmResultHtml(p, QI.chargeCalc(p));
+    const t = e.target; if (!t.closest || !t.closest('#cm') || !t.dataset.p) return;
+    const isText = /\.(name|mrn)$/.test(t.dataset.p);
+    setPath(ui.cm.r, t.dataset.p, t.type === 'checkbox' ? t.checked : isText ? t.value : t.value === '' ? '' : parseFloat(t.value));
+    ui.cm.dirty = true; cmUpdate();
   });
   document.addEventListener('change', (e) => {
-    const f = e.target.closest && e.target.closest('#cmform'); if (!f) return;
-    if (e.target.name === 'grade') { ui.cm = cmFromGrade(QI.cmGrade(e.target.value)); render(); return; }
-    cmRead(f); const p = cmParams(); $('#cm-out').innerHTML = cmResultHtml(p, QI.chargeCalc(p));
+    const t = e.target; if (!t.closest || !t.closest('#cm')) return;
+    if (t.id === 'cm-pick') { cmOpen(QI.cm().recipes.find((x) => x.id === t.value)); render(); return; }
+    if (t.type === 'checkbox' && t.dataset.p) { setPath(ui.cm.r, t.dataset.p, t.checked); ui.cm.dirty = true; cmUpdate(); }
   });
 
   /* ---- approvals queue ---- */
@@ -2830,7 +2875,7 @@ window.PLAN = {
   const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'cm-save': ['charge'], 'cm-mats': ['charge'], 'cm-grade': ['charge'], 'cm-del-grade': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -2855,6 +2900,7 @@ window.PLAN = {
     const y = window.scrollY;
     $('#main').innerHTML = fn(arg);
     applyPerms($('#main'));
+    if (view === 'charge' && ui.cm && ui.cm.r) cmUpdate();
     document.body.classList.toggle('printing', view === 'report');
     if (!open) $('#main').dataset.view = view;
     window.scrollTo(0, y);

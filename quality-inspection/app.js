@@ -359,8 +359,8 @@
       <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
-    ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.grade)} · ${esc(h.charge.weight)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
-      <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Predicted: ${Object.keys(h.charge.pred).filter((e) => h.charge.pred[e] > 0.005).map((e) => e + ' ' + h.charge.pred[e]).join(' · ')} ${h.charge.ok ? badge('within limits', 'ok') : badge('outside limits', 'bad')}</div>
+    ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.recipe)} · LM ${esc(h.charge.lm)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
+      <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Expected: ${Object.keys(h.charge.expected).map((e) => e + ' ' + h.charge.expected[e]).join(' · ')} ${h.charge.ok ? badge('within target', 'ok') : badge('outside target', 'warn')} · Final cost Rs ${h.charge.finalCost}/kg</div>
       <button class="btn sm" data-act="cm-load" data-no="${esc(no)}">Open in calculator</button></section>` : `<section class="card"><h3>Charge mix</h3><div class="muted sm pad">No charge calculated for this heat yet.</div><button class="btn sm" data-act="cm-plan">Plan charge mix</button></section>`}
     ${[4, 8].map((n) => {
       const st = QI.stageOf[n];
@@ -388,97 +388,97 @@
   };
 
 
-  /* ---- charge mix calculator ---- */
-  const cmFromGrade = (g) => ({ grade: g ? g.name : '', weight: 1000, loss: 3, base: g && g.base && g.base.length ? g.base.map((b) => Object.assign({}, b)) : [{ mat: '', pct: '' }], adj: Object.assign({}, QI.DEF_ADJ), rec: {} });
-  const cmParams = () => { const s = ui.cm; return { grade: QI.cmGrade(s.grade), gradeName: s.grade, weight: s.weight, loss: s.loss, base: s.base, adj: s.adj, rec: s.rec }; };
-  const fnum = (v, d) => (v == null || !isFinite(v)) ? '–' : Number(v).toFixed(d == null ? 2 : d);
-  function cmResultHtml(p, r) {
-    if (r.error) return `<div class="warnBox">${esc(r.error)}</div>`;
-    const spec = (p.grade && p.grade.spec) || {};
-    const kg = r.rows.reduce((x, y) => x + y.kg, 0);
-    return `<div class="banner ${r.ok ? 'ok' : 'warn'}">${r.ok ? '✔ Predicted chemistry is within the grade limits.' : '⚠ Predicted chemistry is outside the grade limits – change the base charge or the additions.'}</div>
-      ${table(['Charge material', 'Kg', '% of charge'].concat(r.cost != null ? ['Cost'] : []), r.rows.map((x) => `<tr><td>${esc(x.name)} ${x.kind === 'alloy' ? badge('addition', 'info') : ''}</td><td><b>${fnum(x.kg, 1)}</b></td><td>${fnum(x.pct, 1)}</td>${r.cost != null ? `<td>${fnum(x.cost, 0)}</td>` : ''}</tr>`).concat([`<tr><td><b>Total charge</b></td><td><b>${fnum(kg, 1)}</b></td><td>100</td>${r.cost != null ? `<td><b>${fnum(r.cost, 0)}</b></td>` : ''}</tr>`]))}
-      ${r.cost != null ? `<div class="muted sm pad">Charge cost ≈ ${fnum(r.perKg, 2)} per kg of liquid metal.</div>` : ''}
-      <h4>Predicted chemistry (after recoveries)</h4>
-      ${table(['Element', 'Grade limit', 'Aim', 'Predicted %', ''], QI.EL.filter((e) => spec[e] || r.pred[e] > 0.005).map((e) => `<tr><td><b>${e}</b></td><td>${esc(QI.limText(spec[e] && spec[e].min !== undefined && spec[e].min !== '' ? +spec[e].min : null, spec[e] && spec[e].max !== undefined && spec[e].max !== '' ? +spec[e].max : null, '%') || '–')}</td><td>${r.aim[e] == null ? '–' : fnum(r.aim[e], 3)}</td><td><b>${fnum(r.pred[e], 3)}</b></td><td>${r.status[e] === 'ok' ? badge('OK', 'ok') : r.status[e] === 'na' ? '' : badge(r.status[e] === 'low' ? 'Low' : 'High', 'bad')}</td></tr>`))}`;
+  /* ---- charge mix calculator (method of the "Charge Calculation" design sheets) ---- */
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const f2 = (v, d) => (v == null || !isFinite(v)) ? '–' : Number(v).toFixed(d == null ? 2 : d);
+  const cmEls = () => ui.cm.r.els;
+  const setPath = (obj, path, v) => { const k = path.split('.'); let o = obj; for (let i = 0; i < k.length - 1; i++) { if (o[k[i]] == null) o[k[i]] = {}; o = o[k[i]]; } o[k[k.length - 1]] = v; };
+  const cmOpen = (rec) => { ui.cm = { id: rec ? rec.id : null, r: rec ? clone(rec) : null, dirty: false }; };
+  const cmIn = (p, v, extra) => `<input data-p="${p}" value="${esc(v == null ? '' : v)}" type="number" step="any" inputmode="decimal" ${extra || ''}>`;
+  const cmBadge = (s) => s === 'ok' ? badge('OK', 'ok') : s === 'low' ? badge('Low', 'bad') : s === 'high' ? badge('High', 'bad') : '';
+  function cmValues() {      // every computed cell, keyed by its data-c attribute
+    const r = ui.cm.r, c = QI.sheetCalc(r), m = {};
+    if (c.error) return { err: c.error };
+    r.mats.forEach((mt, i) => { m['kg.' + i] = f2(c.kg[i], 1); m['rs.' + i] = f2(c.rs[i], 0); r.els.forEach((e) => (m[`ct.${i}.${e}`] = c.contrib[i][e] ? f2(c.contrib[i][e], 3) : '')); });
+    r.els.forEach((e) => { m['tot.' + e] = f2(c.total[e], 2); m['aft.' + e] = f2(c.after[e], 2); m['st.' + e] = cmBadge(c.status[e]); });
+    m.sumwt = f2(c.sumAll, 2); m.sumrs = f2(c.cost.total, 0); m.sumkg = f2(c.kg.reduce((a, b) => a + b, 0), 1);
+    m.verdict = c.ok ? '<div class="banner ok">✔ Expected composition (after loss) is within the target limits.</div>' : `<div class="banner warn">⚠ Outside target: ${r.els.filter((e) => c.status[e] === 'low' || c.status[e] === 'high').map((e) => e + ' ' + c.status[e]).join(', ')} – adjust the charge weights.</div>`;
+    const k = c.cost; m['cost.total'] = f2(k.total, 0); m['cost.retkg'] = f2(k.retKg, 0); m['cost.retval'] = f2(k.retVal, 0); m['cost.perkg'] = f2(k.perKg); m['cost.rej'] = f2(k.perKgRej); m['cost.credit'] = f2(k.credit); m['cost.net'] = f2(k.net); m['cost.final'] = f2(k.final);
+    return m;
+  }
+  function cmUpdate() {
+    const m = cmValues();
+    document.querySelectorAll('#cm [data-c]').forEach((el) => { const k = el.dataset.c; if (m.err) { el.innerHTML = k === 'verdict' ? `<div class="warnBox">${esc(m.err)}</div>` : ''; } else if (m[k] != null) el.innerHTML = m[k]; });
+    const d = $('#cm-dirty'); if (d) d.hidden = !ui.cm.dirty;
   }
   V.charge = () => {
     const C = QI.cm();
-    if (!ui.cm) ui.cm = cmFromGrade(C.grades[0]);
-    const s = ui.cm;
-    const matOpts = (cur) => `<option value="">– select –</option>${C.materials.map((m) => `<option value="${esc(m.name)}" ${m.name === cur ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}`;
-    const rows = s.base.length < 3 ? s.base.concat(Array.from({ length: 3 - s.base.length }, () => ({ mat: '', pct: '' }))) : s.base;
-    const per = C.grades.map((g) => { const p = { grade: g, weight: 1000, loss: 3, base: g.base || [], adj: QI.DEF_ADJ, rec: {} }; const r = QI.chargeCalc(p); return { g, r }; });
-    return `<div class="hd"><h2>Charge mix</h2><div class="row"><button class="btn" data-act="cm-mats">Materials…</button><button class="btn" data-act="cm-grade" data-g="">+ New grade</button></div></div>
-    <div class="banner warn">Starter materials and grade limits are typical handbook values. Confirm them against your material certificates, the customer specification and your metallurgist before melting.</div>
-    <section class="card"><h3>Calculate a charge</h3>
-      <form id="cmform" onsubmit="return false">
-        <div class="grid3"><label class="f"><span>Grade</span><select name="grade">${C.grades.map((g) => `<option ${g.name === s.grade ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label>
-          ${fld('Total charge weight (kg)', 'weight', s.weight, 'type="number" min="1" step="any" inputmode="decimal"')}${fld('Melt loss (%)', 'loss', s.loss, 'type="number" min="0" max="20" step="any" inputmode="decimal"')}</div>
-        <div class="lbl">Base charge (returns / scrap / pig iron) – % of the base, normalised automatically</div>
-        ${rows.map((b, i) => `<div class="grid2"><label class="f"><select name="mat${i}">${matOpts(b.mat)}</select></label>${fld('', 'pct' + i, b.pct, 'type="number" min="0" step="any" placeholder="%" inputmode="decimal"')}</div>`).join('')}
-        <button type="button" class="btn sm ghost" data-act="cm-add-row">+ Add base material</button>
-        <details class="hist"><summary>Alloy additions and recoveries</summary>
-          <div class="muted sm pad">Each element with a grade aim is trimmed with the addition chosen here. Recovery = % of the element charged that reaches the melt.</div>
-          <div class="specgrid">${QI.EL.map((e) => `<div><span>${e}</span><select name="adj_${e}"><option value="">no addition</option>${C.materials.filter((m) => m.comp && +m.comp[e] > 20).map((m) => `<option value="${esc(m.name)}" ${s.adj[e] === m.name ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select><input name="rec_${e}" type="number" step="any" value="${esc(s.rec[e] != null ? s.rec[e] : QI.DEF_REC[e])}" title="Recovery %"></div>`).join('')}</div></details>
-      </form>
-      <div id="cm-out">${cmResultHtml(cmParams(), QI.chargeCalc(cmParams()))}</div>
-      <div class="row pad"><button class="btn primary" data-act="cm-save">Save to a heat…</button></div></section>
-    <section class="card"><h3>Standard charge for each grade <small class="muted">per 1000 kg charge, 3 % melt loss</small></h3>
-      ${per.length ? per.map(({ g, r }) => `<div class="li"><div class="row"><b>${esc(g.name)}</b>${r.error ? '' : r.ok ? badge('within limits', 'ok') : badge('check chemistry', 'bad')}<button class="btn sm ghost" data-act="cm-grade" data-g="${esc(g.name)}">Edit</button><button class="btn sm ghost" data-act="cm-del-grade" data-g="${esc(g.name)}">Delete</button></div>
-        ${g.note ? `<div class="muted sm">${esc(g.note)}</div>` : ''}
-        ${r.error ? `<div class="muted sm">${esc(r.error)}</div>` : `<div class="sm pad">${r.rows.map((x) => `${esc(x.name)} <b>${fnum(x.kg, 1)} kg</b>`).join(' · ')}</div><div class="muted sm">Predicted: ${QI.EL.filter((e) => g.spec[e]).map((e) => e + ' ' + fnum(r.pred[e], 2)).join(' · ')}</div>`}</div>`).join('') : '<div class="muted">No grades yet – add one.</div>'}</section>`;
+    if (!ui.cm || !ui.cm.r) cmOpen(C.recipes[0]);
+    if (!ui.cm.r) return `<div class="hd"><h2>Charge mix</h2></div>${empty('No charge recipes yet.')}`;
+    const r = ui.cm.r, els = r.els, w = (e) => 'style="min-width:62px"';
+    const th = els.map((e) => `<th>${e}%</th>`).join('');
+    const per = C.recipes.map((x) => ({ x, c: QI.sheetCalc(x) }));
+    return `<div id="cm"><div class="hd"><h2>Charge mix</h2><div class="row"><select id="cm-pick" aria-label="Recipe">${C.recipes.map((x) => `<option value="${esc(x.id)}" ${x.id === ui.cm.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+      <button class="btn" data-act="cm-dup">Copy as new grade…</button></div></div>
+    <div class="banner warn" id="cm-dirty" ${ui.cm.dirty ? '' : 'hidden'}>Unsaved changes – <button class="btn sm primary" data-act="cm-save">Save recipe</button> <button class="btn sm" data-act="cm-reset">Discard</button></div>
+    ${r.note ? `<div class="banner">${esc(r.note)}</div>` : ''}
+    <div class="muted sm pad">Method as per the “Charge Calculation” sheets in the QC n Design folder. Edit any number; results update as you type. Saved recipes are shared with every department.</div>
+    <section class="card"><h3>${esc(r.customer)} · ${esc(r.grade)}</h3>
+      <div class="grid3"><label class="f"><span>Liquid metal to tap, LM (kg)</span>${cmIn('lm', r.lm)}</label><label class="f"><span>Foundry return in charge, FR (kg)</span>${cmIn('fr', r.fr)}</label><label class="f"><span>Melt loss (%)</span>${cmIn('meltLoss', r.meltLoss)}</label>
+      <label class="f"><span>Yield (%)</span>${cmIn('yield', r.yield)}</label><label class="f"><span>Rejection (%)</span>${cmIn('rej', r.rej)}</label><label class="f"><span>Lining & other cost (Rs/kg)</span>${cmIn('other', r.other)}</label></div></section>
+    <section class="card"><h3>Target composition <button class="btn sm ghost" data-act="cm-cols">Columns…</button></h3><div class="tw"><table class="cmt"><thead><tr><th></th>${th}</tr></thead><tbody>
+      ${['min', 'max', 'aim'].map((k) => `<tr><th>${k === 'min' ? 'Min' : k === 'max' ? 'Max' : 'Aim at'}</th>${els.map((e) => `<td>${cmIn(`tg.${e}.${k}`, r.tg[e] && r.tg[e][k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>
+    <section class="card"><h3>Raw materials – chemical analysis as per report</h3><div class="tw"><table class="cmt"><thead><tr><th>Material</th><th>FR</th><th>MRN</th>${th}<th>Rs/kg</th><th></th></tr></thead><tbody>
+      ${r.mats.map((m, i) => `<tr><td><input data-p="mats.${i}.name" value="${esc(m.name)}"></td><td><input type="checkbox" data-p="mats.${i}.fr" ${m.fr ? 'checked' : ''} title="Foundry return (fixed kg)"></td><td><input data-p="mats.${i}.mrn" value="${esc(m.mrn)}" style="min-width:70px"></td>${els.map((e) => `<td>${cmIn(`mats.${i}.comp.${e}`, m.comp && m.comp[e])}</td>`).join('')}<td>${cmIn(`mats.${i}.rate`, m.rate)}</td><td><button class="x" data-act="cm-delmat" data-i="${i}" title="Remove">×</button></td></tr>`).join('')}</tbody></table></div>
+      <button class="btn sm ghost" data-act="cm-addmat">+ Add material</button></section>
+    <section class="card"><h3>Charging</h3><div data-c="verdict"></div><div class="tw"><table class="cmt"><thead><tr><th>Material</th><th>Wt</th><th>Charge kg</th><th>Rs</th>${th}</tr></thead><tbody>
+      ${r.mats.map((m, i) => `<tr><td>${esc(m.name)}${m.fr ? ' ' + badge('FR', 'mute') : ''}</td><td>${cmIn(`mats.${i}.wt`, m.wt)}</td><td data-c="kg.${i}"></td><td data-c="rs.${i}"></td>${els.map((e) => `<td class="muted" data-c="ct.${i}.${e}"></td>`).join('')}</tr>`).join('')}
+      <tr class="tot"><th>Total</th><th data-c="sumwt"></th><th data-c="sumkg"></th><th data-c="sumrs"></th>${els.map((e) => `<th data-c="tot.${e}"></th>`).join('')}</tr>
+      <tr><th>Loss % of element</th><td colspan="4"></td>${els.map((e) => `<td>${cmIn('loss.' + e, r.loss[e])}</td>`).join('')}</tr>
+      <tr><th>From lining (added)</th><td colspan="4"></td>${els.map((e) => `<td>${cmIn('lin.' + e, r.lin[e])}</td>`).join('')}</tr>
+      <tr class="tot"><th>Expected composition (after loss)</th><td colspan="4"></td>${els.map((e) => `<th data-c="aft.${e}"></th>`).join('')}</tr>
+      <tr><th>Check vs target</th><td colspan="4"></td>${els.map((e) => `<td data-c="st.${e}"></td>`).join('')}</tr>
+      <tr><th>Actual bath report</th><td colspan="4"></td>${els.map((e) => `<td>${cmIn('bath.' + e, r.bath && r.bath[e])}</td>`).join('')}</tr></tbody></table></div></section>
+    <section class="card"><h3>Cost per kg</h3><table class="kv2"><tbody>
+      <tr><td>Cost of charge (Rs)</td><td data-c="cost.total"></td></tr><tr><td>Less: value of returns (<span data-c="cost.retkg"></span> kg)</td><td data-c="cost.retval"></td></tr>
+      <tr><td>Cost per kg</td><td data-c="cost.perkg"></td></tr><tr><td>Cost per kg after rejection (${esc(r.rej)} %)</td><td data-c="cost.rej"></td></tr>
+      <tr><td>Less: material cost of rejected material</td><td data-c="cost.credit"></td></tr><tr><td>Net cost per kg</td><td data-c="cost.net"></td></tr>
+      <tr><td>Lining and other cost</td><td>${f2(r.other)}</td></tr><tr class="tot"><td><b>Final cost per kg (Rs)</b></td><td><b data-c="cost.final"></b></td></tr></tbody></table>
+      <div class="row pad"><button class="btn primary" data-act="cm-save">Save recipe</button><button class="btn" data-act="cm-toheat">Use for a heat…</button><button class="btn danger" data-act="cm-del">Delete recipe</button></div></section>
+    <section class="card"><h3>Charge mix of each grade</h3>${table(['Customer · grade', 'LM kg', 'Charge (kg)', 'Expected vs target', 'Final Rs/kg', ''], per.map(({ x, c }) => `<tr><td>${esc(x.name)}</td><td>${esc(x.lm)}</td><td class="sm">${c.error ? '–' : x.mats.map((m, i) => n0(m.wt) > 0 ? `${esc(m.name)} <b>${f2(c.kg[i], 0)}</b>` : '').filter(Boolean).join(' · ')}</td><td>${c.error ? '' : c.ok ? badge('within target', 'ok') : badge('check', 'warn')}</td><td>${c.error ? '–' : f2(c.cost.final)}</td><td><button class="btn sm ghost" data-act="cm-open" data-id="${esc(x.id)}">Open</button></td></tr>`))}</section></div>`;
   };
-  function cmRead(f) {
-    const s = ui.cm; const g = (n) => (f.elements[n] ? f.elements[n].value : '');
-    s.weight = g('weight'); s.loss = g('loss'); s.base = [];
-    for (let i = 0; f.elements['mat' + i]; i++) s.base.push({ mat: g('mat' + i), pct: g('pct' + i) });
-    QI.EL.forEach((e) => { s.adj[e] = g('adj_' + e); s.rec[e] = g('rec_' + e); });
-  }
-  const fmtMats = (ms) => ms.map((m) => `${m.name} | ${Object.keys(m.comp).map((e) => e + ' ' + m.comp[e]).join(', ')}${m.cost ? ' | ' + m.cost : ''}`).join('\n');
-  const parseMats = (t) => t.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
-    const [name, comps = '', cost = ''] = l.split('|').map((x) => x.trim()); const comp = {};
-    comps.split(',').forEach((c) => { const m = c.trim().match(/^([A-Za-z]{1,2})\s+([\d.]+)$/); if (m) { const e = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase(); if (QI.EL.includes(e)) comp[e] = +m[2]; } });
-    const o = { name, comp }; if (cost && +cost > 0) o.cost = +cost; return o;
-  }).filter((m) => m.name);
-  const gradeBase = (t) => t.split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).map((p) => ({ mat: p[0], pct: parseFloat(p[1]) || 0 }));
+  const n0 = (v) => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
   const CHARGE_ACTS = {
-    'cm-add-row': () => { cmRead($('#cmform')); ui.cm.base.push({ mat: '', pct: '' }); render(); },
-    'cm-mats': () => modal('Charge materials', ta('One per line: name | element %, … | cost per kg (optional)', 'mats', fmtMats(QI.cm().materials), 'e.g. FeMn HC | Mn 75, C 7, Si 1, P 0.3 | 95  — elements: ' + QI.EL.join(', '), 14), (f) => { const ms = parseMats(val(f, 'mats')); if (!ms.length) return 'Add at least one material.'; QI.cm().materials = ms; QI.save(); }),
-    'cm-grade': (el) => {
-      const g = el.dataset.g ? QI.cmGrade(el.dataset.g) : { name: '', note: '', spec: {}, base: [] };
-      const specTxt = QI.EL.filter((e) => g.spec[e]).map((e) => [e, g.spec[e].min === undefined ? '' : g.spec[e].min, g.spec[e].max === undefined ? '' : g.spec[e].max, g.spec[e].aim === undefined ? '' : g.spec[e].aim].join(', ')).join('\n');
-      modal(g.name ? 'Edit grade' : 'New grade', `${fld('Grade name', 'name', g.name, 'required')}${fld('Note (standard / source)', 'note', g.note)}${ta('Chemistry – element, min, max, aim (leave blank if none)', 'spec', specTxt, 'e.g. <i>C, 3.5, 3.9, 3.7</i> · <i>Mn, , 0.4,</i> · aim defaults to the mid-point of min–max', 7)}${ta('Standard base charge – material, % (must match a material name)', 'base', (g.base || []).map((b) => b.mat + ', ' + b.pct).join('\n'), '', 5)}`, (f) => {
-        const name = val(f, 'name'); if (!name) return 'Enter the grade name.';
-        const spec = {}; val(f, 'spec').split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).forEach((p) => {
-          const e = p[0][0].toUpperCase() + p[0].slice(1).toLowerCase(); if (!QI.EL.includes(e)) return;
-          const o = {}; ['min', 'max', 'aim'].forEach((k, i) => { if (p[i + 1] !== undefined && p[i + 1] !== '' && isFinite(+p[i + 1])) o[k] = +p[i + 1]; }); if (Object.keys(o).length) spec[e] = o;
-        });
-        const base = gradeBase(val(f, 'base')); const bad = base.find((b) => !QI.cmMat(b.mat)); if (bad) return `“${bad.mat}” is not in the materials list.`;
-        const C = QI.cm(); const i = g.name ? C.grades.findIndex((x) => x.name === g.name) : -1; const ng = { name, note: val(f, 'note'), spec, base };
-        if (i >= 0) C.grades[i] = ng; else if (C.grades.some((x) => x.name === name)) return 'A grade with this name exists.'; else C.grades.push(ng);
-        QI.learn('grade', name); ui.cm = null; QI.save();
-      });
-    },
-    'cm-del-grade': (el) => ask(`Delete grade “${el.dataset.g}”?`, () => { const C = QI.cm(); C.grades = C.grades.filter((x) => x.name !== el.dataset.g); ui.cm = null; QI.save(); }, 'Delete'),
-    'cm-save': () => {
-      const p = cmParams(), r = QI.chargeCalc(p); if (r.error) { toast(r.error, 'bad'); return; }
+    'cm-open': (el) => { cmOpen(QI.cm().recipes.find((x) => x.id === el.dataset.id)); render(); window.scrollTo(0, 0); },
+    'cm-reset': () => { cmOpen(QI.cm().recipes.find((x) => x.id === ui.cm.id)); render(); },
+    'cm-save': () => { const r = ui.cm.r; const rec = QI.cmSaveRecipe(r); cmOpen(rec); render(); toast('Recipe saved', 'ok'); },
+    'cm-del': () => ask(`Delete the recipe “${ui.cm.r.name}”?`, () => { QI.cmDelete(ui.cm.id); ui.cm = null; }, 'Delete'),
+    'cm-addmat': () => { ui.cm.r.mats.push({ name: 'New material', mrn: '', comp: {}, rate: '', wt: '', fr: false }); ui.cm.dirty = true; render(); },
+    'cm-delmat': (el) => { ui.cm.r.mats.splice(+el.dataset.i, 1); ui.cm.dirty = true; render(); },
+    'cm-cols': () => modal('Element columns', `<div class="chips">${QI.EL.map((e) => `<label class="chip"><input type="checkbox" name="el_${e}" ${ui.cm.r.els.includes(e) ? 'checked' : ''}> ${e}</label>`).join('')}</div>`, (f) => { const els = QI.EL.filter((e) => f.elements['el_' + e].checked); if (!els.length) return 'Choose at least one element.'; ui.cm.r.els = els; ui.cm.dirty = true; }),
+    'cm-dup': () => modal('Copy as a new grade', `${combo('Customer', 'customer', 'customer', ui.cm.r.customer)}${fld('Grade', 'grade', '', 'required')}<label class="chip"><input type="checkbox" name="keep" checked> Keep target, weights and losses (untick to start with empty weights)</label>`, (f) => {
+      const grade = val(f, 'grade'); if (!grade) return 'Enter the grade.'; const r = clone(ui.cm.r); delete r.id; r.customer = cval(f, 'customer', 'customer'); r.grade = grade; r.note = '';
+      if (!f.elements.keep.checked) { r.mats.forEach((m) => { m.wt = ''; }); r.tg = {}; r.loss = {}; r.lin = {}; r.bath = {}; }
+      const rec = QI.cmSaveRecipe(r); cmOpen(rec); }, 'Create'),
+    'cm-toheat': () => {
       if (!S().heats.length) { toast('Create a heat first (Heats page).', 'bad'); return; }
-      modal('Save charge to a heat', `${sel('Heat', 'heat', S().heats.map((h) => h.no), '')}<label class="chip"><input type="checkbox" name="spec" checked> Also set this grade’s limits as the heat’s chemistry specification (checks 4.1 / 4.2)</label>`, (f) => {
-        const h = val(f, 'heat'); const res = QI.saveCharge(h, p, r); if (res.error) return res.error; if (f.elements.spec.checked) QI.applyGradeSpec(h, p.gradeName); toast('Charge saved to heat ' + h, 'ok');
-      }, 'Save');
+      const r = ui.cm.r; if (QI.sheetCalc(r).error) { toast('Enter the charge weights first.', 'bad'); return; }
+      modal('Use this charge for a heat', `${sel('Heat', 'heat', S().heats.map((h) => h.no), '')}<label class="chip"><input type="checkbox" name="spec" checked> Also set the target limits as the heat’s chemistry specification (checks 4.1 / 4.2)</label>`, (f) => {
+        const h = val(f, 'heat'); const res = QI.saveCharge(h, r); if (res.error) return res.error; if (f.elements.spec.checked) QI.applyGradeSpec(h, r); toast('Charge saved to heat ' + h, 'ok'); }, 'Save to heat');
     },
-    'cm-load': (el) => { const h = QI.heat(el.dataset.no); if (!h || !h.charge) return; const c = h.charge; ui.cm = { grade: c.grade, weight: c.weight, loss: c.loss, base: c.base.map((b) => Object.assign({}, b)), adj: Object.assign({}, c.adj), rec: Object.assign({}, c.rec) }; go('charge'); },
-    'cm-plan': () => { ui.cm = null; go('charge'); },
+    'cm-load': (el) => { const h = QI.heat(el.dataset.no); const rec = h && h.charge && QI.cm().recipes.find((x) => x.name === h.charge.recipe); cmOpen(rec || QI.cm().recipes[0]); go('charge'); },
+    'cm-plan': () => { go('charge'); },
   };
   document.addEventListener('input', (e) => {
-    const f = e.target.closest && e.target.closest('#cmform'); if (!f || e.target.name === 'grade') return;
-    cmRead(f); const p = cmParams(); $('#cm-out').innerHTML = cmResultHtml(p, QI.chargeCalc(p));
+    const t = e.target; if (!t.closest || !t.closest('#cm') || !t.dataset.p) return;
+    const isText = /\.(name|mrn)$/.test(t.dataset.p);
+    setPath(ui.cm.r, t.dataset.p, t.type === 'checkbox' ? t.checked : isText ? t.value : t.value === '' ? '' : parseFloat(t.value));
+    ui.cm.dirty = true; cmUpdate();
   });
   document.addEventListener('change', (e) => {
-    const f = e.target.closest && e.target.closest('#cmform'); if (!f) return;
-    if (e.target.name === 'grade') { ui.cm = cmFromGrade(QI.cmGrade(e.target.value)); render(); return; }
-    cmRead(f); const p = cmParams(); $('#cm-out').innerHTML = cmResultHtml(p, QI.chargeCalc(p));
+    const t = e.target; if (!t.closest || !t.closest('#cm')) return;
+    if (t.id === 'cm-pick') { cmOpen(QI.cm().recipes.find((x) => x.id === t.value)); render(); return; }
+    if (t.type === 'checkbox' && t.dataset.p) { setPath(ui.cm.r, t.dataset.p, t.checked); ui.cm.dirty = true; cmUpdate(); }
   });
 
   /* ---- approvals queue ---- */
@@ -723,7 +723,7 @@
   const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'cm-save': ['charge'], 'cm-mats': ['charge'], 'cm-grade': ['charge'], 'cm-del-grade': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -748,6 +748,7 @@
     const y = window.scrollY;
     $('#main').innerHTML = fn(arg);
     applyPerms($('#main'));
+    if (view === 'charge' && ui.cm && ui.cm.r) cmUpdate();
     document.body.classList.toggle('printing', view === 'report');
     if (!open) $('#main').dataset.view = view;
     window.scrollTo(0, y);
