@@ -1499,6 +1499,7 @@ window.PLAN = {
     if (action === 'create') return (d.create || []).includes(arg);
     if (action === 'link') return (d.link || []).includes(arg);
     if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
+    if (action === 'charge') return d.id === 'melt';
     return false;                                 // release, reject, ncr, plan, admin: quality only
   };
 
@@ -1507,7 +1508,7 @@ window.PLAN = {
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
   const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id' };
-  const cfgForm = () => ({ seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const cfgForm = () => ({ charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
     Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
@@ -1547,7 +1548,7 @@ window.PLAN = {
       const w = user.can ? user.can('data.write') : null; QI.me.canWrite = w !== false;
     }
     let pending = 0;
-    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; QI.seed(); pushDiff(); QI.onChange(true); } };
+    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; QI.seed(); if (QI.seedCharge) QI.seedCharge(); pushDiff(); QI.onChange(true); } };
     const reg = (path, handler) => { pending++; listen(path, handler, done); };
     Object.keys(COLS).forEach((col) => reg(col, (ch) => {
       const body = clone(ch.doc.data() || {}), p = col + '/' + ch.doc.id;
@@ -1575,7 +1576,7 @@ window.PLAN = {
     reg('meta', (ch) => {
       if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
       const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
-      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); if (b.charge && b.charge.materials) S.settings.charge = b.charge; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
       synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
     });
     reg('people', (ch) => {
@@ -1994,6 +1995,116 @@ window.PLAN = {
 
 </script>
 <script>
+/* DCL Quality Inspection – charge-mix calculator.
+   Given a grade (target chemistry), total charge weight and the base charge (returns / scrap / pig iron),
+   it solves the ferro-alloy and recarburiser additions that bring the predicted melt to the grade aim,
+   allowing for element recoveries, and checks the result against the grade limits. */
+(function () {
+  'use strict';
+  const QI = window.QI;
+  const EL = ['C', 'Si', 'Mn', 'P', 'S', 'Cr', 'Ni', 'Mo', 'Cu'];
+  QI.EL = EL;
+  QI.DEF_REC = { C: 95, Si: 90, Mn: 85, P: 100, S: 100, Cr: 95, Ni: 100, Mo: 97, Cu: 100 };      // % of the element charged that reaches the melt
+  QI.DEF_ADJ = { C: 'Recarburiser (graphite)', Si: 'FeSi 75', Mn: 'FeMn HC', Cr: 'FeCr HC', Ni: 'Nickel', Mo: 'FeMo', Cu: 'Copper' };
+  const S = () => QI.S();
+  QI.cm = () => (S().settings.charge || (S().settings.charge = { materials: [], grades: [] }));
+  QI.cmMat = (n) => QI.cm().materials.find((m) => m.name === n);
+  QI.cmGrade = (n) => QI.cm().grades.find((g) => g.name === n);
+
+  /* Starter data: typical handbook values so the calculator works on day one.
+     CONFIRM every value against your material certificates and customer / standard specification. */
+  QI.seedCharge = () => {
+    const c = QI.cm(); if (c.seeded) return;
+    c.materials = [
+      { name: 'Steel scrap (MS)', comp: { C: 0.2, Si: 0.25, Mn: 0.5, P: 0.025, S: 0.025 } },
+      { name: 'Pig iron', comp: { C: 4.0, Si: 1.5, Mn: 0.4, P: 0.04, S: 0.02 } },
+      { name: 'Returns – carbon steel', comp: { C: 0.25, Si: 0.45, Mn: 0.8, P: 0.02, S: 0.02 } },
+      { name: 'Returns – SG iron', comp: { C: 3.6, Si: 2.4, Mn: 0.3, P: 0.04, S: 0.01 } },
+      { name: 'Recarburiser (graphite)', comp: { C: 98 } },
+      { name: 'FeSi 75', comp: { Si: 75, C: 0.2 } },
+      { name: 'FeMn HC', comp: { Mn: 75, C: 7, Si: 1, P: 0.3 } },
+      { name: 'FeCr HC', comp: { Cr: 60, C: 8, Si: 2 } },
+      { name: 'FeMo', comp: { Mo: 65 } },
+      { name: 'Nickel', comp: { Ni: 99 } },
+      { name: 'Copper', comp: { Cu: 99 } },
+    ];
+    c.grades = [
+      { name: 'Carbon steel ASTM A216 WCB', note: 'Typical limits – confirm with the standard / PO',
+        spec: { C: { max: 0.3, aim: 0.24 }, Si: { max: 0.6, aim: 0.45 }, Mn: { max: 1.0, aim: 0.8 }, P: { max: 0.035 }, S: { max: 0.035 } },
+        base: [{ mat: 'Returns – carbon steel', pct: 40 }, { mat: 'Steel scrap (MS)', pct: 60 }] },
+      { name: 'SG iron EN-GJS-500-7', note: 'Typical base-iron chemistry before Mg treatment – confirm with your metallurgist',
+        spec: { C: { min: 3.5, max: 3.9 }, Si: { min: 2.2, max: 2.8 }, Mn: { max: 0.4 }, P: { max: 0.05 }, S: { max: 0.02 } },
+        base: [{ mat: 'Returns – SG iron', pct: 40 }, { mat: 'Pig iron', pct: 30 }, { mat: 'Steel scrap (MS)', pct: 30 }] },
+    ];
+    c.seeded = 1; QI.save();
+  };
+
+  /* p: { grade:{spec}, weight (kg), loss (%), base:[{mat,pct}], adj:{El:material}, rec:{El:%} } */
+  QI.chargeCalc = (p) => {
+    const W = +p.weight;
+    if (!(W > 0)) return { error: 'Enter the total charge weight.' };
+    const loss = +p.loss || 0, liquid = W * (1 - loss / 100);
+    const rec = Object.assign({}, QI.DEF_REC, p.rec || {});
+    const base = (p.base || []).filter((b) => b.mat && +b.pct > 0).map((b) => ({ mat: b.mat, pct: +b.pct }));
+    const pctSum = base.reduce((a, b) => a + b.pct, 0);
+    if (!pctSum) return { error: 'Choose the base charge materials (returns, scrap, pig iron) and their %.' };
+    const comp = (name, e) => { const m = QI.cmMat(name); return (m && m.comp && +m.comp[e]) || 0; };
+    const spec = (p.grade && p.grade.spec) || {};
+    const has = (v) => v !== undefined && v !== null && v !== '';
+    const aim = (e) => { const s = spec[e]; if (!s) return null; if (has(s.aim)) return +s.aim; if (has(s.min) && has(s.max)) return (+s.min + +s.max) / 2; if (has(s.min)) return +s.min; return null; };
+    const alloys = {};
+    const predict = () => {
+      const aTot = Object.values(alloys).reduce((a, b) => a + b, 0), baseKg = Math.max(W - aTot, 0), out = {};
+      EL.forEach((e) => {
+        let mass = 0;
+        base.forEach((b) => { mass += baseKg * b.pct / pctSum * comp(b.mat, e) / 100 * rec[e] / 100; });
+        Object.keys(alloys).forEach((n) => { mass += alloys[n] * comp(n, e) / 100 * rec[e] / 100; });
+        out[e] = mass / liquid * 100;
+      });
+      return out;
+    };
+    for (let it = 0; it < 400; it++) {
+      const pr = predict(); let moved = 0;
+      EL.forEach((e) => {
+        const a = aim(e), adj = p.adj && p.adj[e]; if (a == null || !adj) return;
+        const c = comp(adj, e); if (!c) return;
+        const delta = (a - pr[e]) / 100 * liquid / (c / 100 * rec[e] / 100);
+        const cur = alloys[adj] || 0, nk = Math.max(cur + delta * 0.5, 0);
+        moved += Math.abs(nk - cur); alloys[adj] = nk;
+      });
+      if (moved < 1e-5) break;
+    }
+    const pred = predict();
+    const aTot = Object.values(alloys).reduce((a, b) => a + b, 0), baseKg = Math.max(W - aTot, 0);
+    const rows = base.map((b) => ({ name: b.mat, kg: baseKg * b.pct / pctSum, kind: 'base' }))
+      .concat(Object.keys(alloys).filter((n) => alloys[n] > 0.005).map((n) => ({ name: n, kg: alloys[n], kind: 'alloy' })));
+    rows.forEach((r) => { r.pct = r.kg / W * 100; const m = QI.cmMat(r.name); r.cost = m && +m.cost > 0 ? r.kg * +m.cost : null; });
+    const status = {};
+    EL.forEach((e) => {
+      const s = spec[e]; if (!s || (!has(s.min) && !has(s.max))) { status[e] = 'na'; return; }
+      status[e] = has(s.min) && pred[e] < +s.min - 1e-9 ? 'low' : has(s.max) && pred[e] > +s.max + 1e-9 ? 'high' : 'ok';
+    });
+    const costed = rows.length && rows.every((r) => r.cost != null);
+    const cost = costed ? rows.reduce((a, r) => a + r.cost, 0) : null;
+    return { rows, pred, status, aim: Object.fromEntries(EL.map((e) => [e, aim(e)])), liquid, total: W, cost, perKg: cost != null ? cost / liquid : null, ok: EL.every((e) => status[e] !== 'low' && status[e] !== 'high') };
+  };
+  QI.saveCharge = (heatNo, params, res) => {
+    const h = QI.heat(heatNo); if (!h) return { error: 'Heat not found.' };
+    h.charge = { grade: params.gradeName, weight: params.weight, loss: params.loss, base: params.base, adj: params.adj, rec: params.rec,
+      rows: res.rows.map((r) => ({ name: r.name, kg: +r.kg.toFixed(2), kind: r.kind })), pred: Object.fromEntries(Object.keys(res.pred).map((e) => [e, +res.pred[e].toFixed(3)])), ok: res.ok, by: S().settings.inspector || QI.me.name || '', ts: Date.now() };
+    QI.save(); return { ok: true };
+  };
+  QI.applyGradeSpec = (heatNo, gradeName) => {
+    const h = QI.heat(heatNo), g = QI.cmGrade(gradeName); if (!h || !g) return;
+    h.chemSpec = EL.filter((e) => g.spec[e] && (g.spec[e].min !== undefined && g.spec[e].min !== '' || g.spec[e].max !== undefined && g.spec[e].max !== ''))
+      .map((e) => ({ name: e, min: g.spec[e].min === undefined ? '' : String(g.spec[e].min), max: g.spec[e].max === undefined ? '' : String(g.spec[e].max) }));
+    if (!h.grade) h.grade = gradeName;
+    QI.save();
+  };
+})();
+
+</script>
+<script>
 /* DCL Quality Inspection – UI. Hash-routed single page app, no build step. */
 (function () {
   'use strict';
@@ -2007,7 +2118,7 @@ window.PLAN = {
   const hist = [];
   const HOSTED = !!window.claude;
   const go = (p) => { p = String(p).replace(/^#?\/?/, '') || 'dashboard'; if (p !== route) { hist.push(route); route = p; } window.scrollTo(0, 0); render(); };
-  const ui = { open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
+  const ui = { cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
   const SCOPE_LABEL = { job: 'Work order', log: 'Sand & calibration log', heat: 'Heat', casting: 'Casting' };
 
   /* ================= small components ================= */
@@ -2355,6 +2466,9 @@ window.PLAN = {
       <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
+    ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.grade)} · ${esc(h.charge.weight)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
+      <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Predicted: ${Object.keys(h.charge.pred).filter((e) => h.charge.pred[e] > 0.005).map((e) => e + ' ' + h.charge.pred[e]).join(' · ')} ${h.charge.ok ? badge('within limits', 'ok') : badge('outside limits', 'bad')}</div>
+      <button class="btn sm" data-act="cm-load" data-no="${esc(no)}">Open in calculator</button></section>` : `<section class="card"><h3>Charge mix</h3><div class="muted sm pad">No charge calculated for this heat yet.</div><button class="btn sm" data-act="cm-plan">Plan charge mix</button></section>`}
     ${[4, 8].map((n) => {
       const st = QI.stageOf[n];
       const sts = st.groups[0].steps.flatMap((s) => s.checks).map((c) => QI.status('heat', no, c.id));
@@ -2379,6 +2493,100 @@ window.PLAN = {
     return `<div class="hd"><div><h2>Sand & calibration log – ${esc(l.date)}, shift ${esc(l.shift)}</h2><div class="muted">${QI.logCastings(id).length} casting(s) linked · opened by ${esc(l.by || '–')}</div></div></div>
       <section class="card">${stageBlock(QI.stageOf[2], 'log', id)}${approvalStrip('log', id, 2, QI.jobsOf('log', id))}</section>`;
   };
+
+
+  /* ---- charge mix calculator ---- */
+  const cmFromGrade = (g) => ({ grade: g ? g.name : '', weight: 1000, loss: 3, base: g && g.base && g.base.length ? g.base.map((b) => Object.assign({}, b)) : [{ mat: '', pct: '' }], adj: Object.assign({}, QI.DEF_ADJ), rec: {} });
+  const cmParams = () => { const s = ui.cm; return { grade: QI.cmGrade(s.grade), gradeName: s.grade, weight: s.weight, loss: s.loss, base: s.base, adj: s.adj, rec: s.rec }; };
+  const fnum = (v, d) => (v == null || !isFinite(v)) ? '–' : Number(v).toFixed(d == null ? 2 : d);
+  function cmResultHtml(p, r) {
+    if (r.error) return `<div class="warnBox">${esc(r.error)}</div>`;
+    const spec = (p.grade && p.grade.spec) || {};
+    const kg = r.rows.reduce((x, y) => x + y.kg, 0);
+    return `<div class="banner ${r.ok ? 'ok' : 'warn'}">${r.ok ? '✔ Predicted chemistry is within the grade limits.' : '⚠ Predicted chemistry is outside the grade limits – change the base charge or the additions.'}</div>
+      ${table(['Charge material', 'Kg', '% of charge'].concat(r.cost != null ? ['Cost'] : []), r.rows.map((x) => `<tr><td>${esc(x.name)} ${x.kind === 'alloy' ? badge('addition', 'info') : ''}</td><td><b>${fnum(x.kg, 1)}</b></td><td>${fnum(x.pct, 1)}</td>${r.cost != null ? `<td>${fnum(x.cost, 0)}</td>` : ''}</tr>`).concat([`<tr><td><b>Total charge</b></td><td><b>${fnum(kg, 1)}</b></td><td>100</td>${r.cost != null ? `<td><b>${fnum(r.cost, 0)}</b></td>` : ''}</tr>`]))}
+      ${r.cost != null ? `<div class="muted sm pad">Charge cost ≈ ${fnum(r.perKg, 2)} per kg of liquid metal.</div>` : ''}
+      <h4>Predicted chemistry (after recoveries)</h4>
+      ${table(['Element', 'Grade limit', 'Aim', 'Predicted %', ''], QI.EL.filter((e) => spec[e] || r.pred[e] > 0.005).map((e) => `<tr><td><b>${e}</b></td><td>${esc(QI.limText(spec[e] && spec[e].min !== undefined && spec[e].min !== '' ? +spec[e].min : null, spec[e] && spec[e].max !== undefined && spec[e].max !== '' ? +spec[e].max : null, '%') || '–')}</td><td>${r.aim[e] == null ? '–' : fnum(r.aim[e], 3)}</td><td><b>${fnum(r.pred[e], 3)}</b></td><td>${r.status[e] === 'ok' ? badge('OK', 'ok') : r.status[e] === 'na' ? '' : badge(r.status[e] === 'low' ? 'Low' : 'High', 'bad')}</td></tr>`))}`;
+  }
+  V.charge = () => {
+    const C = QI.cm();
+    if (!ui.cm) ui.cm = cmFromGrade(C.grades[0]);
+    const s = ui.cm;
+    const matOpts = (cur) => `<option value="">– select –</option>${C.materials.map((m) => `<option value="${esc(m.name)}" ${m.name === cur ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}`;
+    const rows = s.base.length < 3 ? s.base.concat(Array.from({ length: 3 - s.base.length }, () => ({ mat: '', pct: '' }))) : s.base;
+    const per = C.grades.map((g) => { const p = { grade: g, weight: 1000, loss: 3, base: g.base || [], adj: QI.DEF_ADJ, rec: {} }; const r = QI.chargeCalc(p); return { g, r }; });
+    return `<div class="hd"><h2>Charge mix</h2><div class="row"><button class="btn" data-act="cm-mats">Materials…</button><button class="btn" data-act="cm-grade" data-g="">+ New grade</button></div></div>
+    <div class="banner warn">Starter materials and grade limits are typical handbook values. Confirm them against your material certificates, the customer specification and your metallurgist before melting.</div>
+    <section class="card"><h3>Calculate a charge</h3>
+      <form id="cmform" onsubmit="return false">
+        <div class="grid3"><label class="f"><span>Grade</span><select name="grade">${C.grades.map((g) => `<option ${g.name === s.grade ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label>
+          ${fld('Total charge weight (kg)', 'weight', s.weight, 'type="number" min="1" step="any" inputmode="decimal"')}${fld('Melt loss (%)', 'loss', s.loss, 'type="number" min="0" max="20" step="any" inputmode="decimal"')}</div>
+        <div class="lbl">Base charge (returns / scrap / pig iron) – % of the base, normalised automatically</div>
+        ${rows.map((b, i) => `<div class="grid2"><label class="f"><select name="mat${i}">${matOpts(b.mat)}</select></label>${fld('', 'pct' + i, b.pct, 'type="number" min="0" step="any" placeholder="%" inputmode="decimal"')}</div>`).join('')}
+        <button type="button" class="btn sm ghost" data-act="cm-add-row">+ Add base material</button>
+        <details class="hist"><summary>Alloy additions and recoveries</summary>
+          <div class="muted sm pad">Each element with a grade aim is trimmed with the addition chosen here. Recovery = % of the element charged that reaches the melt.</div>
+          <div class="specgrid">${QI.EL.map((e) => `<div><span>${e}</span><select name="adj_${e}"><option value="">no addition</option>${C.materials.filter((m) => m.comp && +m.comp[e] > 20).map((m) => `<option value="${esc(m.name)}" ${s.adj[e] === m.name ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select><input name="rec_${e}" type="number" step="any" value="${esc(s.rec[e] != null ? s.rec[e] : QI.DEF_REC[e])}" title="Recovery %"></div>`).join('')}</div></details>
+      </form>
+      <div id="cm-out">${cmResultHtml(cmParams(), QI.chargeCalc(cmParams()))}</div>
+      <div class="row pad"><button class="btn primary" data-act="cm-save">Save to a heat…</button></div></section>
+    <section class="card"><h3>Standard charge for each grade <small class="muted">per 1000 kg charge, 3 % melt loss</small></h3>
+      ${per.length ? per.map(({ g, r }) => `<div class="li"><div class="row"><b>${esc(g.name)}</b>${r.error ? '' : r.ok ? badge('within limits', 'ok') : badge('check chemistry', 'bad')}<button class="btn sm ghost" data-act="cm-grade" data-g="${esc(g.name)}">Edit</button><button class="btn sm ghost" data-act="cm-del-grade" data-g="${esc(g.name)}">Delete</button></div>
+        ${g.note ? `<div class="muted sm">${esc(g.note)}</div>` : ''}
+        ${r.error ? `<div class="muted sm">${esc(r.error)}</div>` : `<div class="sm pad">${r.rows.map((x) => `${esc(x.name)} <b>${fnum(x.kg, 1)} kg</b>`).join(' · ')}</div><div class="muted sm">Predicted: ${QI.EL.filter((e) => g.spec[e]).map((e) => e + ' ' + fnum(r.pred[e], 2)).join(' · ')}</div>`}</div>`).join('') : '<div class="muted">No grades yet – add one.</div>'}</section>`;
+  };
+  function cmRead(f) {
+    const s = ui.cm; const g = (n) => (f.elements[n] ? f.elements[n].value : '');
+    s.weight = g('weight'); s.loss = g('loss'); s.base = [];
+    for (let i = 0; f.elements['mat' + i]; i++) s.base.push({ mat: g('mat' + i), pct: g('pct' + i) });
+    QI.EL.forEach((e) => { s.adj[e] = g('adj_' + e); s.rec[e] = g('rec_' + e); });
+  }
+  const fmtMats = (ms) => ms.map((m) => `${m.name} | ${Object.keys(m.comp).map((e) => e + ' ' + m.comp[e]).join(', ')}${m.cost ? ' | ' + m.cost : ''}`).join('\n');
+  const parseMats = (t) => t.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
+    const [name, comps = '', cost = ''] = l.split('|').map((x) => x.trim()); const comp = {};
+    comps.split(',').forEach((c) => { const m = c.trim().match(/^([A-Za-z]{1,2})\s+([\d.]+)$/); if (m) { const e = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase(); if (QI.EL.includes(e)) comp[e] = +m[2]; } });
+    const o = { name, comp }; if (cost && +cost > 0) o.cost = +cost; return o;
+  }).filter((m) => m.name);
+  const gradeBase = (t) => t.split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).map((p) => ({ mat: p[0], pct: parseFloat(p[1]) || 0 }));
+  const CHARGE_ACTS = {
+    'cm-add-row': () => { cmRead($('#cmform')); ui.cm.base.push({ mat: '', pct: '' }); render(); },
+    'cm-mats': () => modal('Charge materials', ta('One per line: name | element %, … | cost per kg (optional)', 'mats', fmtMats(QI.cm().materials), 'e.g. FeMn HC | Mn 75, C 7, Si 1, P 0.3 | 95  — elements: ' + QI.EL.join(', '), 14), (f) => { const ms = parseMats(val(f, 'mats')); if (!ms.length) return 'Add at least one material.'; QI.cm().materials = ms; QI.save(); }),
+    'cm-grade': (el) => {
+      const g = el.dataset.g ? QI.cmGrade(el.dataset.g) : { name: '', note: '', spec: {}, base: [] };
+      const specTxt = QI.EL.filter((e) => g.spec[e]).map((e) => [e, g.spec[e].min === undefined ? '' : g.spec[e].min, g.spec[e].max === undefined ? '' : g.spec[e].max, g.spec[e].aim === undefined ? '' : g.spec[e].aim].join(', ')).join('\n');
+      modal(g.name ? 'Edit grade' : 'New grade', `${fld('Grade name', 'name', g.name, 'required')}${fld('Note (standard / source)', 'note', g.note)}${ta('Chemistry – element, min, max, aim (leave blank if none)', 'spec', specTxt, 'e.g. <i>C, 3.5, 3.9, 3.7</i> · <i>Mn, , 0.4,</i> · aim defaults to the mid-point of min–max', 7)}${ta('Standard base charge – material, % (must match a material name)', 'base', (g.base || []).map((b) => b.mat + ', ' + b.pct).join('\n'), '', 5)}`, (f) => {
+        const name = val(f, 'name'); if (!name) return 'Enter the grade name.';
+        const spec = {}; val(f, 'spec').split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((p) => p[0]).forEach((p) => {
+          const e = p[0][0].toUpperCase() + p[0].slice(1).toLowerCase(); if (!QI.EL.includes(e)) return;
+          const o = {}; ['min', 'max', 'aim'].forEach((k, i) => { if (p[i + 1] !== undefined && p[i + 1] !== '' && isFinite(+p[i + 1])) o[k] = +p[i + 1]; }); if (Object.keys(o).length) spec[e] = o;
+        });
+        const base = gradeBase(val(f, 'base')); const bad = base.find((b) => !QI.cmMat(b.mat)); if (bad) return `“${bad.mat}” is not in the materials list.`;
+        const C = QI.cm(); const i = g.name ? C.grades.findIndex((x) => x.name === g.name) : -1; const ng = { name, note: val(f, 'note'), spec, base };
+        if (i >= 0) C.grades[i] = ng; else if (C.grades.some((x) => x.name === name)) return 'A grade with this name exists.'; else C.grades.push(ng);
+        QI.learn('grade', name); ui.cm = null; QI.save();
+      });
+    },
+    'cm-del-grade': (el) => ask(`Delete grade “${el.dataset.g}”?`, () => { const C = QI.cm(); C.grades = C.grades.filter((x) => x.name !== el.dataset.g); ui.cm = null; QI.save(); }, 'Delete'),
+    'cm-save': () => {
+      const p = cmParams(), r = QI.chargeCalc(p); if (r.error) { toast(r.error, 'bad'); return; }
+      if (!S().heats.length) { toast('Create a heat first (Heats page).', 'bad'); return; }
+      modal('Save charge to a heat', `${sel('Heat', 'heat', S().heats.map((h) => h.no), '')}<label class="chip"><input type="checkbox" name="spec" checked> Also set this grade’s limits as the heat’s chemistry specification (checks 4.1 / 4.2)</label>`, (f) => {
+        const h = val(f, 'heat'); const res = QI.saveCharge(h, p, r); if (res.error) return res.error; if (f.elements.spec.checked) QI.applyGradeSpec(h, p.gradeName); toast('Charge saved to heat ' + h, 'ok');
+      }, 'Save');
+    },
+    'cm-load': (el) => { const h = QI.heat(el.dataset.no); if (!h || !h.charge) return; const c = h.charge; ui.cm = { grade: c.grade, weight: c.weight, loss: c.loss, base: c.base.map((b) => Object.assign({}, b)), adj: Object.assign({}, c.adj), rec: Object.assign({}, c.rec) }; go('charge'); },
+    'cm-plan': () => { ui.cm = null; go('charge'); },
+  };
+  document.addEventListener('input', (e) => {
+    const f = e.target.closest && e.target.closest('#cmform'); if (!f || e.target.name === 'grade') return;
+    cmRead(f); const p = cmParams(); $('#cm-out').innerHTML = cmResultHtml(p, QI.chargeCalc(p));
+  });
+  document.addEventListener('change', (e) => {
+    const f = e.target.closest && e.target.closest('#cmform'); if (!f) return;
+    if (e.target.name === 'grade') { ui.cm = cmFromGrade(QI.cmGrade(e.target.value)); render(); return; }
+    cmRead(f); const p = cmParams(); $('#cm-out').innerHTML = cmResultHtml(p, QI.chargeCalc(p));
+  });
 
   /* ---- approvals queue ---- */
   V.approvals = () => {
@@ -2540,6 +2748,7 @@ window.PLAN = {
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
+  Object.assign(ACT, CHARGE_ACTS);
   function download(name, text, type) {
     if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -2618,10 +2827,10 @@ window.PLAN = {
   }
 
   /* ================= router ================= */
-  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
+  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'cm-save': ['charge'], 'cm-mats': ['charge'], 'cm-grade': ['charge'], 'cm-del-grade': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -2659,13 +2868,13 @@ window.PLAN = {
     if ($('#dlg').open || $('form.chkform')) { ui.stale = true; $('#stale').hidden = false; } else render();
   };
   QI.onError = (e) => toast('Not saved: ' + ((e && e.code === 'not_writer') || (e && /permission|writer|denied/i.test(e.message || '')) ? 'you have view-only access.' : (e && e.message) || 'connection problem.'), 'bad');
-  if (!HOSTED) QI.seed();
+  if (!HOSTED) QI.seed(); if (QI.seedCharge) QI.seedCharge();
   render();
   if (HOSTED) {
     Promise.all([window.claude.use('db'), window.claude.use('user'), window.claude.use('downloads')]).then(([db, user, dl]) => {
       DL = dl;
-      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; QI.seed(); render(); QI.onError(e); }); else { booting = false; QI.seed(); render(); }
-    }).catch(() => { booting = false; QI.seed(); render(); });
+      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; QI.seed(); if (QI.seedCharge) QI.seedCharge(); render(); QI.onError(e); }); else { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); render(); }
+    }).catch(() => { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); render(); });
   }
   if (!QI.persistent) toast('Browser storage unavailable – data will not be saved. Use Settings → Backup.', 'bad');
   window.QIApp = { render, demoData };

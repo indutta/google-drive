@@ -74,6 +74,7 @@
     if (action === 'create') return (d.create || []).includes(arg);
     if (action === 'link') return (d.link || []).includes(arg);
     if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
+    if (action === 'charge') return d.id === 'melt';
     return false;                                 // release, reject, ncr, plan, admin: quality only
   };
 
@@ -82,7 +83,7 @@
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
   const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id' };
-  const cfgForm = () => ({ seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const cfgForm = () => ({ charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
     Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
@@ -122,7 +123,7 @@
       const w = user.can ? user.can('data.write') : null; QI.me.canWrite = w !== false;
     }
     let pending = 0;
-    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; QI.seed(); pushDiff(); QI.onChange(true); } };
+    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; QI.seed(); if (QI.seedCharge) QI.seedCharge(); pushDiff(); QI.onChange(true); } };
     const reg = (path, handler) => { pending++; listen(path, handler, done); };
     Object.keys(COLS).forEach((col) => reg(col, (ch) => {
       const body = clone(ch.doc.data() || {}), p = col + '/' + ch.doc.id;
@@ -150,7 +151,7 @@
     reg('meta', (ch) => {
       if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
       const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
-      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); if (b.charge && b.charge.materials) S.settings.charge = b.charge; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
       synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
     });
     reg('people', (ch) => {

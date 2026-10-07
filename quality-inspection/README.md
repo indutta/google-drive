@@ -43,3 +43,6 @@ Each stage is signed three times: **Inspector → QC Manager → Factory Head**.
 
 ## Customers and items
 Dropdowns start with Escorts (Main Body, Knuckle), Tega (Tega Small Casting, Tega Big Casting), Thejo (Thejo Lifter Bar), Komatsu (17M Idler, 195 Idler, 21 N Idler, 154 Idler), plus BEML and Sona (items to be added). Choosing a customer shows that customer's items; a new item typed under *Other* is saved for that customer only.
+
+## Charge mix
+**Charge mix** page: pick a grade, enter the total charge weight and the base charge (returns / scrap / pig iron, in %). The app solves the ferro-alloy and recarburiser additions that bring the predicted melt to the grade aim, allowing for element recoveries and melt loss, then checks every element against the grade limits. A table shows the standard charge per 1000 kg for every grade. *Save to a heat* stores the charge on the heat and can copy the grade limits into the heat's chemistry specification (checks 4.1 / 4.2). Materials, grades and recoveries are editable. **The starter materials and the two starter grades (WCB steel, EN-GJS-500-7 SG iron) are typical handbook values – confirm them before use.**
