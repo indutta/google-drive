@@ -24,7 +24,7 @@
 
   /* ---------- state ---------- */
   const blank = () => ({ v: 1, seq: { ncr: 0, log: 0 }, settings: { inspector: '', overrides: {} },
-    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], results: {}, approvals: {}, ncrs: [] });
+    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], mouldPlans: [], results: {}, approvals: {}, ncrs: [] });
   let S = blank();
   QI.persistent = true;
   try {
@@ -75,6 +75,7 @@
     if (action === 'link') return (d.link || []).includes(arg);
     if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
     if (action === 'charge' || action === 'melt') return d.id === 'melt';
+    if (action === 'mould') return d.id === 'sand' || d.id === 'planning';
     return false;                                 // release, reject, ncr, plan, admin: quality only
   };
 
@@ -82,8 +83,8 @@
   let DB = null, ready = true, synced = {}, queue = Promise.resolve();
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
-  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat' };
-  const cfgForm = () => ({ melt: S.settings.melt || {}, charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat', mouldPlans: 'date' };
+  const cfgForm = () => ({ mould: S.settings.mould || {}, melt: S.settings.melt || {}, charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
     Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
@@ -151,7 +152,7 @@
     reg('meta', (ch) => {
       if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
       const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
-      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); if (b.charge && (b.charge.recipes || b.charge.materials)) S.settings.charge = b.charge; if (b.melt && b.melt.specs) S.settings.melt = b.melt; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); if (b.charge && (b.charge.recipes || b.charge.materials)) S.settings.charge = b.charge; if (b.melt && b.melt.specs) S.settings.melt = b.melt; if (b.mould && b.mould.densResin) S.settings.mould = b.mould; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
       synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
     });
     reg('people', (ch) => {

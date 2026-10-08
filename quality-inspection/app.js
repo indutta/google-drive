@@ -11,7 +11,7 @@
   const hist = [];
   const HOSTED = !!window.claude;
   const go = (p) => { p = String(p).replace(/^#?\/?/, '') || 'dashboard'; if (p !== route) { hist.push(route); route = p; } window.scrollTo(0, 0); render(); };
-  const ui = { ml: null, cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
+  const ui = { mp: null, ml: null, cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
   const SCOPE_LABEL = { job: 'Work order', log: 'Sand & calibration log', heat: 'Heat', casting: 'Casting' };
 
   /* ================= small components ================= */
@@ -530,7 +530,7 @@
       <tr><td>Foundry return (runner / riser etc.)</td><td>${mlIn('fr.wt')}</td><td>${mlIn('fr.note', { type: 'text' })}</td></tr>
       <tr class="tot"><th>Scrap + return</th><th><span data-c="ml.scrap"></span></th><th></th></tr></tbody></table></div><button class="btn sm ghost" data-act="ml-addscrap">+ Add scrap row</button></section>
     <section class="card"><h3>Ferro alloys <small class="muted">weight per addition: charge + after Bath 1 + after Bath 2</small></h3><div class="tw"><table class="cmt"><thead><tr><th>Alloy</th><th>Wt 1</th><th>Wt 2</th><th>Wt 3</th><th>Total</th><th>MRN No.</th></tr></thead><tbody>
-      ${QI.ML_ALLOYS.map(([k, t]) => `<tr><td>${t}</td>${[0, 1, 2].map((i) => `<td>${mlIn(`alloys.${k}.w.${i}`)}</td>`).join('')}<td class="calc" data-c="at.${k}"></td><td>${mlIn(`alloys.${k}.mrn`, { type: 'text' })}</td></tr>`).join('')}
+      ${QI.ML_ALLOYS.map(([k, t]) => `<tr><td>${t}</td>${[0, 1, 2].map((i) => `<td>${mlIn(`alloys.${k}.w.${i}`)}</td>`).join('')}<td><span class="calc" data-c="at.${k}"></span></td><td>${mlIn(`alloys.${k}.mrn`, { type: 'text' })}</td></tr>`).join('')}
       <tr class="tot"><th>Ferro alloys total</th><td colspan="3"></td><th data-c="ml.alloy"></th><td></td></tr></tbody></table></div></section>
     <section class="card"><h3>LM distribution</h3><div class="grid3">${[['mould', 'Mould pouring (kg)'], ['pigged', 'Pigged (kg)'], ['heel', 'Heel / Return (kg)'], ['floor', 'Floor loss (kg)'], ['skull', 'Ladle skull (kg)']].map(([k, t]) => mlLbl(t, mlIn('lm.' + k))).join('')}
       ${mlLbl('Total LM (kg)', '<div class="calc" data-c="ml.lm"></div>')}${mlLbl('Total charges (kg)', '<div class="calc" data-c="ml.charges"></div>')}${mlLbl('Melting loss (kg)', '<div class="calc" data-c="ml.loss"></div>')}${mlLbl('Melting loss (%)', '<div class="calc" data-c="ml.losspct"></div>')}</div></section>
@@ -601,6 +601,96 @@
       if (t.value === '__other') { o.hidden = false; o.focus(); return; }
       setPath(ui.ml.log, t.dataset.p, t.value); ui.ml.dirty = true;
       if (t.dataset.p === 'grade') { const sp = (QI.mlStore().specs || {})[t.value]; if (sp && !Object.keys(ui.ml.log.spec).length) ui.ml.log.spec = clone(sp); render(); } else mlUpdate();
+    }
+  });
+
+  /* ---- moulding daily plan ---- */
+  const mpLoad = (date) => { const ex = QI.mouldPlan(date); ui.mp = { plan: ex ? clone(ex) : QI.mpNew(date), dirty: false }; };
+  const mpIn = (p, o) => { o = o || {}; const v = getP(ui.mp.plan, p); return `<input data-p="${p}" type="${o.type || 'number'}" ${o.type ? '' : 'step="any" inputmode="decimal"'} value="${esc(v == null ? '' : v)}" ${o.extra || ''}>`; };
+  const mpSel = (p, listKey, defs, extraOpts) => {
+    const cur = getP(ui.mp.plan, p) || ''; const opts = QI.opts(listKey, defs); (extraOpts || []).forEach((x) => { if (!opts.includes(x)) opts.push(x); }); if (cur && !opts.includes(cur)) opts.unshift(cur);
+    return `<select class="mpsel" data-p="${p}" data-list="${listKey}"><option value="">– select –</option>${opts.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option></select><input class="other" data-other="${p}" data-list="${listKey}" placeholder="Type new value – saved for next time" hidden>`;
+  };
+  const calibStatus = (kind, v) => v == null ? '' : kind === 'resin' ? (v >= 1.8 && v <= 2 ? 'ok' : 'bad') : (v >= 18 && v <= 21 ? 'ok' : 'bad');
+  function mpValues() {
+    const c = QI.mpCalc(ui.mp.plan), m = {}; m['mp.total'] = String(c.total);
+    ui.mp.plan.items.forEach((it, i) => { m['mp.item.' + i] = String(c.perItem[i]); });
+    m['mp.heats'] = c.heats.length ? c.heats.map((h) => `${esc(h.label)}: <b>${h.qty}</b>`).join(' · ') : '–';
+    QI.MP_PLANTS.forEach((k) => { const r = c.resinPct[k], t = c.catPct[k]; m['mp.res.' + k] = r == null ? '–' : `<span class="rd-${calibStatus('resin', r)}">${r.toFixed(2)} %</span>`; m['mp.cat.' + k] = t == null ? '–' : `<span class="rd-${calibStatus('cat', t)}">${t.toFixed(1)} %</span>`; });
+    return m;
+  }
+  function mpUpdate() { if (!ui.mp) return; const m = mpValues(); document.querySelectorAll('#mp [data-c]').forEach((el) => { if (m[el.dataset.c] != null) el.innerHTML = m[el.dataset.c]; }); const d = $('#mp-dirty'); if (d) d.hidden = !ui.mp.dirty; }
+  V.mould = () => {
+    const L = S().mouldPlans.slice().sort((x, y) => y.date.localeCompare(x.date));
+    return `<div class="hd"><h2>Moulding log <small>Daily plan &amp; calibration</small></h2><button class="btn primary" data-act="mp-new">+ New moulding plan</button></div>
+    ${L.length ? table(['Date', 'Items', 'Moulds planned', 'Heats', 'Calibration', ''], L.map((p) => { const c = QI.mpCalc(p); const cal = QI.MP_CALIB.slice(0, 3).some(([k]) => QI.MP_PLANTS.some((q) => p.calib[k] && p.calib[k][q] !== '' && p.calib[k][q] != null));
+      return `<tr><td><b>${esc(p.date)}</b></td><td>${p.items.length}</td><td>${c.total}</td><td class="sm">${c.heats.map((h) => esc(h.label) + ' ' + h.qty).join(' · ')}</td><td>${cal ? badge('recorded', 'ok') : badge('–', 'mute')}</td><td><button class="btn sm ghost" data-act="mp-open" data-date="${esc(p.date)}">Open</button></td></tr>`; })) : empty('No moulding plans yet. Tap “New moulding plan” to record the day’s items, heat-wise quantities and calibration.')}`;
+  };
+  V.mouldplan = (date) => {
+    if (!ui.mp || ui.mp.plan.date !== date) mpLoad(date);
+    const p = ui.mp.plan, d = QI.mpStore(), saved = !!p.ts;
+    const heats = S().heats.map((h) => h.no);
+    return `<div id="mp"><div class="hd"><div><h2>Moulding Daily Plan</h2><div class="muted sm">${saved ? `Saved by ${esc(p.by)}, ${fdt(p.ts)}` : 'Not saved yet'}</div></div>
+      <div class="row"><button class="btn primary" data-act="mp-save">Save plan</button><button class="btn" data-act="mp-post">Post calibration…</button><button class="btn" data-act="mp-dl">Download sheet</button></div></div>
+    <div class="banner warn" id="mp-dirty" ${ui.mp.dirty ? '' : 'hidden'}>Unsaved changes – tap <b>Save plan</b>.</div>
+    <section class="card"><h3>Date</h3><div class="grid3">${mlLbl('Date', mpIn('date', { type: 'date', extra: saved ? 'readonly' : '' }))}${mlLbl('Moulds planned (total)', '<div class="calc" data-c="mp.total"></div>')}${mlLbl('Heat-wise total', '<div class="calc sm" data-c="mp.heats"></div>')}</div></section>
+    ${p.items.map((it, i) => `<section class="card"><div class="hd"><h3>Item ${i + 1} <span class="muted sm">· moulds: <b data-c="mp.item.${i}"></b></span></h3><button class="btn sm ghost" data-act="mp-delitem" data-i="${i}">Remove item</button></div>
+      ${mlLbl('Item name', mpSel(`items.${i}.item`, 'mlProduct', []))}
+      <div class="tw"><table class="cmt"><thead><tr><th>H/T No.</th><th>Qty</th><th>Furnace log</th><th></th></tr></thead><tbody>
+        ${it.lines.map((l, j) => { const pr = l.heat && it.item ? QI.mpPoured(l.heat, it.item) : null; return `<tr><td>${mpSel(`items.${i}.lines.${j}.heat`, 'mpHeat', [], heats)}</td><td>${mpIn(`items.${i}.lines.${j}.qty`)}</td><td>${pr == null ? '<span class="muted sm">no log</span>' : badge('poured ' + pr, pr >= n0(l.qty) && n0(l.qty) > 0 ? 'ok' : 'warn')}</td><td><button class="x" data-act="mp-delline" data-i="${i}" data-j="${j}" title="Remove">×</button></td></tr>`; }).join('')}</tbody></table></div>
+      <button class="btn sm ghost" data-act="mp-addline" data-i="${i}">+ Add heat line</button></section>`).join('')}
+    <button class="btn" data-act="mp-additem">+ Add item</button>
+    <section class="card pad"><h3>Calibration</h3><div class="muted sm pad">Readings per plant P1–P3. Resin and catalyst are checked as % (resin ÷ sand weight, catalyst ÷ resin) against the plan limits 1.8–2 % and 18–21 %.</div>
+      <div class="tw"><table class="cmt"><thead><tr><th></th>${QI.MP_PLANTS.map((k) => `<th>${k.toUpperCase()}</th>`).join('')}</tr></thead><tbody>
+        ${QI.MP_CALIB.map(([k, t]) => `<tr><th>${t}</th>${QI.MP_PLANTS.map((q) => `<td>${mpIn(`calib.${k}.${q}`)}</td>`).join('')}</tr>`).join('')}
+        <tr class="tot"><th>Resin % of sand wt</th>${QI.MP_PLANTS.map((q) => `<td><span class="calc" data-c="mp.res.${q}"></span></td>`).join('')}</tr>
+        <tr class="tot"><th>Catalyst % of resin wt</th>${QI.MP_PLANTS.map((q) => `<td><span class="calc" data-c="mp.cat.${q}"></span></td>`).join('')}</tr></tbody></table></div>
+      <div class="grid2 pad"><label class="f"><span>Resin density (kg/l) – confirm from data sheet</span><input data-g="densResin" type="number" step="any" value="${esc(d.densResin)}"></label><label class="f"><span>Catalyst density (kg/l) – confirm from data sheet</span><input data-g="densCat" type="number" step="any" value="${esc(d.densCat)}"></label></div></section>
+    <section class="card"><h3>Remarks</h3><textarea data-p="remarks" rows="3">${esc(p.remarks)}</textarea></section></div>`;
+  };
+  function mpSheetHtml(p) {
+    const c = QI.mpCalc(p), td = (v) => `<td>${esc(v == null ? '' : v)}</td>`;
+    return `<h2>Molding Daily Plan – ${esc(p.date)}</h2><table><tr><th>Item name</th><th>H/T No, Qty</th></tr>${p.items.map((it) => `<tr>${td(it.item)}<td>${it.lines.filter((l) => l.heat || l.qty).map((l) => esc(l.heat) + '-' + esc(l.qty)).join(' &nbsp; ')}</td></tr>`).join('')}</table>
+    <p>Total moulds: <b>${c.total}</b> &nbsp; ${c.heats.map((h) => esc(h.label) + ': ' + h.qty).join(' · ')}</p>
+    <table><tr><th>Calibration</th><th>P1</th><th>P2</th><th>P3</th></tr>${QI.MP_CALIB.map(([k, t]) => `<tr><th>${t}</th>${QI.MP_PLANTS.map((q) => td(p.calib[k][q])).join('')}</tr>`).join('')}<tr><th>Resin % of sand</th>${QI.MP_PLANTS.map((q) => td(c.resinPct[q] == null ? '' : c.resinPct[q].toFixed(2))).join('')}</tr><tr><th>Catalyst % of resin</th>${QI.MP_PLANTS.map((q) => td(c.catPct[q] == null ? '' : c.catPct[q].toFixed(1))).join('')}</tr></table><p>${esc(p.remarks)}</p>`;
+  }
+  const MOULD_ACTS = {
+    'mp-new': () => { const last = S().mouldPlans.slice().sort((x, y) => y.date.localeCompare(x.date))[0]; modal('New moulding plan', `${fld('Date', 'date', today(), 'type="date" required')}${last ? `<label class="chip"><input type="checkbox" name="copy"> Copy items from the last plan (${esc(last.date)})</label>` : ''}`, (f) => {
+      const date = val(f, 'date'); if (!date) return 'Choose the date.'; if (QI.mouldPlan(date)) { mpLoad(date); go('mouldplan/' + date); return; }
+      ui.mp = { plan: QI.mpNew(date, f.elements.copy && f.elements.copy.checked ? last : null), dirty: true }; go('mouldplan/' + date); }, 'Open plan'); },
+    'mp-open': (el) => { mpLoad(el.dataset.date); go('mouldplan/' + el.dataset.date); },
+    'mp-save': () => { if (needInspector()) return; const r = QI.mpSave(ui.mp.plan); if (r.error) { toast(r.error, 'bad'); return; } ui.mp.dirty = false; mpLoad(ui.mp.plan.date); render(); toast('Moulding plan saved', 'ok'); },
+    'mp-addline': (el) => { ui.mp.plan.items[+el.dataset.i].lines.push({ heat: '', qty: '' }); ui.mp.dirty = true; render(); },
+    'mp-delline': (el) => { const ls = ui.mp.plan.items[+el.dataset.i].lines; if (ls.length > 1) ls.splice(+el.dataset.j, 1); else ls[0] = { heat: '', qty: '' }; ui.mp.dirty = true; render(); },
+    'mp-additem': () => { ui.mp.plan.items.push({ item: '', lines: [{ heat: '', qty: '' }] }); ui.mp.dirty = true; render(); },
+    'mp-delitem': (el) => { ui.mp.plan.items.splice(+el.dataset.i, 1); if (!ui.mp.plan.items.length) ui.mp.plan.items.push({ item: '', lines: [{ heat: '', qty: '' }] }); ui.mp.dirty = true; render(); },
+    'mp-dl': () => download(`moulding-plan-${ui.mp.plan.date}.html`, `<!doctype html><meta charset="utf-8"><title>Molding Daily Plan ${esc(ui.mp.plan.date)}</title><style>body{font:13px system-ui;margin:14px}table{border-collapse:collapse;margin-bottom:10px}th,td{border:1px solid #888;padding:3px 8px;text-align:left}th{background:#eee}</style>${mpSheetHtml(ui.mp.plan)}`, 'text/html'),
+    'mp-post': () => {
+      if (needInspector()) return; if (ui.mp.dirty || !ui.mp.plan.ts) { toast('Save the plan first.', 'bad'); return; }
+      const p = ui.mp.plan, items = QI.mpPreview(p);
+      if (!items.length) { toast('Enter calibration readings first.', 'bad'); return; }
+      modal('Post calibration to the sand & calibration log', `${sel('Shift', 'shift', ['A', 'B', 'C'], 'A')}<p class="muted sm">Recorded against the sand log of ${esc(p.date)} (stage 2). P3 sand and water have no check in the plan and are not posted.</p>
+        ${items.map((it) => `<div class="li"><b>${it.id}</b> ${esc(it.label)} – ${it.plant}: ${it.ev.error ? esc(it.ev.error) : `${it.ev.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')} ${esc(it.ev.summary)}`}
+          ${!it.ev.error && it.ev.result === 'nok' ? `<label class="f"><span>If Not OK – action</span><select name="act_${it.id}${it.plant}">${it.actions.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>` : ''}</div>`).join('')}`,
+        (f) => { const acts = {}; items.forEach((it) => { const e = f.elements['act_' + it.id + it.plant]; if (e) acts[it.id + it.plant] = e.value; });
+          const r = QI.mpPost(p, val(f, 'shift'), acts); if (r.error) return r.error; const bad = r.res.filter((x) => x.error); if (!r.res.length || bad.length === r.res.length) return (bad[0] && bad[0].error) || 'Nothing to post.';
+          toast(`Posted ${r.res.length - bad.length} calibration check(s) to ${r.logId}${r.res.some((x) => x.ncr) ? ' · NCR raised' : ''}`, r.res.some((x) => x.result === 'nok') ? 'bad' : 'ok'); }, 'Post');
+    },
+  };
+  document.addEventListener('input', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#mp') || !ui.mp) return;
+    if (t.dataset.g) { const d = QI.mpStore(); d[t.dataset.g] = parseFloat(t.value) || 0; QI.save(); mpUpdate(); return; }
+    if (t.dataset.other) { setPath(ui.mp.plan, t.dataset.other, t.value); ui.mp.dirty = true; return; }
+    if (!t.dataset.p || t.tagName === 'SELECT') return;
+    setPath(ui.mp.plan, t.dataset.p, t.type === 'number' ? (t.value === '' ? '' : parseFloat(t.value)) : t.value); ui.mp.dirty = true; mpUpdate();
+  });
+  document.addEventListener('change', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#mp') || !ui.mp) return;
+    if (t.dataset.other) { QI.learn(t.dataset.list, t.value.trim()); ui.mp.dirty = true; render(); return; }
+    if (t.classList.contains('mpsel')) {
+      const o = t.parentNode.querySelector('input[data-other]');
+      if (t.value === '__other') { o.hidden = false; o.focus(); return; }
+      setPath(ui.mp.plan, t.dataset.p, t.value); ui.mp.dirty = true; render();
     }
   });
 
@@ -764,7 +854,7 @@
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS);
   function download(name, text, type) {
     if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -843,10 +933,10 @@
   }
 
   /* ================= router ================= */
-  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['melt', 'Melting log'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
+  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['melt', 'Melting log'], ['mould', 'Moulding log'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -862,7 +952,7 @@
     const view = parts[0]; const arg = decodeURIComponent(parts.slice(1).join('/'));
     const fn = booting || (QI.mode === 'shared' && !QI.ready) ? () => empty('Connecting to shared inspection data…') : (V[view] || V.dashboard);
     const open = $('#dlg').open;
-    const active = view === 'meltlog' ? 'melt' : view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
+    const active = view === 'mouldplan' ? 'mould' : view === 'meltlog' ? 'melt' : view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
     $('#nav').innerHTML = NAV.map(([k, t]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${t}</a>`).join('');
     $('#who').textContent = QI.mode === 'shared' ? (QI.me.dept ? `👤 ${QI.me.name || 'You'} · ${QI.dept().name.split(' ')[0]}` : 'Choose department') : (S().settings.inspector ? '👤 ' + S().settings.inspector : 'Set inspector');
     $('#back').hidden = !hist.length;
@@ -873,6 +963,7 @@
     applyPerms($('#main'));
     if (view === 'charge' && ui.cm && ui.cm.r) cmUpdate();
     if (view === 'meltlog' && ui.ml) mlUpdate();
+    if (view === 'mouldplan' && ui.mp) mpUpdate();
     document.body.classList.toggle('printing', view === 'report');
     if (!open) $('#main').dataset.view = view;
     window.scrollTo(0, y);
