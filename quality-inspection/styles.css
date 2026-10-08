@@ -86,3 +86,7 @@ dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface)
 .cmt{min-width:560px}.cmt input{width:100%;min-width:58px;padding:.25rem .35rem;min-height:36px}.cmt th{white-space:nowrap}.cmt .tot th,.cmt .tot td{background:var(--s2)}.cmt td[data-c]{font-variant-numeric:tabular-nums;text-align:right}
 .kv2{max-width:520px}.kv2 td:last-child{text-align:right;font-variant-numeric:tabular-nums}.kv2 .tot td{border-top:2px solid var(--line)}
 .cmt td:first-child input{min-width:150px}.cmt td:first-child{white-space:nowrap}
+
+.calc{min-height:44px;display:flex;align-items:center;font-weight:700;font-variant-numeric:tabular-nums}
+#ml .cmt input[data-rd]{min-width:64px}.rd-ok{background:var(--okbg)}.rd-low,.rd-high{background:var(--badbg);color:var(--bad);font-weight:700}
+#ml .mlsel{width:100%;min-width:130px}#ml .cmt td{vertical-align:middle}

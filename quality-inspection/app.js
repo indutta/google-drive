@@ -11,7 +11,7 @@
   const hist = [];
   const HOSTED = !!window.claude;
   const go = (p) => { p = String(p).replace(/^#?\/?/, '') || 'dashboard'; if (p !== route) { hist.push(route); route = p; } window.scrollTo(0, 0); render(); };
-  const ui = { cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
+  const ui = { ml: null, cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
   const SCOPE_LABEL = { job: 'Work order', log: 'Sand & calibration log', heat: 'Heat', casting: 'Casting' };
 
   /* ================= small components ================= */
@@ -359,6 +359,7 @@
       <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
+    ${(() => { const fl = QI.furnaceLog(no); if (!fl) return QI.can('melt') ? `<section class="card"><h3>Furnace log sheet</h3><div class="muted sm pad">No furnace log for this heat yet.</div><button class="btn sm" data-act="ml-open" data-heat="${esc(no)}">Open furnace log</button></section>` : ''; const c = QI.mlCalc(fl); return `<section class="card"><h3>Furnace log sheet <small class="muted">${esc(fl.furnace ? 'Furnace ' + fl.furnace : '')} · saved by ${esc(fl.by)}, ${fdt(fl.ts)}</small></h3><div class="sm">Total LM <b>${f2(c.lm, 0)} kg</b> · charges ${f2(c.charges, 0)} kg · melting loss ${c.lossPct == null ? '–' : f2(c.lossPct, 1) + ' %'} · ${c.kwhPerT == null ? '–' : f2(c.kwhPerT, 0) + ' kWh/t'} · tapping ${esc(fl.tapTemp || '–')} °C · pouring ${esc(fl.pourTemp || '–')} °C</div><button class="btn sm" data-act="ml-open" data-heat="${esc(no)}">Open furnace log</button></section>`; })()}
     ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.recipe)} · LM ${esc(h.charge.lm)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
       <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Expected: ${Object.keys(h.charge.expected).map((e) => e + ' ' + h.charge.expected[e]).join(' · ')} ${h.charge.ok ? badge('within target', 'ok') : badge('outside target', 'warn')} · Final cost Rs ${h.charge.finalCost}/kg</div>
       <button class="btn sm" data-act="cm-load" data-no="${esc(no)}">Open in calculator</button></section>` : `<section class="card"><h3>Charge mix</h3><div class="muted sm pad">No charge calculated for this heat yet.</div><button class="btn sm" data-act="cm-plan">Plan charge mix</button></section>`}
@@ -392,7 +393,7 @@
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const f2 = (v, d) => (v == null || !isFinite(v)) ? '–' : Number(v).toFixed(d == null ? 2 : d);
   const cmEls = () => ui.cm.r.els;
-  const setPath = (obj, path, v) => { const k = path.split('.'); let o = obj; for (let i = 0; i < k.length - 1; i++) { if (o[k[i]] == null) o[k[i]] = {}; o = o[k[i]]; } o[k[k.length - 1]] = v; };
+  const setPath = (obj, path, v) => { const k = path.split('.'); let o = obj; for (let i = 0; i < k.length - 1; i++) { if (o[k[i]] == null) o[k[i]] = /^\d+$/.test(k[i + 1]) ? [] : {}; o = o[k[i]]; } o[k[k.length - 1]] = v; };
   const cmOpen = (rec) => { ui.cm = { id: rec ? rec.id : null, r: rec ? clone(rec) : null, dirty: false }; };
   const cmIn = (p, v, extra) => `<input data-p="${p}" value="${esc(v == null ? '' : v)}" type="number" step="any" inputmode="decimal" ${extra || ''}>`;
   const cmBadge = (s) => s === 'ok' ? badge('OK', 'ok') : s === 'low' ? badge('Low', 'bad') : s === 'high' ? badge('High', 'bad') : '';
@@ -479,6 +480,128 @@
     const t = e.target; if (!t.closest || !t.closest('#cm')) return;
     if (t.id === 'cm-pick') { cmOpen(QI.cm().recipes.find((x) => x.id === t.value)); render(); return; }
     if (t.type === 'checkbox' && t.dataset.p) { setPath(ui.cm.r, t.dataset.p, t.checked); ui.cm.dirty = true; cmUpdate(); }
+  });
+
+  /* ---- furnace log sheet (DCL/FR/04 Re/05) ---- */
+  const getP = (o, path) => path.split('.').reduce((x, k) => (x == null ? '' : x[k]), o);
+  const mlLoad = (heat) => { const ex = QI.furnaceLog(heat); ui.ml = { log: ex ? clone(ex) : QI.mlNew(heat, ''), dirty: false, isNew: !ex }; };
+  const mlIn = (p, o) => { o = o || {}; const v = getP(ui.ml.log, p); return `<input data-p="${p}" type="${o.type || 'number'}" ${o.type ? '' : 'step="any" inputmode="decimal"'} value="${esc(v == null ? '' : v)}" ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.extra || ''}>`; };
+  const mlSel = (p, listKey, defs) => {      // dropdown with "Other (specify)…" that learns new values
+    const cur = getP(ui.ml.log, p) || ''; const opts = QI.opts(listKey, defs); if (cur && !opts.includes(cur)) opts.unshift(cur);
+    return `<select class="mlsel" data-p="${p}" data-list="${listKey}"><option value="">– select –</option>${opts.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option></select><input class="other" data-other="${p}" data-list="${listKey}" placeholder="Type new value – saved for next time" hidden>`;
+  };
+  const mlLbl = (t, inner) => `<label class="f"><span>${t}</span>${inner}</label>`;
+  function mlValues() {
+    const l = ui.ml.log, c = QI.mlCalc(l), m = {};
+    m['ml.scrap'] = f2(c.scrap, 1); m['ml.alloy'] = f2(c.alloy, 1); m['ml.charges'] = f2(c.charges, 1); m['ml.lm'] = f2(c.lm, 1);
+    m['ml.loss'] = c.loss == null ? '–' : f2(c.loss, 1); m['ml.losspct'] = c.lossPct == null ? '–' : f2(c.lossPct, 2) + ' %'; m['ml.kwh'] = c.kwh == null ? '–' : f2(c.kwh, 0); m['ml.kwhpt'] = c.kwhPerT == null ? '–' : f2(c.kwhPerT, 0); m['ml.ht'] = c.heatTime || '–';
+    QI.ML_ALLOYS.forEach(([k]) => { m['at.' + k] = f2(((l.alloys[k] && l.alloys[k].w) || []).reduce((x, v) => x + n0(v), 0), 1); });
+    return m;
+  }
+  function mlUpdate() {
+    if (!ui.ml) return; const m = mlValues();
+    document.querySelectorAll('#ml [data-c]').forEach((el) => { if (m[el.dataset.c] != null) el.textContent = m[el.dataset.c]; });
+    document.querySelectorAll('#ml input[data-rd]').forEach((el) => { const [bk, e] = el.dataset.rd.split('.'); const st = QI.mlStatus(ui.ml.log, e, getP(ui.ml.log, `bath.${bk}.${e}`)); el.className = st ? 'rd-' + st : ''; });
+    const d = $('#ml-dirty'); if (d) d.hidden = !ui.ml.dirty;
+  }
+  V.melt = () => {
+    const L = S().furnaceLogs.slice().sort((x, y) => (y.date || '').localeCompare(x.date || '') || y.heat.localeCompare(x.heat));
+    return `<div class="hd"><h2>Melting log <small>Furnace Log Sheet</small></h2><button class="btn primary" data-act="ml-new">+ New furnace log</button></div>
+    ${L.length ? table(['Heat', 'Date', 'Furnace', 'Grade', 'Total LM (kg)', 'Melting loss', 'kWh / t', 'Signed', ''], L.map((l) => { const c = QI.mlCalc(l); const sg = ['shift', 'incharge', 'metallurgist'].filter((k) => l.sign && l.sign[k]).length;
+      return `<tr><td><b>${esc(l.heat)}</b></td><td>${esc(l.date)}</td><td>${esc(l.furnace)}</td><td>${esc(l.grade)}</td><td>${f2(c.lm, 0)}</td><td>${c.lossPct == null ? '–' : f2(c.lossPct, 1) + ' %'}</td><td>${c.kwhPerT == null ? '–' : f2(c.kwhPerT, 0)}</td><td>${badge(sg + ' / 3', sg === 3 ? 'ok' : 'mute')}</td><td><button class="btn sm ghost" data-act="ml-open" data-heat="${esc(l.heat)}">Open</button></td></tr>`; })) : empty('No furnace logs yet. Tap “New furnace log” to record a heat exactly as on the paper Furnace Log Sheet.')}`;
+  };
+  V.meltlog = (heat) => {
+    if (!ui.ml || ui.ml.log.heat !== heat) mlLoad(heat);
+    const l = ui.ml.log, els = QI.ML_EL;
+    const rowEl = (key, label, f) => `<tr><th>${label}</th>${els.map((e) => `<td>${f(e)}</td>`).join('')}</tr>`;
+    const posted = !!l.ts;
+    return `<div id="ml"><div class="hd"><div><h2>Furnace Log Sheet <small>Format No. DCL/FR/04 Re/05</small></h2><div class="muted sm">${posted ? `Last saved by ${esc(l.by)}, ${fdt(l.ts)}` : 'Not saved yet'}</div></div>
+      <div class="row"><button class="btn primary" data-act="ml-save">Save log</button><button class="btn" data-act="ml-post">Post to inspection…</button><button class="btn" data-act="ml-dl">Download sheet</button></div></div>
+    <div class="banner warn" id="ml-dirty" ${ui.ml.dirty ? '' : 'hidden'}>Unsaved changes – tap <b>Save log</b>.</div>
+    <section class="card"><h3>Heat</h3><div class="grid3">
+      ${mlLbl('Heat No.', `<input data-p="heat" type="text" value="${esc(l.heat)}" ${posted ? 'readonly' : ''}>`)}${mlLbl('Furnace No.', mlSel('furnace', 'furnace', QI.ML_DEFAULTS.furnace))}${mlLbl('Material grade', mlSel('grade', 'mlGrade', QI.ML_DEFAULTS.mlGrade))}
+      ${mlLbl('Date', mlIn('date', { type: 'date' }))}${mlLbl('Heat on lining', mlIn('lining'))}${mlLbl('Heat on patching', mlIn('patching', { type: 'text', ph: 'e.g. 02-10' }))}</div></section>
+    <section class="card"><h3>Chemical analysis (%)</h3><div class="muted sm pad">Spec min / max are remembered for each grade and offered next time. Readings outside the spec turn red.</div><div class="tw"><table class="cmt"><thead><tr><th></th>${els.map((e) => `<th>${e}</th>`).join('')}</tr></thead><tbody>
+      ${rowEl('smin', 'Spec Min', (e) => mlIn(`spec.${e}.min`))}${rowEl('smax', 'Spec Max', (e) => mlIn(`spec.${e}.max`))}
+      ${[['b1', 'Bath 1'], ['b2', 'Bath 2'], ['b3', 'Bath 3'], ['final', 'Ladle Final']].map(([k, t]) => rowEl(k, t, (e) => mlIn(`bath.${k}.${e}`, { extra: `data-rd="${k}.${e}"` }))).join('')}</tbody></table></div>
+      <div class="grid3 pad">${mlLbl('Power on at', mlIn('powerOn', { type: 'time' }))}${mlLbl('Tapped at', mlIn('tapped', { type: 'time' }))}${mlLbl('Heat time (hh:mm)', '<div class="calc" data-c="ml.ht"></div>')}</div></section>
+    <section class="card"><h3>Input charges</h3><div class="tw"><table class="cmt"><thead><tr><th>Scrap</th><th>Wt (kg)</th><th>MRN No.</th></tr></thead><tbody>
+      ${l.scrap.map((r, i) => `<tr><td>${mlSel(`scrap.${i}.mat`, 'mlScrap', QI.ML_DEFAULTS.mlScrap)}</td><td>${mlIn(`scrap.${i}.wt`)}</td><td>${mlIn(`scrap.${i}.mrn`, { type: 'text' })}</td></tr>`).join('')}
+      <tr><td>Foundry return (runner / riser etc.)</td><td>${mlIn('fr.wt')}</td><td>${mlIn('fr.note', { type: 'text' })}</td></tr>
+      <tr class="tot"><th>Scrap + return</th><th><span data-c="ml.scrap"></span></th><th></th></tr></tbody></table></div><button class="btn sm ghost" data-act="ml-addscrap">+ Add scrap row</button></section>
+    <section class="card"><h3>Ferro alloys <small class="muted">weight per addition: charge + after Bath 1 + after Bath 2</small></h3><div class="tw"><table class="cmt"><thead><tr><th>Alloy</th><th>Wt 1</th><th>Wt 2</th><th>Wt 3</th><th>Total</th><th>MRN No.</th></tr></thead><tbody>
+      ${QI.ML_ALLOYS.map(([k, t]) => `<tr><td>${t}</td>${[0, 1, 2].map((i) => `<td>${mlIn(`alloys.${k}.w.${i}`)}</td>`).join('')}<td class="calc" data-c="at.${k}"></td><td>${mlIn(`alloys.${k}.mrn`, { type: 'text' })}</td></tr>`).join('')}
+      <tr class="tot"><th>Ferro alloys total</th><td colspan="3"></td><th data-c="ml.alloy"></th><td></td></tr></tbody></table></div></section>
+    <section class="card"><h3>LM distribution</h3><div class="grid3">${[['mould', 'Mould pouring (kg)'], ['pigged', 'Pigged (kg)'], ['heel', 'Heel / Return (kg)'], ['floor', 'Floor loss (kg)'], ['skull', 'Ladle skull (kg)']].map(([k, t]) => mlLbl(t, mlIn('lm.' + k))).join('')}
+      ${mlLbl('Total LM (kg)', '<div class="calc" data-c="ml.lm"></div>')}${mlLbl('Total charges (kg)', '<div class="calc" data-c="ml.charges"></div>')}${mlLbl('Melting loss (kg)', '<div class="calc" data-c="ml.loss"></div>')}${mlLbl('Melting loss (%)', '<div class="calc" data-c="ml.losspct"></div>')}</div></section>
+    <section class="card"><h3>Power, ladle and temperatures</h3><div class="grid3">
+      ${mlLbl('Meter reading – initial', mlIn('power.init'))}${mlLbl('Meter reading – final', mlIn('power.final'))}${mlLbl('Meter multiplier', mlIn('power.mult'))}
+      ${mlLbl('Actual (kWh)', '<div class="calc" data-c="ml.kwh"></div>')}${mlLbl('kWh per tonne LM', '<div class="calc" data-c="ml.kwhpt"></div>')}${mlLbl('Furnace max power (kWh)', mlIn('power.max'))}
+      ${mlLbl('Ladle No.', mlSel('ladle.no', 'mlLadle', QI.ML_DEFAULTS.mlLadle))}${mlLbl('Ladle life (heats)', mlIn('ladle.life'))}${mlLbl('Ladle preheating', mlIn('ladle.preheat', { type: 'text' }))}
+      ${mlLbl('L.D.O. / HSD used (litres)', mlIn('ldo'))}${mlLbl('Witness', mlSel('witness', 'mlWitness', []))}<div></div>
+      ${mlLbl('Tapping temp (°C)', mlIn('tapTemp'))}${mlLbl('Tapping limit min', mlIn('tapMin'))}${mlLbl('Tapping limit max', mlIn('tapMax'))}
+      ${mlLbl('Pouring temp (°C)', mlIn('pourTemp'))}${mlLbl('Pouring limit min', mlIn('pourMin'))}${mlLbl('Pouring limit max', mlIn('pourMax'))}</div><div class="muted sm">Limits come from the method plan DCL/MTD/01 and are stored on the heat.</div></section>
+    <section class="card"><h3>Mould pouring allocation</h3><div class="tw"><table class="cmt"><thead><tr><th>No. of boxes</th><th>Product code / Drg. No.</th><th>Quantity</th><th>L.M.W.T</th><th>Net casting</th></tr></thead><tbody>
+      ${l.alloc.map((r, i) => `<tr><td>${mlIn(`alloc.${i}.boxes`)}</td><td>${mlSel(`alloc.${i}.product`, 'mlProduct', [])}</td><td>${mlIn(`alloc.${i}.qty`)}</td><td>${mlIn(`alloc.${i}.lmwt`)}</td><td>${mlIn(`alloc.${i}.net`)}</td></tr>`).join('')}</tbody></table></div>
+      <button class="btn sm ghost" data-act="ml-addalloc">+ Add row</button><div class="grid2 pad">${mlLbl('Rin LM / Heel (kg)', mlIn('rinLM'))}${mlLbl('Rejected casting', mlIn('rejected', { type: 'text' }))}</div></section>
+    <section class="card"><h3>Fluxes, de-oxidisers, consumables and refractory</h3><div class="specgrid">${[].concat(QI.ML_FLUX.map(([k, t]) => [`flux.${k}`, t + ' (kg)`'.slice(0, 0) + ' (kg)']), QI.ML_CONSUM.map(([k, t]) => [`consum.${k}`, t]), QI.ML_REFR.map(([k, t]) => [`refr.${k}`, t])).map(([p, t]) => mlLbl(t, mlIn(p))).join('')}${mlLbl('Nozzle size (mm)', mlIn('nozzleSize', { type: 'text' }))}</div></section>
+    <section class="card"><h3>Remarks</h3><div class="grid2">${mlLbl('Remark', mlSel('remarks', 'mlRemarks', QI.ML_DEFAULTS.mlRemarks))}${mlLbl('Pouring time (mm:ss)', mlIn('pourTime', { type: 'text', ph: '08:57' }))}</div>${mlLbl('Notes', `<textarea data-p="remarkNote" rows="3">${esc(l.remarkNote)}</textarea>`)}</section>
+    <section class="card"><h3>Signatures</h3><div class="aps">${[['shift', 'Shift Engineer'], ['incharge', 'Melting Shop Incharge'], ['metallurgist', 'Plant Metallurgist']].map(([k, t]) => { const s = l.sign && l.sign[k]; return `<div class="ap ${s ? 'done' : ''}"><div class="apl">${t}</div>${s ? `<div><b>${esc(s.by)}</b></div><div class="muted sm">${fdt(s.ts)}</div>` : posted ? `<button class="btn sm primary" data-act="ml-sign" data-role="${k}">Sign</button>` : '<div class="muted sm">Save the log first</div>'}</div>`; }).join('')}</div></section></div>`;
+  };
+  function mlSheetHtml(l) {
+    const c = QI.mlCalc(l), E = QI.ML_EL, td = (v) => `<td>${esc(v == null ? '' : v)}</td>`;
+    return `<h2>Datre Corporation Limited – Furnace Log Sheet <small>DCL/FR/04 Re/05</small></h2>
+    <table><tr><th>Heat No.</th>${td(l.heat)}<th>Material grade</th>${td(l.grade)}<th>Date</th>${td(l.date)}</tr><tr><th>Furnace No.</th>${td(l.furnace)}<th>Heat on lining</th>${td(l.lining)}<th>Heat on patching</th>${td(l.patching)}</tr></table>
+    <table><tr><th></th>${E.map((e) => `<th>${e}</th>`).join('')}</tr><tr><th>Spec Min</th>${E.map((e) => td(l.spec[e] && l.spec[e].min)).join('')}</tr><tr><th>Spec Max</th>${E.map((e) => td(l.spec[e] && l.spec[e].max)).join('')}</tr>${[['b1', 'Bath 1'], ['b2', 'Bath 2'], ['b3', 'Bath 3'], ['final', 'Ladle Final']].map(([k, t]) => `<tr><th>${t}</th>${E.map((e) => td(l.bath[k][e])).join('')}</tr>`).join('')}</table>
+    <p>Power on ${esc(l.powerOn)} · Tapped ${esc(l.tapped)} · Heat time ${esc(c.heatTime)} · Tapping ${esc(l.tapTemp)} °C · Pouring ${esc(l.pourTemp)} °C · Ladle ${esc(l.ladle.no)} (life ${esc(l.ladle.life)}) · Witness ${esc(l.witness)}</p>
+    <table><tr><th>Input charges</th><th>Wt kg</th><th>MRN</th></tr>${l.scrap.filter((r) => r.mat || r.wt).map((r) => `<tr>${td(r.mat)}${td(r.wt)}${td(r.mrn)}</tr>`).join('')}<tr>${td('Foundry return ' + (l.fr.note || ''))}${td(l.fr.wt)}${td('')}</tr></table>
+    <table><tr><th>Ferro alloy</th><th>Wt 1</th><th>Wt 2</th><th>Wt 3</th><th>Total</th><th>MRN</th></tr>${QI.ML_ALLOYS.filter(([k]) => l.alloys[k] && (l.alloys[k].w || []).some((v) => v !== '')).map(([k, t]) => { const w = l.alloys[k].w || []; return `<tr>${td(t)}${td(w[0])}${td(w[1])}${td(w[2])}${td(f2(w.reduce((x, v) => x + n0(v), 0), 1))}${td(l.alloys[k].mrn)}</tr>`; }).join('')}</table>
+    <p>Mould pouring ${esc(l.lm.mould)} · Pigged ${esc(l.lm.pigged)} · Heel ${esc(l.lm.heel)} · Floor loss ${esc(l.lm.floor)} · Ladle skull ${esc(l.lm.skull)} · <b>Total LM ${f2(c.lm, 0)} kg</b> · Total charges ${f2(c.charges, 0)} kg · Melting loss ${c.loss == null ? '–' : f2(c.loss, 1)} kg (${c.lossPct == null ? '–' : f2(c.lossPct, 2)} %)</p>
+    <p>Power ${c.kwh == null ? '–' : f2(c.kwh, 0)} kWh (${c.kwhPerT == null ? '–' : f2(c.kwhPerT, 0)} kWh/t) · Max power ${esc(l.power.max)} · L.D.O./HSD ${esc(l.ldo)} l</p>
+    <table><tr><th>Boxes</th><th>Product / Drg</th><th>Qty</th><th>LMWT</th><th>Net casting</th></tr>${l.alloc.filter((r) => r.product || r.boxes).map((r) => `<tr>${td(r.boxes)}${td(r.product)}${td(r.qty)}${td(r.lmwt)}${td(r.net)}</tr>`).join('')}</table>
+    <p>Remarks: ${esc(l.remarks)} ${esc(l.remarkNote)} · Pouring time ${esc(l.pourTime)}</p>
+    <div class="sig">${[['shift', 'Shift Engineer'], ['incharge', 'Melting Shop Incharge'], ['metallurgist', 'Plant Metallurgist']].map(([k, t]) => `<div>${t}<br>${l.sign && l.sign[k] ? esc(l.sign[k].by) + ', ' + fd(l.sign[k].ts) : ''}</div>`).join('')}</div>`;
+  }
+  const MELT_ACTS = {
+    'ml-new': () => modal('New furnace log', `${fld('Heat No.', 'heat', '', 'required')}${combo('Material grade', 'grade', 'mlGrade', '', QI.ML_DEFAULTS.mlGrade)}${combo('Furnace No.', 'furnace', 'furnace', '', QI.ML_DEFAULTS.furnace)}`, (f) => {
+      const heat = val(f, 'heat'); if (!heat) return 'Enter the heat number.'; if (QI.furnaceLog(heat)) { mlLoad(heat); go('meltlog/' + heat); return; }
+      const grade = cval(f, 'grade', 'mlGrade'), furnace = cval(f, 'furnace', 'furnace');
+      ui.ml = { log: Object.assign(QI.mlNew(heat, grade), { furnace }), dirty: true, isNew: true }; go('meltlog/' + heat); }, 'Open log'),
+    'ml-open': (el) => { mlLoad(el.dataset.heat); go('meltlog/' + el.dataset.heat); },
+    'ml-save': () => { if (needInspector()) return; const r = QI.mlSave(ui.ml.log); if (r.error) { toast(r.error, 'bad'); return; } ui.ml.dirty = false; render(); toast('Furnace log saved', 'ok'); },
+    'ml-sign': (el) => { if (needInspector()) return; if (ui.ml.dirty) { toast('Save the log first.', 'bad'); return; } const r = QI.mlSign(ui.ml.log.heat, el.dataset.role); if (r.error) { toast(r.error, 'bad'); return; } mlLoad(ui.ml.log.heat); render(); },
+    'ml-addscrap': () => { ui.ml.log.scrap.push({ mat: '', wt: '', mrn: '' }); ui.ml.dirty = true; render(); },
+    'ml-addalloc': () => { ui.ml.log.alloc.push({ boxes: '', product: '', qty: '', lmwt: '', net: '' }); ui.ml.dirty = true; render(); },
+    'ml-dl': () => download(`furnace-log-${ui.ml.log.heat}.html`, `<!doctype html><meta charset="utf-8"><title>Furnace Log ${esc(ui.ml.log.heat)}</title><style>body{font:12px system-ui;margin:14px}table{border-collapse:collapse;width:100%;margin-bottom:8px}th,td{border:1px solid #888;padding:2px 5px;text-align:left}th{background:#eee}small{font-weight:400}.sig{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}.sig div{border-top:1px solid #000;padding-top:3px}</style>${mlSheetHtml(ui.ml.log)}`, 'text/html'),
+    'ml-post': () => {
+      if (needInspector()) return; if (ui.ml.dirty || !ui.ml.log.ts) { toast('Save the log first.', 'bad'); return; }
+      const heat = ui.ml.log.heat, items = QI.mlPreview(heat);
+      if (!items.length) { toast('Enter bath / ladle readings or temperatures first.', 'bad'); return; }
+      modal('Post to inspection records', `<p class="muted sm">These results will be recorded against heat ${esc(heat)} (stage 4).</p>${items.map((it) => `<div class="li"><b>${it.id}</b> ${esc(it.label)}<div class="sm">${it.ev.error ? `<span class="badT">${esc(it.ev.error)}</span>` : `${it.ev.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')} ${esc(it.ev.summary || '')}`}${it.recheck ? `<div class="sm">↻ Then re-checked with the ladle-final readings: ${badge('OK', 'ok')} (corrected by the ferro addition – the NCR closes automatically)</div>` : ''}</div>
+        ${!it.ev.error && it.ev.result === 'nok' && !it.recheck ? `<label class="f"><span>If Not OK – action</span><select name="act_${it.id}">${it.actions.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>${it.id === '4.2.1' ? '<div class="sm badT">Choosing “Reject all castings poured” rejects every casting already assigned to this heat.</div>' : ''}` : ''}</div>`).join('')}`,
+        (f) => { const acts = {}; items.forEach((it) => { if (f.elements['act_' + it.id]) acts[it.id] = f.elements['act_' + it.id].value; });
+          const res = QI.mlPost(heat, acts); const bad = res.filter((x) => x.error); const ok = res.filter((x) => !x.error);
+          if (!ok.length) return bad.map((x) => x.id + ': ' + x.error).join(' · ');
+          toast(`Posted ${ok.length} check(s)${ok.some((x) => x.ncr) ? ' · NCR raised' : ''}${bad.length ? ' · ' + bad.length + ' skipped' : ''}`, ok.some((x) => x.result === 'nok') ? 'bad' : 'ok'); }, 'Post');
+    },
+  };
+  document.addEventListener('input', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#ml') || !ui.ml) return;
+    if (t.dataset.other) { setPath(ui.ml.log, t.dataset.other, t.value); ui.ml.dirty = true; return; }
+    if (!t.dataset.p || t.tagName === 'SELECT') return;
+    setPath(ui.ml.log, t.dataset.p, t.type === 'number' ? (t.value === '' ? '' : parseFloat(t.value)) : t.value);
+    if (/^heat$/.test(t.dataset.p)) { ui.ml.log.heat = t.value; }
+    ui.ml.dirty = true; mlUpdate();
+  });
+  document.addEventListener('change', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#ml') || !ui.ml) return;
+    if (t.dataset.other) { QI.learn(t.dataset.list, t.value.trim()); ui.ml.dirty = true; render(); return; }
+    if (t.classList.contains('mlsel')) {
+      const o = t.parentNode.querySelector('input[data-other]');
+      if (t.value === '__other') { o.hidden = false; o.focus(); return; }
+      setPath(ui.ml.log, t.dataset.p, t.value); ui.ml.dirty = true;
+      if (t.dataset.p === 'grade') { const sp = (QI.mlStore().specs || {})[t.value]; if (sp && !Object.keys(ui.ml.log.spec).length) ui.ml.log.spec = clone(sp); render(); } else mlUpdate();
+    }
   });
 
   /* ---- approvals queue ---- */
@@ -641,7 +764,7 @@
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS);
   function download(name, text, type) {
     if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -720,10 +843,10 @@
   }
 
   /* ================= router ================= */
-  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
+  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['melt', 'Melting log'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -739,7 +862,7 @@
     const view = parts[0]; const arg = decodeURIComponent(parts.slice(1).join('/'));
     const fn = booting || (QI.mode === 'shared' && !QI.ready) ? () => empty('Connecting to shared inspection data…') : (V[view] || V.dashboard);
     const open = $('#dlg').open;
-    const active = view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
+    const active = view === 'meltlog' ? 'melt' : view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
     $('#nav').innerHTML = NAV.map(([k, t]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${t}</a>`).join('');
     $('#who').textContent = QI.mode === 'shared' ? (QI.me.dept ? `👤 ${QI.me.name || 'You'} · ${QI.dept().name.split(' ')[0]}` : 'Choose department') : (S().settings.inspector ? '👤 ' + S().settings.inspector : 'Set inspector');
     $('#back').hidden = !hist.length;
@@ -749,6 +872,7 @@
     $('#main').innerHTML = fn(arg);
     applyPerms($('#main'));
     if (view === 'charge' && ui.cm && ui.cm.r) cmUpdate();
+    if (view === 'meltlog' && ui.ml) mlUpdate();
     document.body.classList.toggle('printing', view === 'report');
     if (!open) $('#main').dataset.view = view;
     window.scrollTo(0, y);
@@ -762,13 +886,13 @@
     if ($('#dlg').open || $('form.chkform')) { ui.stale = true; $('#stale').hidden = false; } else render();
   };
   QI.onError = (e) => toast('Not saved: ' + ((e && e.code === 'not_writer') || (e && /permission|writer|denied/i.test(e.message || '')) ? 'you have view-only access.' : (e && e.message) || 'connection problem.'), 'bad');
-  if (!HOSTED) QI.seed(); if (QI.seedCharge) QI.seedCharge();
+  if (!HOSTED) QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed();
   render();
   if (HOSTED) {
     Promise.all([window.claude.use('db'), window.claude.use('user'), window.claude.use('downloads')]).then(([db, user, dl]) => {
       DL = dl;
-      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; QI.seed(); if (QI.seedCharge) QI.seedCharge(); render(); QI.onError(e); }); else { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); render(); }
-    }).catch(() => { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); render(); });
+      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); QI.onError(e); }); else { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); }
+    }).catch(() => { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); });
   }
   if (!QI.persistent) toast('Browser storage unavailable – data will not be saved. Use Settings → Backup.', 'bad');
   window.QIApp = { render, demoData };
