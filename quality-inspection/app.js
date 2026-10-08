@@ -11,7 +11,7 @@
   const hist = [];
   const HOSTED = !!window.claude;
   const go = (p) => { p = String(p).replace(/^#?\/?/, '') || 'dashboard'; if (p !== route) { hist.push(route); route = p; } window.scrollTo(0, 0); render(); };
-  const ui = { mp: null, ml: null, cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
+  const ui = { rmx: null, rmf: null, mp: null, ml: null, cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
   const SCOPE_LABEL = { job: 'Work order', log: 'Sand & calibration log', heat: 'Heat', casting: 'Casting' };
 
   /* ================= small components ================= */
@@ -265,6 +265,7 @@
       <div class="kpi"><b class="${s.rejected ? 'badT' : ''}">${s.rejected}</b><span>Rejected</span></div>
       <div class="kpi"><b class="${s.awaiting ? 'warnT' : ''}">${s.awaiting}</b><span>Awaiting QC / Factory Head</span></div>
       <div class="kpi"><b class="${s.openNcr ? 'warnT' : ''}">${s.openNcr}</b><span>Open NCRs</span></div>
+      <div class="kpi"><b class="${st.rmLots.filter((x) => ['pending', 'hold'].includes(x.decision)).length ? 'warnT' : ''}">${st.rmLots.filter((x) => ['pending', 'hold'].includes(x.decision)).length}</b><span>Raw material lots awaiting decision</span></div>
       <div class="kpi"><b>${pct(s.fpy)}</b><span>First-time-OK rate (checks)</span></div>
       <div class="kpi"><b>${pct(s.yield)}</b><span>Casting yield (released ÷ finished)</span></div>
     </div>
@@ -359,6 +360,7 @@
       <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
+    ${(() => { const hl = QI.rmHeatLots(no); return hl.length ? `<section class="card"><h3>Raw material traceability</h3>${table(['MRN', 'Material', 'Supplier', 'Charged kg', 'Inspection'], hl.map((x) => `<tr><td>${x.lot ? link('/rmlot/' + x.lot.mrn, x.mrn) : esc(x.mrn)}</td><td>${esc(x.lot ? x.lot.material : x.label)}</td><td class="sm">${esc(x.lot ? x.lot.supplier : '')}</td><td>${f2(x.kg, 0)}</td><td>${x.lot ? decBadge(x.lot.decision) : badge('not registered', 'mute')}</td></tr>`))}</section>` : ''; })()}
     ${(() => { const fl = QI.furnaceLog(no); if (!fl) return QI.can('melt') ? `<section class="card"><h3>Furnace log sheet</h3><div class="muted sm pad">No furnace log for this heat yet.</div><button class="btn sm" data-act="ml-open" data-heat="${esc(no)}">Open furnace log</button></section>` : ''; const c = QI.mlCalc(fl); return `<section class="card"><h3>Furnace log sheet <small class="muted">${esc(fl.furnace ? 'Furnace ' + fl.furnace : '')} · saved by ${esc(fl.by)}, ${fdt(fl.ts)}</small></h3><div class="sm">Total LM <b>${f2(c.lm, 0)} kg</b> · charges ${f2(c.charges, 0)} kg · melting loss ${c.lossPct == null ? '–' : f2(c.lossPct, 1) + ' %'} · ${c.kwhPerT == null ? '–' : f2(c.kwhPerT, 0) + ' kWh/t'} · tapping ${esc(fl.tapTemp || '–')} °C · pouring ${esc(fl.pourTemp || '–')} °C</div><button class="btn sm" data-act="ml-open" data-heat="${esc(no)}">Open furnace log</button></section>`; })()}
     ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.recipe)} · LM ${esc(h.charge.lm)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
       <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Expected: ${Object.keys(h.charge.expected).map((e) => e + ' ' + h.charge.expected[e]).join(' · ')} ${h.charge.ok ? badge('within target', 'ok') : badge('outside target', 'warn')} · Final cost Rs ${h.charge.finalCost}/kg</div>
@@ -431,7 +433,7 @@
       ${['min', 'max', 'aim'].map((k) => `<tr><th>${k === 'min' ? 'Min' : k === 'max' ? 'Max' : 'Aim at'}</th>${els.map((e) => `<td>${cmIn(`tg.${e}.${k}`, r.tg[e] && r.tg[e][k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>
     <section class="card"><h3>Raw materials – chemical analysis as per report</h3><div class="tw"><table class="cmt"><thead><tr><th>Material</th><th>FR</th><th>MRN</th>${th}<th>Rs/kg</th><th></th></tr></thead><tbody>
       ${r.mats.map((m, i) => `<tr><td><input data-p="mats.${i}.name" value="${esc(m.name)}"></td><td><input type="checkbox" data-p="mats.${i}.fr" ${m.fr ? 'checked' : ''} title="Foundry return (fixed kg)"></td><td><input data-p="mats.${i}.mrn" value="${esc(m.mrn)}" style="min-width:70px"></td>${els.map((e) => `<td>${cmIn(`mats.${i}.comp.${e}`, m.comp && m.comp[e])}</td>`).join('')}<td>${cmIn(`mats.${i}.rate`, m.rate)}</td><td><button class="x" data-act="cm-delmat" data-i="${i}" title="Remove">×</button></td></tr>`).join('')}</tbody></table></div>
-      <button class="btn sm ghost" data-act="cm-addmat">+ Add material</button></section>
+      <button class="btn sm ghost" data-act="cm-addmat">+ Add material</button> <button class="btn sm" data-act="cm-lots">Update analysis from received lots</button></section>
     <section class="card"><h3>Charging</h3><div data-c="verdict"></div><div class="tw"><table class="cmt"><thead><tr><th>Material</th><th>Wt</th><th>Charge kg</th><th>Rs</th>${th}</tr></thead><tbody>
       ${r.mats.map((m, i) => `<tr><td>${esc(m.name)}${m.fr ? ' ' + badge('FR', 'mute') : ''}</td><td>${cmIn(`mats.${i}.wt`, m.wt)}</td><td data-c="kg.${i}"></td><td data-c="rs.${i}"></td>${els.map((e) => `<td class="muted" data-c="ct.${i}.${e}"></td>`).join('')}</tr>`).join('')}
       <tr class="tot"><th>Total</th><th data-c="sumwt"></th><th data-c="sumkg"></th><th data-c="sumrs"></th>${els.map((e) => `<th data-c="tot.${e}"></th>`).join('')}</tr>
@@ -525,12 +527,14 @@
       ${rowEl('smin', 'Spec Min', (e) => mlIn(`spec.${e}.min`))}${rowEl('smax', 'Spec Max', (e) => mlIn(`spec.${e}.max`))}
       ${[['b1', 'Bath 1'], ['b2', 'Bath 2'], ['b3', 'Bath 3'], ['final', 'Ladle Final']].map(([k, t]) => rowEl(k, t, (e) => mlIn(`bath.${k}.${e}`, { extra: `data-rd="${k}.${e}"` }))).join('')}</tbody></table></div>
       <div class="grid3 pad">${mlLbl('Power on at', mlIn('powerOn', { type: 'time' }))}${mlLbl('Tapped at', mlIn('tapped', { type: 'time' }))}${mlLbl('Heat time (hh:mm)', '<div class="calc" data-c="ml.ht"></div>')}</div></section>
+    <datalist id="rm-mrns">${S().rmLots.map((x) => `<option value="${esc(x.mrn)}">${esc(x.material)} · ${esc(x.supplier)} · ${esc(x.decision)}</option>`).join('')}</datalist>
+    ${QI.mlMrnCheck(l).map((i) => `<div class="banner ${i.lvl === 'bad' ? 'bad' : i.lvl === 'warn' ? 'warn' : ''}">${esc(i.msg)}</div>`).join('')}
     <section class="card"><h3>Input charges</h3><div class="tw"><table class="cmt"><thead><tr><th>Scrap</th><th>Wt (kg)</th><th>MRN No.</th></tr></thead><tbody>
-      ${l.scrap.map((r, i) => `<tr><td>${mlSel(`scrap.${i}.mat`, 'mlScrap', QI.ML_DEFAULTS.mlScrap)}</td><td>${mlIn(`scrap.${i}.wt`)}</td><td>${mlIn(`scrap.${i}.mrn`, { type: 'text' })}</td></tr>`).join('')}
+      ${l.scrap.map((r, i) => `<tr><td>${mlSel(`scrap.${i}.mat`, 'mlScrap', QI.ML_DEFAULTS.mlScrap)}</td><td>${mlIn(`scrap.${i}.wt`)}</td><td>${mlIn(`scrap.${i}.mrn`, { type: 'text', extra: 'list="rm-mrns"' })}</td></tr>`).join('')}
       <tr><td>Foundry return (runner / riser etc.)</td><td>${mlIn('fr.wt')}</td><td>${mlIn('fr.note', { type: 'text' })}</td></tr>
       <tr class="tot"><th>Scrap + return</th><th><span data-c="ml.scrap"></span></th><th></th></tr></tbody></table></div><button class="btn sm ghost" data-act="ml-addscrap">+ Add scrap row</button></section>
     <section class="card"><h3>Ferro alloys <small class="muted">weight per addition: charge + after Bath 1 + after Bath 2</small></h3><div class="tw"><table class="cmt"><thead><tr><th>Alloy</th><th>Wt 1</th><th>Wt 2</th><th>Wt 3</th><th>Total</th><th>MRN No.</th></tr></thead><tbody>
-      ${QI.ML_ALLOYS.map(([k, t]) => `<tr><td>${t}</td>${[0, 1, 2].map((i) => `<td>${mlIn(`alloys.${k}.w.${i}`)}</td>`).join('')}<td><span class="calc" data-c="at.${k}"></span></td><td>${mlIn(`alloys.${k}.mrn`, { type: 'text' })}</td></tr>`).join('')}
+      ${QI.ML_ALLOYS.map(([k, t]) => `<tr><td>${t}</td>${[0, 1, 2].map((i) => `<td>${mlIn(`alloys.${k}.w.${i}`)}</td>`).join('')}<td><span class="calc" data-c="at.${k}"></span></td><td>${mlIn(`alloys.${k}.mrn`, { type: 'text', extra: 'list="rm-mrns"' })}</td></tr>`).join('')}
       <tr class="tot"><th>Ferro alloys total</th><td colspan="3"></td><th data-c="ml.alloy"></th><td></td></tr></tbody></table></div></section>
     <section class="card"><h3>LM distribution</h3><div class="grid3">${[['mould', 'Mould pouring (kg)'], ['pigged', 'Pigged (kg)'], ['heel', 'Heel / Return (kg)'], ['floor', 'Floor loss (kg)'], ['skull', 'Ladle skull (kg)']].map(([k, t]) => mlLbl(t, mlIn('lm.' + k))).join('')}
       ${mlLbl('Total LM (kg)', '<div class="calc" data-c="ml.lm"></div>')}${mlLbl('Total charges (kg)', '<div class="calc" data-c="ml.charges"></div>')}${mlLbl('Melting loss (kg)', '<div class="calc" data-c="ml.loss"></div>')}${mlLbl('Melting loss (%)', '<div class="calc" data-c="ml.losspct"></div>')}</div></section>
@@ -577,7 +581,7 @@
       if (needInspector()) return; if (ui.ml.dirty || !ui.ml.log.ts) { toast('Save the log first.', 'bad'); return; }
       const heat = ui.ml.log.heat, items = QI.mlPreview(heat);
       if (!items.length) { toast('Enter bath / ladle readings or temperatures first.', 'bad'); return; }
-      modal('Post to inspection records', `<p class="muted sm">These results will be recorded against heat ${esc(heat)} (stage 4).</p>${items.map((it) => `<div class="li"><b>${it.id}</b> ${esc(it.label)}<div class="sm">${it.ev.error ? `<span class="badT">${esc(it.ev.error)}</span>` : `${it.ev.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')} ${esc(it.ev.summary || '')}`}${it.recheck ? `<div class="sm">↻ Then re-checked with the ladle-final readings: ${badge('OK', 'ok')} (corrected by the ferro addition – the NCR closes automatically)</div>` : ''}</div>
+      modal('Post to inspection records', `<p class="muted sm">These results will be recorded against heat ${esc(heat)} (stage 4).</p>${QI.mlMrnCheck(ui.ml.log).filter((i) => i.lvl !== 'info').map((i) => `<div class="banner ${i.lvl === 'bad' ? 'bad' : 'warn'}">${esc(i.msg)}</div>`).join('')}${items.map((it) => `<div class="li"><b>${it.id}</b> ${esc(it.label)}<div class="sm">${it.ev.error ? `<span class="badT">${esc(it.ev.error)}</span>` : `${it.ev.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')} ${esc(it.ev.summary || '')}`}${it.recheck ? `<div class="sm">↻ Then re-checked with the ladle-final readings: ${badge('OK', 'ok')} (corrected by the ferro addition – the NCR closes automatically)</div>` : ''}</div>
         ${!it.ev.error && it.ev.result === 'nok' && !it.recheck ? `<label class="f"><span>If Not OK – action</span><select name="act_${it.id}">${it.actions.map((x) => `<option>${esc(x)}</option>`).join('')}</select></label>${it.id === '4.2.1' ? '<div class="sm badT">Choosing “Reject all castings poured” rejects every casting already assigned to this heat.</div>' : ''}` : ''}</div>`).join('')}`,
         (f) => { const acts = {}; items.forEach((it) => { if (f.elements['act_' + it.id]) acts[it.id] = f.elements['act_' + it.id].value; });
           const res = QI.mlPost(heat, acts); const bad = res.filter((x) => x.error); const ok = res.filter((x) => !x.error);
@@ -692,6 +696,92 @@
       if (t.value === '__other') { o.hidden = false; o.focus(); return; }
       setPath(ui.mp.plan, t.dataset.p, t.value); ui.mp.dirty = true; render();
     }
+  });
+
+  /* ---- raw material inspection register ---- */
+  const rmLoad = (mrn) => { const ex = QI.rmLot(mrn); ui.rmx = { lot: ex ? clone(ex) : QI.rmNew(mrn), dirty: false }; };
+  const rIn = (p, o) => { o = o || {}; const v = getP(ui.rmx.lot, p); return `<input data-p="${p}" type="${o.type || 'number'}" ${o.type ? '' : 'step="any" inputmode="decimal"'} value="${esc(v == null ? '' : v)}" ${o.extra || ''}>`; };
+  const rSel = (p, listKey, defs) => {
+    const cur = getP(ui.rmx.lot, p) || ''; const opts = QI.opts(listKey, defs); if (cur && !opts.includes(cur)) opts.unshift(cur);
+    return `<select class="rmsel" data-p="${p}" data-list="${listKey}"><option value="">– select –</option>${opts.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option></select><input class="other" data-other="${p}" data-list="${listKey}" placeholder="Type new value – saved for next time" hidden>`;
+  };
+  const decBadge = (d) => ({ accepted: badge('Accepted', 'ok'), deviation: badge('Accepted – deviation', 'warn'), rejected: badge('Rejected', 'bad'), hold: badge('Hold', 'warn'), pending: badge('Pending', 'mute') }[d] || badge('Pending', 'mute'));
+  const has0 = (v) => v !== '' && v != null && isFinite(+v);
+  const stats = (arr) => { const n = arr.length, m = arr.reduce((a, b) => a + b, 0) / n; const sd = n > 1 ? Math.sqrt(arr.reduce((a, b) => a + (b - m) * (b - m), 0) / (n - 1)) : 0; return { n, m, sd }; };
+  function rmUpdate() {
+    if (!ui.rmx) return; const l = ui.rmx.lot;
+    document.querySelectorAll('#rm input[data-rd]').forEach((el) => { const [src, e] = el.dataset.rd.split('.'); const st = QI.rmStatus(l, e, getP(l, `${src}.${e}`)); el.className = st ? 'rd-' + st : ''; });
+    const iss = QI.rmIssues(l), sg = QI.rmSuggest(l), box = $('#rm-suggest');
+    if (box) box.innerHTML = iss.length ? `<div class="banner warn"><b>Suggested decision: reject / hold.</b><br>${iss.map(esc).join('<br>')}</div>` : sg === 'accepted' ? '<div class="banner ok">✔ All entered analysis and checks are within limits – suggested decision: accept.</div>' : '<div class="muted sm">Enter the analysis and checks to get a suggested decision.</div>';
+    const d = $('#rm-dirty'); if (d) d.hidden = !ui.rmx.dirty;
+  }
+  V.rm = () => {
+    const f = ui.rmf || (ui.rmf = { status: 'all', q: '' }); const q = f.q.toLowerCase();
+    let L = S().rmLots.slice().sort((x, y) => (y.date || '').localeCompare(x.date || '') || (y.ts || 0) - (x.ts || 0));
+    const total = L.length, cnt = (d) => L.filter((x) => x.decision === d).length;
+    L = L.filter((x) => (f.status === 'all' || (f.status === 'open' ? ['pending', 'hold'].includes(x.decision) : f.status === 'accepted' ? ['accepted', 'deviation'].includes(x.decision) : x.decision === f.status)) && (!q || (x.mrn + ' ' + x.material + ' ' + x.supplier + ' ' + x.po).toLowerCase().includes(q)));
+    const sm = QI.rmSummary();
+    return `<div class="hd"><h2>Raw materials <small>Incoming inspection register</small></h2><div class="row"><button class="btn" data-act="rm-csv">Export register (CSV)</button><button class="btn primary" data-act="rm-new">+ New receipt</button></div></div>
+    <div class="kpis"><div class="kpi"><b>${total}</b><span>Lots registered</span></div><div class="kpi"><b class="${cnt('pending') + cnt('hold') ? 'warnT' : ''}">${cnt('pending') + cnt('hold')}</b><span>Awaiting decision</span></div><div class="kpi"><b>${cnt('accepted') + cnt('deviation')}</b><span>Accepted</span></div><div class="kpi"><b class="${cnt('rejected') ? 'badT' : ''}">${cnt('rejected')}</b><span>Rejected</span></div></div>
+    <div class="row pad"><div class="seg">${[['all', 'All'], ['open', 'Awaiting'], ['accepted', 'Accepted'], ['rejected', 'Rejected']].map(([k, t]) => `<button class="${f.status === k ? 'on' : ''}" data-act="rm-filter" data-f="${k}">${t}</button>`).join('')}</div><input class="search" placeholder="Search MRN, material, supplier, PO…" value="${esc(f.q)}" data-act="rm-search"></div>
+    ${L.length ? table(['MRN', 'Date', 'Material', 'Supplier', 'Qty (kg)', 'Decision', 'Used / balance (kg)', ''], L.map((x) => { const u = QI.rmUsage(x.mrn), ok = x.decision === 'accepted' || x.decision === 'deviation'; return `<tr><td><b>${esc(x.mrn)}</b></td><td>${esc(x.date)}</td><td>${esc(x.material)}</td><td class="sm">${esc(x.supplier)}</td><td>${esc(x.qty)}</td><td>${decBadge(x.decision)}</td><td class="sm">${u.kg ? f2(u.kg, 0) : '–'}${ok && has0(x.accQty) ? ' / ' + f2(n0(x.accQty) - u.kg, 0) : ''}</td><td><button class="btn sm ghost" data-act="rm-open" data-mrn="${esc(x.mrn)}">Open</button></td></tr>`; })) : empty(total ? 'No lots match this filter.' : 'No raw material receipts yet. Tap “New receipt” to record an incoming lot against its MRN.')}
+    ${total ? `<section class="card pad"><h3>Supplier performance</h3>${table(['Supplier', 'Lots', 'Accepted', 'Rejected', 'Received kg', 'Rejected kg'], Object.keys(sm.sup).map((k) => { const s = sm.sup[k]; return `<tr><td>${esc(k)}</td><td>${s.lots}</td><td>${s.lots ? Math.round(s.ok / s.lots * 100) + ' %' : '–'}</td><td>${s.rej}</td><td>${f2(s.kg, 0)}</td><td>${f2(s.rejKg, 0)}</td></tr>`; }))}</section>
+    <section class="card"><h3>Analysis of accepted lots <small class="muted">mean ± std. deviation</small></h3>${table(['Material', 'Lots'].concat(QI.RM_EL.slice(0, 8)), Object.keys(sm.mat).filter((k) => sm.mat[k].lots).map((k) => `<tr><td>${esc(k)}</td><td>${sm.mat[k].lots}</td>${QI.RM_EL.slice(0, 8).map((e) => { const a = sm.mat[k].el[e]; if (!a) return '<td></td>'; const s = stats(a); return `<td class="sm">${f2(s.m, 3)}${s.n > 1 ? ' ±' + f2(s.sd, 3) : ''}</td>`; }).join('')}</tr>`))}</section>` : ''}`;
+  };
+  V.rmlot = (mrn) => {
+    if (!ui.rmx || ui.rmx.lot.mrn !== mrn) rmLoad(mrn);
+    const l = ui.rmx.lot, saved = !!l.ts, els = QI.RM_EL, u = saved ? QI.rmUsage(l.mrn) : { kg: 0, rows: [] }, canDec = QI.can('rmdecide');
+    const rowEl = (label, f) => `<tr><th>${label}</th>${els.map((e) => `<td>${f(e)}</td>`).join('')}</tr>`;
+    return `<div id="rm"><div class="hd"><div><h2>MRN ${esc(l.mrn)} ${decBadge(l.decision)}</h2><div class="muted sm">${saved ? `Saved by ${esc(l.by)}, ${fdt(l.ts)}` : 'Not saved yet'}</div></div><div class="row"><button class="btn primary" data-act="rm-save">Save inspection</button></div></div>
+    <div class="banner warn" id="rm-dirty" ${ui.rmx.dirty ? '' : 'hidden'}>Unsaved changes – tap <b>Save inspection</b>.</div>
+    <section class="card"><h3>Receipt</h3><div class="grid3">${mlLbl('MRN No.', `<input data-p="mrn" type="text" value="${esc(l.mrn)}" ${saved ? 'readonly' : ''}>`)}${mlLbl('Receipt date', rIn('date', { type: 'date' }))}${mlLbl('Material', rSel('material', 'rmMaterial', QI.RM_DEFAULTS.rmMaterial))}
+      ${mlLbl('Supplier', rSel('supplier', 'rmSupplier', QI.RM_DEFAULTS.rmSupplier))}${mlLbl('PO No.', rIn('po', { type: 'text' }))}${mlLbl('Challan / invoice No.', rIn('challan', { type: 'text' }))}
+      ${mlLbl('Vehicle No.', rIn('vehicle', { type: 'text' }))}${mlLbl('Supplier lot / heat No.', rIn('supplierLot', { type: 'text' }))}${mlLbl('TC / COA No.', rIn('cert', { type: 'text' }))}
+      ${mlLbl('Quantity received (kg)', rIn('qty'))}${mlLbl('Rate (Rs/kg)', rIn('rate'))}<div></div></div></section>
+    <section class="card"><h3>Chemical analysis (%)</h3><div class="muted sm pad">Limits are remembered for each material. The own-lab result, when entered, replaces the supplier certificate for the charge-mix analysis.</div><div class="tw"><table class="cmt"><thead><tr><th></th>${els.map((e) => `<th>${e}</th>`).join('')}</tr></thead><tbody>
+      ${rowEl('Spec min', (e) => rIn(`spec.${e}.min`))}${rowEl('Spec max', (e) => rIn(`spec.${e}.max`))}${rowEl('Supplier TC', (e) => rIn(`tc.${e}`, { extra: `data-rd="tc.${e}"` }))}${rowEl('Datre lab (spectro)', (e) => rIn(`lab.${e}`, { extra: `data-rd="lab.${e}"` }))}</tbody></table></div></section>
+    <section class="card"><h3>Visual and document checks</h3><div class="tw"><table class="cmt"><thead><tr><th>Check</th><th>Result</th><th>Note</th><th></th></tr></thead><tbody>
+      ${l.checks.map((c, i) => `<tr><td><input data-p="checks.${i}.name" type="text" value="${esc(c.name)}"></td><td><select data-p="checks.${i}.res" class="rmres"><option value="" ${!c.res ? 'selected' : ''}>–</option><option value="ok" ${c.res === 'ok' ? 'selected' : ''}>OK</option><option value="nok" ${c.res === 'nok' ? 'selected' : ''}>Not OK</option><option value="na" ${c.res === 'na' ? 'selected' : ''}>N/A</option></select></td><td><input data-p="checks.${i}.note" type="text" value="${esc(c.note)}"></td><td><button class="x" data-act="rm-delcheck" data-i="${i}" title="Remove">×</button></td></tr>`).join('')}</tbody></table></div><button class="btn sm ghost" data-act="rm-addcheck">+ Add check</button></section>
+    <section class="card"><h3>Decision</h3><div id="rm-suggest"></div>
+      <div class="grid3">${mlLbl('Decision', `<select data-p="decision" class="rmres" ${canDec ? '' : 'disabled'}>${QI.RM_DECISIONS.map(([k, t]) => `<option value="${k}" ${l.decision === k ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}${mlLbl('Accepted qty (kg)', rIn('accQty'))}${mlLbl('Rejected qty (kg)', rIn('rejQty'))}</div>
+      ${canDec ? '' : '<div class="muted sm">The accept / reject decision is taken by Quality or the QC Manager.</div>'}
+      <div class="grid2 pad">${mlLbl('Remark', rSel('remarks', 'rmRemarks', QI.RM_DEFAULTS.rmRemarks))}${mlLbl('Notes', rIn('remarkNote', { type: 'text' }))}</div></section>
+    ${saved ? `<section class="card"><h3>Used in production</h3>${u.rows.length ? table(['Heat', 'Date', 'Charged (kg)'], u.rows.map((r) => `<tr><td>${link('/heat/' + r.heat, r.heat)}</td><td>${esc(r.date)}</td><td>${f2(r.kg, 0)}</td></tr>`)) + `<div class="muted sm pad">Total used ${f2(u.kg, 0)} kg${has0(l.accQty) ? ` · balance ${f2(n0(l.accQty) - u.kg, 0)} kg` : ''}</div>` : '<div class="muted">Not charged in any heat yet. Enter this MRN on the Furnace Log Sheet to link it.</div>'}</section>` : ''}</div>`;
+  };
+  const RM_ACTS = {
+    'rm-new': () => modal('New raw material receipt', `${fld('MRN No.', 'mrn', '', 'required')}${combo('Material', 'material', 'rmMaterial', '', QI.RM_DEFAULTS.rmMaterial)}`, (f) => {
+      const mrn = val(f, 'mrn'); if (!mrn) return 'Enter the MRN number.'; const ex = QI.rmLot(mrn); if (ex) { rmLoad(ex.mrn); go('rmlot/' + ex.mrn); return; }
+      const material = cval(f, 'material', 'rmMaterial'); ui.rmx = { lot: QI.rmNew(mrn, material), dirty: true }; go('rmlot/' + mrn); }, 'Open'),
+    'rm-open': (el) => { rmLoad(el.dataset.mrn); go('rmlot/' + el.dataset.mrn); },
+    'rm-filter': (el) => { ui.rmf.status = el.dataset.f; render(); },
+    'rm-search': (el) => { ui.rmf.q = el.value; render(); const i = $('.search'); i.focus(); i.setSelectionRange(99, 99); },
+    'rm-save': () => { if (needInspector()) return; const r = QI.rmSave(ui.rmx.lot); if (r.error) { toast(r.error, 'bad'); return; } const m = ui.rmx.lot.mrn; ui.rmx.dirty = false; rmLoad(m); render(); toast('Raw material inspection saved', 'ok'); },
+    'rm-addcheck': () => { ui.rmx.lot.checks.push({ name: '', res: '', note: '' }); ui.rmx.dirty = true; render(); },
+    'rm-delcheck': (el) => { ui.rmx.lot.checks.splice(+el.dataset.i, 1); ui.rmx.dirty = true; render(); },
+    'rm-csv': () => { const H = ['MRN', 'Date', 'Material', 'Supplier', 'PO', 'Challan', 'Supplier lot', 'TC no', 'Qty kg', 'Decision', 'Accepted kg', 'Rejected kg', 'Used kg'].concat(QI.RM_EL); const q = (v) => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+      download(`raw-material-register-${today()}.csv`, [H].concat(S().rmLots.map((l) => { const a = l.analysis || QI.rmAnalysis(l); return [l.mrn, l.date, l.material, l.supplier, l.po, l.challan, l.supplierLot, l.cert, l.qty, l.decision, l.accQty, l.rejQty, QI.rmUsage(l.mrn).kg].concat(QI.RM_EL.map((e) => (a[e] == null ? '' : a[e]))); })).map((r) => r.map(q).join(',')).join('\n'), 'text/csv'); },
+    'cm-lots': () => {
+      const r = ui.cm.r, ch = QI.rmChargeUpdate(r);
+      if (!ch.length) { toast('No accepted lots in the raw material register match this recipe’s materials.', 'bad'); return; }
+      ask('Update the analysis and MRN of ' + ch.length + ' material(s) from their latest accepted lot?\n' + ch.map((c) => `${c.name} ← MRN ${c.lot.mrn} (${c.lot.date})`).join('\n'), () => {
+        ch.forEach((c) => { const m = r.mats[c.i]; m.mrn = c.lot.mrn; m.comp = m.comp || {}; const a = c.lot.analysis || QI.rmAnalysis(c.lot); Object.keys(a).forEach((e) => { m.comp[e] = a[e]; }); });
+        ui.cm.dirty = true; }, 'Update');
+    },
+  };
+  document.addEventListener('input', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#rm') || !ui.rmx) return;
+    if (t.dataset.other) { setPath(ui.rmx.lot, t.dataset.other, t.value); ui.rmx.dirty = true; return; }
+    if (!t.dataset.p || t.tagName === 'SELECT') return;
+    setPath(ui.rmx.lot, t.dataset.p, t.type === 'number' ? (t.value === '' ? '' : parseFloat(t.value)) : t.value); ui.rmx.dirty = true; rmUpdate();
+  });
+  document.addEventListener('change', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#rm') || !ui.rmx) return;
+    if (t.dataset.other) { QI.learn(t.dataset.list, t.value.trim()); ui.rmx.dirty = true; render(); return; }
+    if (t.classList.contains('rmsel')) {
+      const o = t.parentNode.querySelector('input[data-other]'); if (t.value === '__other') { o.hidden = false; o.focus(); return; }
+      setPath(ui.rmx.lot, t.dataset.p, t.value); ui.rmx.dirty = true;
+      if (t.dataset.p === 'material') { const sp = (QI.rmStore().specs || {})[t.value]; if (sp && !Object.keys(ui.rmx.lot.spec).length) ui.rmx.lot.spec = clone(sp); render(); } else rmUpdate();
+    } else if (t.classList.contains('rmres') && t.dataset.p) { setPath(ui.rmx.lot, t.dataset.p, t.value); ui.rmx.dirty = true; rmUpdate(); }
   });
 
   /* ---- approvals queue ---- */
@@ -854,7 +944,7 @@
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS);
   function download(name, text, type) {
     if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -933,10 +1023,10 @@
   }
 
   /* ================= router ================= */
-  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['melt', 'Melting log'], ['mould', 'Moulding log'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
+  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['melt', 'Melting log'], ['mould', 'Moulding log'], ['rm', 'Raw materials'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -952,7 +1042,7 @@
     const view = parts[0]; const arg = decodeURIComponent(parts.slice(1).join('/'));
     const fn = booting || (QI.mode === 'shared' && !QI.ready) ? () => empty('Connecting to shared inspection data…') : (V[view] || V.dashboard);
     const open = $('#dlg').open;
-    const active = view === 'mouldplan' ? 'mould' : view === 'meltlog' ? 'melt' : view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
+    const active = view === 'rmlot' ? 'rm' : view === 'mouldplan' ? 'mould' : view === 'meltlog' ? 'melt' : view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
     $('#nav').innerHTML = NAV.map(([k, t]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${t}</a>`).join('');
     $('#who').textContent = QI.mode === 'shared' ? (QI.me.dept ? `👤 ${QI.me.name || 'You'} · ${QI.dept().name.split(' ')[0]}` : 'Choose department') : (S().settings.inspector ? '👤 ' + S().settings.inspector : 'Set inspector');
     $('#back').hidden = !hist.length;
@@ -964,6 +1054,7 @@
     if (view === 'charge' && ui.cm && ui.cm.r) cmUpdate();
     if (view === 'meltlog' && ui.ml) mlUpdate();
     if (view === 'mouldplan' && ui.mp) mpUpdate();
+    if (view === 'rmlot' && ui.rmx) rmUpdate();
     document.body.classList.toggle('printing', view === 'report');
     if (!open) $('#main').dataset.view = view;
     window.scrollTo(0, y);
