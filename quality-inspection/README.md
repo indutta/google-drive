@@ -66,3 +66,13 @@ The **Raw materials** page records every incoming lot against its **MRN**: recei
 * Each lot shows where it was used (heat, kg) and its remaining balance; each heat shows a **Raw material traceability** card (MRN, supplier, kg charged, inspection decision).
 * Charge mix → **Update analysis from received lots** loads the analysis and MRN of the latest accepted lot into the recipe's materials.
 * The register page summarises supplier performance (accept / reject %, rejected kg) and the mean ± standard deviation of accepted-lot analysis per material, and exports to CSV – the base data for later output analysis (analysis → heat → casting results).
+
+## Melting plan (daily melting heat plan)
+The **Melting plan** page mirrors the paper *Melting heat plan*: date; per heat the heat number, nozzle size, items with **moulds × liquid metal per mould** (sub liquid, e.g. 4 × 252 = 1008 kg) and the total liquid metal (auto sum, overridable). Heat, item and nozzle are dropdowns that learn new values; saving the plan creates any missing heats.
+**Logical synchronisation**
+* **Furnace log:** *Start log* on a planned heat opens the Furnace Log Sheet pre-filled with the plan (items → mould pouring allocation: boxes and LM weight, nozzle size, date). The log shows a banner with planned vs actual liquid metal and the variance.
+* **Plan sync table** (on the plan page): planned LM vs actual LM from the furnace log with variance (green ±3 %, amber ±6 %, red beyond), nozzle planned vs logged, and per item: planned moulds · moulds on the moulding plan for that heat · boxes poured on the furnace log.
+* **Moulding plan:** each heat/item line shows a *melt plan n* badge (green when it equals the moulding quantity).
+* **Charge mix:** *Charge…* opens the charge-mix calculator of a chosen recipe with LM set to the heat's planned liquid metal.
+* **Heat page:** shows the melting plan of the heat next to its furnace log, raw-material traceability and charge.
+Together the chain *melting plan → moulding plan → charge mix → raw material lots → furnace log → inspection results* is now linked by heat number, item and MRN, which is the base for output analysis.

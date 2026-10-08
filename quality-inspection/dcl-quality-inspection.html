@@ -1457,7 +1457,7 @@ window.PLAN = {
 
   /* ---------- state ---------- */
   const blank = () => ({ v: 1, seq: { ncr: 0, log: 0 }, settings: { inspector: '', overrides: {} },
-    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], mouldPlans: [], rmLots: [], results: {}, approvals: {}, ncrs: [] });
+    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], mouldPlans: [], meltPlans: [], rmLots: [], results: {}, approvals: {}, ncrs: [] });
   let S = blank();
   QI.persistent = true;
   try {
@@ -1509,6 +1509,7 @@ window.PLAN = {
     if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
     if (action === 'charge' || action === 'melt') return d.id === 'melt';
     if (action === 'mould') return d.id === 'sand' || d.id === 'planning';
+    if (action === 'mplan') return ['melt', 'planning'].includes(d.id);
     if (action === 'rm') return ['qa', 'qcm', 'lab', 'planning'].includes(d.id);
     if (action === 'rmdecide') return d.id === 'qa' || d.id === 'qcm';
     return false;                                 // release, reject, ncr, plan, admin: quality only
@@ -1518,7 +1519,7 @@ window.PLAN = {
   let DB = null, ready = true, synced = {}, queue = Promise.resolve();
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
-  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat', mouldPlans: 'date', rmLots: 'mrn' };
+  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat', mouldPlans: 'date', meltPlans: 'date', rmLots: 'mrn' };
   const cfgForm = () => ({ rm: S.settings.rm || {}, mould: S.settings.mould || {}, melt: S.settings.melt || {}, charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
@@ -2337,6 +2338,59 @@ window.PLAN = {
 
 </script>
 <script>
+/* DCL Quality Inspection – Melting Heat Plan (daily): heat -> items x liquid metal per mould -> total LM and nozzle size.
+   Synchronised with: moulding plan (planned moulds per heat/item), furnace log (actual LM, boxes poured, nozzle), heats, charge mix. */
+(function () {
+  'use strict';
+  const QI = window.QI;
+  const S = () => QI.S();
+  const num = (v) => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
+  QI.ML_DEFAULTS.mlProduct = ['Reinf 11906', 'Reinf 11907', 'Reinf 11909', 'Reinf 11910', 'Reinf 11904', 'Idler 175', 'T.P (test piece)'];
+  QI.ML_DEFAULTS.mlNozzle = ['60 mm'];
+  QI.mlpNew = (date, copyFrom) => ({ date, rows: copyFrom ? JSON.parse(JSON.stringify(copyFrom.rows)).map((r) => Object.assign(r, { heat: '' })) : [{ heat: '', nozzle: '60 mm', total: '', items: [{ item: '', n: '', lmw: '' }] }], note: '' });
+  QI.meltPlan = (date) => S().meltPlans.find((p) => p.date === date);
+  QI.mlpRowLM = (r) => r.items.reduce((a, i) => a + num(i.n) * num(i.lmw), 0);
+  QI.mlpFor = (heat) => {      // latest plan row for a heat number (H-370 ~ H370)
+    const k = QI.mpNorm(heat); let best = null;
+    S().meltPlans.forEach((p) => p.rows.forEach((r) => { if (QI.mpNorm(r.heat) === k && (!best || p.date >= best.plan.date)) best = { plan: p, row: r }; }));
+    return best;
+  };
+  QI.mlpSave = (p) => {
+    if (!QI.can('mplan')) return { error: 'Only Melting, Planning and Quality can save the melting plan.' };
+    if (!p.date) return { error: 'Choose the date.' };
+    p.rows = p.rows.filter((r) => r.heat || r.items.some((i) => i.item || i.n || i.lmw));
+    p.rows.forEach((r) => { r.items = r.items.filter((i) => i.item || i.n || i.lmw); if (!r.items.length) r.items = [{ item: '', n: '', lmw: '' }];
+      r.items.forEach((i) => QI.learn('mlProduct', i.item)); QI.learn('mlNozzle', r.nozzle); QI.learn('mpHeat', r.heat);
+      if (r.heat && !QI.heat(QI.heatNoFor(r.heat)) && QI.can('create', 'heat')) QI.addHeat({ no: r.heat, date: p.date }); });
+    p.by = S().settings.inspector || QI.me.name || ''; p.ts = Date.now();
+    const i = S().meltPlans.findIndex((x) => x.date === p.date), copy = JSON.parse(JSON.stringify(p));
+    if (i >= 0) S().meltPlans[i] = copy; else S().meltPlans.push(copy);
+    QI.save(); return { ok: true };
+  };
+  /* plan vs moulding plan vs furnace log */
+  QI.mlpSync = (p) => p.rows.filter((r) => r.heat).map((r) => {
+    const heatNo = QI.heatNoFor(r.heat), fl = QI.furnaceLog(heatNo), planLM = QI.mlpRowLM(r), entered = num(r.total);
+    const calc = fl ? QI.mlCalc(fl) : null, actual = calc && calc.lm > 0 ? calc.lm : null, ref = entered || planLM;
+    const items = r.items.filter((i) => i.item).map((i) => {
+      const k = QI.mpNorm(i.item); let mould = 0, any = false;
+      S().mouldPlans.forEach((mp) => mp.items.forEach((it) => { if (QI.mpNorm(it.item) === k) it.lines.forEach((l) => { if (QI.mpNorm(l.heat) === QI.mpNorm(r.heat)) { mould += num(l.qty); any = true; } }); }));
+      const poured = fl ? fl.alloc.filter((a) => QI.mpNorm(a.product) === k).reduce((a, x) => a + num(x.boxes), 0) : null;
+      return { item: i.item, n: num(i.n), lm: num(i.n) * num(i.lmw), mould: any ? mould : null, poured };
+    });
+    return { row: r, heatNo, heat: QI.heat(heatNo), fl, planLM, entered, actual, var: actual != null && ref > 0 ? (actual - ref) / ref * 100 : null,
+      nozzlePlan: r.nozzle, nozzleActual: fl && fl.nozzleSize ? fl.nozzleSize : null, items };
+  });
+  QI.mlpNewLog = (heat, grade) => {     // furnace log prefilled from the melting plan
+    const l = QI.mlNew(heat, grade), pr = QI.mlpFor(heat); if (!pr) return l;
+    const its = pr.row.items.filter((i) => i.item);
+    its.forEach((i, k) => { const row = { boxes: i.n, product: i.item, qty: '', lmwt: num(i.n) * num(i.lmw) || '', net: '' }; if (k < l.alloc.length) l.alloc[k] = row; else l.alloc.push(row); });
+    l.nozzleSize = (pr.row.nozzle || '').replace(/\s*mm$/i, ''); l.date = pr.plan.date;
+    return l;
+  };
+})();
+
+</script>
+<script>
 /* DCL Quality Inspection – raw material inspection register (incoming lots by MRN).
    Links to production: MRNs typed on the furnace log are checked against this register and consumption is tracked per lot;
    accepted lot analyses can refresh the charge-mix material table; each heat shows the lots (supplier, analysis) charged into it. */
@@ -2460,7 +2514,7 @@ window.PLAN = {
   const hist = [];
   const HOSTED = !!window.claude;
   const go = (p) => { p = String(p).replace(/^#?\/?/, '') || 'dashboard'; if (p !== route) { hist.push(route); route = p; } window.scrollTo(0, 0); render(); };
-  const ui = { rmx: null, rmf: null, mp: null, ml: null, cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
+  const ui = { mpl: null, rmx: null, rmf: null, mp: null, ml: null, cm: null, open: {}, stale: false, filter: { castings: '', ncr: 'open', plan: '' }, stageOpen: {} };
   const SCOPE_LABEL = { job: 'Work order', log: 'Sand & calibration log', heat: 'Heat', casting: 'Casting' };
 
   /* ================= small components ================= */
@@ -2809,6 +2863,7 @@ window.PLAN = {
       <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
+    ${(() => { const pr = QI.mlpFor(no); if (!pr) return ''; return `<section class="card"><h3>Melting plan <small class="muted">${esc(pr.plan.date)}</small></h3><div class="sm">${pr.row.items.filter((i) => i.item).map((i) => esc(i.item) + ' <b>' + esc(i.n) + '×' + esc(i.lmw) + '</b>').join(' · ')} · planned LM <b>${f2(n0(pr.row.total) || QI.mlpRowLM(pr.row), 0)} kg</b> · nozzle ${esc(pr.row.nozzle || '–')}</div><button class="btn sm ghost" data-act="mpl-open" data-date="${esc(pr.plan.date)}">Open plan</button></section>`; })()}
     ${(() => { const hl = QI.rmHeatLots(no); return hl.length ? `<section class="card"><h3>Raw material traceability</h3>${table(['MRN', 'Material', 'Supplier', 'Charged kg', 'Inspection'], hl.map((x) => `<tr><td>${x.lot ? link('/rmlot/' + x.lot.mrn, x.mrn) : esc(x.mrn)}</td><td>${esc(x.lot ? x.lot.material : x.label)}</td><td class="sm">${esc(x.lot ? x.lot.supplier : '')}</td><td>${f2(x.kg, 0)}</td><td>${x.lot ? decBadge(x.lot.decision) : badge('not registered', 'mute')}</td></tr>`))}</section>` : ''; })()}
     ${(() => { const fl = QI.furnaceLog(no); if (!fl) return QI.can('melt') ? `<section class="card"><h3>Furnace log sheet</h3><div class="muted sm pad">No furnace log for this heat yet.</div><button class="btn sm" data-act="ml-open" data-heat="${esc(no)}">Open furnace log</button></section>` : ''; const c = QI.mlCalc(fl); return `<section class="card"><h3>Furnace log sheet <small class="muted">${esc(fl.furnace ? 'Furnace ' + fl.furnace : '')} · saved by ${esc(fl.by)}, ${fdt(fl.ts)}</small></h3><div class="sm">Total LM <b>${f2(c.lm, 0)} kg</b> · charges ${f2(c.charges, 0)} kg · melting loss ${c.lossPct == null ? '–' : f2(c.lossPct, 1) + ' %'} · ${c.kwhPerT == null ? '–' : f2(c.kwhPerT, 0) + ' kWh/t'} · tapping ${esc(fl.tapTemp || '–')} °C · pouring ${esc(fl.pourTemp || '–')} °C</div><button class="btn sm" data-act="ml-open" data-heat="${esc(no)}">Open furnace log</button></section>`; })()}
     ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.recipe)} · LM ${esc(h.charge.lm)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
@@ -2976,6 +3031,7 @@ window.PLAN = {
       ${rowEl('smin', 'Spec Min', (e) => mlIn(`spec.${e}.min`))}${rowEl('smax', 'Spec Max', (e) => mlIn(`spec.${e}.max`))}
       ${[['b1', 'Bath 1'], ['b2', 'Bath 2'], ['b3', 'Bath 3'], ['final', 'Ladle Final']].map(([k, t]) => rowEl(k, t, (e) => mlIn(`bath.${k}.${e}`, { extra: `data-rd="${k}.${e}"` }))).join('')}</tbody></table></div>
       <div class="grid3 pad">${mlLbl('Power on at', mlIn('powerOn', { type: 'time' }))}${mlLbl('Tapped at', mlIn('tapped', { type: 'time' }))}${mlLbl('Heat time (hh:mm)', '<div class="calc" data-c="ml.ht"></div>')}</div></section>
+    ${(() => { const pr = QI.mlpFor(l.heat); if (!pr) return ''; const c = QI.mlCalc(l), pl = n0(pr.row.total) || QI.mlpRowLM(pr.row), v = c.lm > 0 && pl > 0 ? (c.lm - pl) / pl * 100 : null; return `<div class="banner"><b>Melting plan ${esc(pr.plan.date)}:</b> ${pr.row.items.filter((i) => i.item).map((i) => esc(i.item) + ' ' + esc(i.n) + '×' + esc(i.lmw)).join(' · ')} → planned LM <b>${f2(pl, 0)} kg</b>, nozzle ${esc(pr.row.nozzle || '–')}. Actual LM <b>${c.lm > 0 ? f2(c.lm, 0) : '–'} kg</b> ${v == null ? '' : varBadge(v)}</div>`; })()}
     <datalist id="rm-mrns">${S().rmLots.map((x) => `<option value="${esc(x.mrn)}">${esc(x.material)} · ${esc(x.supplier)} · ${esc(x.decision)}</option>`).join('')}</datalist>
     ${QI.mlMrnCheck(l).map((i) => `<div class="banner ${i.lvl === 'bad' ? 'bad' : i.lvl === 'warn' ? 'warn' : ''}">${esc(i.msg)}</div>`).join('')}
     <section class="card"><h3>Input charges</h3><div class="tw"><table class="cmt"><thead><tr><th>Scrap</th><th>Wt (kg)</th><th>MRN No.</th></tr></thead><tbody>
@@ -3019,7 +3075,7 @@ window.PLAN = {
     'ml-new': () => modal('New furnace log', `${fld('Heat No.', 'heat', '', 'required')}${combo('Material grade', 'grade', 'mlGrade', '', QI.ML_DEFAULTS.mlGrade)}${combo('Furnace No.', 'furnace', 'furnace', '', QI.ML_DEFAULTS.furnace)}`, (f) => {
       const heat = val(f, 'heat'); if (!heat) return 'Enter the heat number.'; if (QI.furnaceLog(heat)) { mlLoad(heat); go('meltlog/' + heat); return; }
       const grade = cval(f, 'grade', 'mlGrade'), furnace = cval(f, 'furnace', 'furnace');
-      ui.ml = { log: Object.assign(QI.mlNew(heat, grade), { furnace }), dirty: true, isNew: true }; go('meltlog/' + heat); }, 'Open log'),
+      ui.ml = { log: Object.assign(QI.mlpNewLog(heat, grade), { furnace }), dirty: true, isNew: true }; go('meltlog/' + heat); }, 'Open log'),
     'ml-open': (el) => { mlLoad(el.dataset.heat); go('meltlog/' + el.dataset.heat); },
     'ml-save': () => { if (needInspector()) return; const r = QI.mlSave(ui.ml.log); if (r.error) { toast(r.error, 'bad'); return; } ui.ml.dirty = false; render(); toast('Furnace log saved', 'ok'); },
     'ml-sign': (el) => { if (needInspector()) return; if (ui.ml.dirty) { toast('Save the log first.', 'bad'); return; } const r = QI.mlSign(ui.ml.log.heat, el.dataset.role); if (r.error) { toast(r.error, 'bad'); return; } mlLoad(ui.ml.log.heat); render(); },
@@ -3090,7 +3146,7 @@ window.PLAN = {
     ${p.items.map((it, i) => `<section class="card"><div class="hd"><h3>Item ${i + 1} <span class="muted sm">· moulds: <b data-c="mp.item.${i}"></b></span></h3><button class="btn sm ghost" data-act="mp-delitem" data-i="${i}">Remove item</button></div>
       ${mlLbl('Item name', mpSel(`items.${i}.item`, 'mlProduct', []))}
       <div class="tw"><table class="cmt"><thead><tr><th>H/T No.</th><th>Qty</th><th>Furnace log</th><th></th></tr></thead><tbody>
-        ${it.lines.map((l, j) => { const pr = l.heat && it.item ? QI.mpPoured(l.heat, it.item) : null; return `<tr><td>${mpSel(`items.${i}.lines.${j}.heat`, 'mpHeat', [], heats)}</td><td>${mpIn(`items.${i}.lines.${j}.qty`)}</td><td>${pr == null ? '<span class="muted sm">no log</span>' : badge('poured ' + pr, pr >= n0(l.qty) && n0(l.qty) > 0 ? 'ok' : 'warn')}</td><td><button class="x" data-act="mp-delline" data-i="${i}" data-j="${j}" title="Remove">×</button></td></tr>`; }).join('')}</tbody></table></div>
+        ${it.lines.map((l, j) => { const pr = l.heat && it.item ? QI.mpPoured(l.heat, it.item) : null; return `<tr><td>${mpSel(`items.${i}.lines.${j}.heat`, 'mpHeat', [], heats)}</td><td>${mpIn(`items.${i}.lines.${j}.qty`)}</td><td>${pr == null ? '<span class="muted sm">no log</span>' : badge('poured ' + pr, pr >= n0(l.qty) && n0(l.qty) > 0 ? 'ok' : 'warn')}${(() => { const mp = l.heat && it.item ? QI.mlpFor(l.heat) : null; const hit = mp && mp.row.items.find((x) => QI.mpNorm(x.item) === QI.mpNorm(it.item)); return hit ? ' ' + badge('melt plan ' + hit.n, n0(hit.n) === n0(l.qty) ? 'ok' : 'warn') : ''; })()}</td><td><button class="x" data-act="mp-delline" data-i="${i}" data-j="${j}" title="Remove">×</button></td></tr>`; }).join('')}</tbody></table></div>
       <button class="btn sm ghost" data-act="mp-addline" data-i="${i}">+ Add heat line</button></section>`).join('')}
     <button class="btn" data-act="mp-additem">+ Add item</button>
     <section class="card pad"><h3>Calibration</h3><div class="muted sm pad">Readings per plant P1–P3. Resin and catalyst are checked as % (resin ÷ sand weight, catalyst ÷ resin) against the plan limits 1.8–2 % and 18–21 %.</div>
@@ -3231,6 +3287,75 @@ window.PLAN = {
       setPath(ui.rmx.lot, t.dataset.p, t.value); ui.rmx.dirty = true;
       if (t.dataset.p === 'material') { const sp = (QI.rmStore().specs || {})[t.value]; if (sp && !Object.keys(ui.rmx.lot.spec).length) ui.rmx.lot.spec = clone(sp); render(); } else rmUpdate();
     } else if (t.classList.contains('rmres') && t.dataset.p) { setPath(ui.rmx.lot, t.dataset.p, t.value); ui.rmx.dirty = true; rmUpdate(); }
+  });
+
+  /* ---- melting heat plan ---- */
+  const mplLoad = (date) => { const ex = QI.meltPlan(date); ui.mpl = { plan: ex ? clone(ex) : QI.mlpNew(date), dirty: false }; };
+  const lIn = (p, o) => { o = o || {}; const v = getP(ui.mpl.plan, p); return `<input data-p="${p}" type="${o.type || 'number'}" ${o.type ? '' : 'step="any" inputmode="decimal"'} value="${esc(v == null ? '' : v)}" ${o.extra || ''}>`; };
+  const lSel = (p, listKey, defs, extra) => {
+    const cur = getP(ui.mpl.plan, p) || ''; const opts = QI.opts(listKey, defs); (extra || []).forEach((x) => { if (!opts.includes(x)) opts.push(x); }); if (cur && !opts.includes(cur)) opts.unshift(cur);
+    return `<select class="mplsel" data-p="${p}" data-list="${listKey}"><option value="">– select –</option>${opts.map((x) => `<option value="${esc(x)}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">＋ Other (specify)…</option></select><input class="other" data-other="${p}" data-list="${listKey}" placeholder="Type new value – saved for next time" hidden>`;
+  };
+  const varBadge = (v) => v == null ? '<span class="muted sm">no log</span>' : badge((v > 0 ? '+' : '') + f2(v, 1) + ' %', Math.abs(v) <= 3 ? 'ok' : Math.abs(v) <= 6 ? 'warn' : 'bad');
+  function mplSyncHtml() {
+    const p = ui.mpl.plan, sy = QI.mlpSync(p); if (!sy.length) return '<div class="muted sm">Add heats to see the plan synchronised with the moulding plan and furnace log.</div>';
+    const dayPlan = sy.reduce((a, x) => a + (x.entered || x.planLM), 0), dayAct = sy.reduce((a, x) => a + (x.actual || 0), 0), done = sy.filter((x) => x.actual != null).length;
+    return `<div class="sm pad">Planned LM <b>${f2(dayPlan, 0)} kg</b> · poured per furnace logs <b>${f2(dayAct, 0)} kg</b> · ${done} of ${sy.length} heats logged</div>
+    ${table(['Heat', 'Planned LM (kg)', 'Actual LM (kg)', 'Variance', 'Nozzle plan / log', 'Items: planned moulds · moulding plan · poured', ''], sy.map((x, i) => `<tr><td><b>${esc(x.row.heat)}</b>${x.heat ? '' : ' ' + badge('new heat', 'mute')}</td><td>${f2(x.entered || x.planLM, 0)}${x.entered && Math.abs(x.entered - x.planLM) > 0.5 ? `<div class="sm badT">items add up to ${f2(x.planLM, 0)}</div>` : ''}</td><td>${x.actual == null ? '–' : f2(x.actual, 0)}</td><td>${varBadge(x.var)}</td><td class="sm">${esc(x.nozzlePlan || '–')} / ${x.nozzleActual ? esc(x.nozzleActual) + ' mm' : '–'}${x.nozzleActual && x.nozzlePlan && parseFloat(x.nozzlePlan) !== parseFloat(x.nozzleActual) ? ' ' + badge('differs', 'warn') : ''}</td>
+      <td class="sm">${x.items.map((it) => `${esc(it.item)}: ${it.n} · ${it.mould == null ? '–' : it.mould} · ${it.poured == null ? '–' : it.poured}`).join('<br>')}</td><td><button class="btn sm ghost" data-act="mpl-log" data-heat="${esc(x.row.heat)}">${x.fl ? 'Open log' : 'Start log'}</button> <button class="btn sm ghost" data-act="mpl-charge" data-i="${p.rows.indexOf(x.row)}">Charge…</button></td></tr>`))}`;
+  }
+  function mplUpdate() {
+    if (!ui.mpl) return; const p = ui.mpl.plan;
+    p.rows.forEach((r, i) => { const lm = QI.mlpRowLM(r); r.items.forEach((it, j) => { const c = $(`#mpl [data-c="sub.${i}.${j}"]`); if (c) c.textContent = f2(n0(it.n) * n0(it.lmw), 0); }); const t = $(`#mpl [data-c="tot.${i}"]`); if (t) t.textContent = f2(lm, 0); });
+    const sy = $('#mpl-sync'); if (sy) sy.innerHTML = mplSyncHtml(); const d = $('#mpl-dirty'); if (d) d.hidden = !ui.mpl.dirty;
+  }
+  V.mplan = () => {
+    const L = S().meltPlans.slice().sort((x, y) => y.date.localeCompare(x.date));
+    return `<div class="hd"><h2>Melting plan <small>Daily heat plan</small></h2><button class="btn primary" data-act="mpl-new">+ New melting plan</button></div>
+    ${L.length ? table(['Date', 'Heats', 'Planned LM (kg)', 'Poured per logs (kg)', 'Logged', ''], L.map((p) => { const sy = QI.mlpSync(p); const pl = sy.reduce((a, x) => a + (x.entered || x.planLM), 0), ac = sy.reduce((a, x) => a + (x.actual || 0), 0), dn = sy.filter((x) => x.actual != null).length;
+      return `<tr><td><b>${esc(p.date)}</b></td><td class="sm">${sy.map((x) => esc(x.row.heat)).join(' · ')}</td><td>${f2(pl, 0)}</td><td>${ac ? f2(ac, 0) : '–'}</td><td>${badge(dn + ' / ' + sy.length, dn === sy.length && dn ? 'ok' : 'mute')}</td><td><button class="btn sm ghost" data-act="mpl-open" data-date="${esc(p.date)}">Open</button></td></tr>`; })) : empty('No melting plans yet. Tap “New melting plan” to enter the day’s heats, items and liquid metal.')}`;
+  };
+  V.mplanedit = (date) => {
+    if (!ui.mpl || ui.mpl.plan.date !== date) mplLoad(date);
+    const p = ui.mpl.plan, saved = !!p.ts, heats = S().heats.map((h) => h.no);
+    return `<div id="mpl"><div class="hd"><div><h2>Melting Heat Plan</h2><div class="muted sm">${saved ? `Saved by ${esc(p.by)}, ${fdt(p.ts)}` : 'Not saved yet'}</div></div><div class="row"><button class="btn primary" data-act="mpl-save">Save plan</button><button class="btn" data-act="mpl-dl">Download sheet</button></div></div>
+    <div class="banner warn" id="mpl-dirty" ${ui.mpl.dirty ? '' : 'hidden'}>Unsaved changes – tap <b>Save plan</b>.</div>
+    <section class="card"><div class="grid2">${mlLbl('Date', lIn('date', { type: 'date', extra: saved ? 'readonly' : '' }))}</div></section>
+    ${p.rows.map((r, i) => `<section class="card"><div class="hd"><h3>Heat ${i + 1}</h3><button class="btn sm ghost" data-act="mpl-delrow" data-i="${i}">Remove heat</button></div>
+      <div class="grid3">${mlLbl('Heat No.', lSel(`rows.${i}.heat`, 'mpHeat', [], heats))}${mlLbl('Nozzle size', lSel(`rows.${i}.nozzle`, 'mlNozzle', QI.ML_DEFAULTS.mlNozzle))}${mlLbl('Total liquid metal (kg)', `${lIn(`rows.${i}.total`, { extra: 'placeholder="auto"' })}<div class="muted sm">Items add up to <b data-c="tot.${i}"></b> kg</div>`)}</div>
+      <div class="tw"><table class="cmt"><thead><tr><th>Item name</th><th>Moulds (nos)</th><th>LM per mould (kg)</th><th>Sub liquid (kg)</th><th></th></tr></thead><tbody>
+        ${r.items.map((it, j) => `<tr><td>${lSel(`rows.${i}.items.${j}.item`, 'mlProduct', QI.ML_DEFAULTS.mlProduct)}</td><td>${lIn(`rows.${i}.items.${j}.n`)}</td><td>${lIn(`rows.${i}.items.${j}.lmw`)}</td><td class="calc"><span data-c="sub.${i}.${j}"></span></td><td><button class="x" data-act="mpl-delitem" data-i="${i}" data-j="${j}" title="Remove">×</button></td></tr>`).join('')}</tbody></table></div>
+      <button class="btn sm ghost" data-act="mpl-additem" data-i="${i}">+ Add item</button></section>`).join('')}
+    <button class="btn" data-act="mpl-addrow">+ Add heat</button>
+    <section class="card pad"><h3>Synchronisation <small class="muted">plan · moulding plan · furnace log</small></h3><div id="mpl-sync"></div><div class="muted sm pad">Variance: green within ±3 %, amber ±6 %, red beyond. Moulds columns: planned (this sheet) · planned on the moulding plan for the same heat · boxes poured on the furnace log.</div></section>
+    <section class="card"><h3>Note</h3><textarea data-p="note" rows="2">${esc(p.note)}</textarea></section></div>`;
+  };
+  function mplSheetHtml(p) { const td = (v) => `<td>${esc(v == null ? '' : v)}</td>`; return `<h2>Melting heat plan – ${esc(p.date)}</h2><table><tr><th>Heat No</th><th>Item name</th><th>Sub liquid</th><th>Total liquid metal</th><th>Nozzle size</th></tr>${p.rows.map((r) => r.items.map((it, j) => `<tr>${j === 0 ? `<td rowspan="${r.items.length}">${esc(r.heat)}</td>` : ''}${td(it.item)}${td(it.n && it.lmw ? it.n + '×' + it.lmw : '')}${j === 0 ? `<td rowspan="${r.items.length}">${f2(n0(r.total) || QI.mlpRowLM(r), 0)} kg</td><td rowspan="${r.items.length}">${esc(r.nozzle)}</td>` : ''}</tr>`).join('')).join('')}</table><p>${esc(p.note)}</p>`; }
+  const MPL_ACTS = {
+    'mpl-new': () => { const last = S().meltPlans.slice().sort((x, y) => y.date.localeCompare(x.date))[0]; modal('New melting plan', `${fld('Date', 'date', today(), 'type="date" required')}${last ? `<label class="chip"><input type="checkbox" name="copy"> Copy items from the last plan (${esc(last.date)}) with blank heat numbers</label>` : ''}`, (f) => {
+      const date = val(f, 'date'); if (!date) return 'Choose the date.'; if (QI.meltPlan(date)) { mplLoad(date); go('mplanedit/' + date); return; }
+      ui.mpl = { plan: QI.mlpNew(date, f.elements.copy && f.elements.copy.checked ? last : null), dirty: true }; go('mplanedit/' + date); }, 'Open plan'); },
+    'mpl-open': (el) => { mplLoad(el.dataset.date); go('mplanedit/' + el.dataset.date); },
+    'mpl-save': () => { if (needInspector()) return; const r = QI.mlpSave(ui.mpl.plan); if (r.error) { toast(r.error, 'bad'); return; } const d = ui.mpl.plan.date; ui.mpl.dirty = false; mplLoad(d); render(); toast('Melting plan saved', 'ok'); },
+    'mpl-addrow': () => { ui.mpl.plan.rows.push({ heat: '', nozzle: '60 mm', total: '', items: [{ item: '', n: '', lmw: '' }] }); ui.mpl.dirty = true; render(); },
+    'mpl-delrow': (el) => { ui.mpl.plan.rows.splice(+el.dataset.i, 1); if (!ui.mpl.plan.rows.length) ui.mpl.plan.rows.push({ heat: '', nozzle: '60 mm', total: '', items: [{ item: '', n: '', lmw: '' }] }); ui.mpl.dirty = true; render(); },
+    'mpl-additem': (el) => { ui.mpl.plan.rows[+el.dataset.i].items.push({ item: '', n: '', lmw: '' }); ui.mpl.dirty = true; render(); },
+    'mpl-delitem': (el) => { const its = ui.mpl.plan.rows[+el.dataset.i].items; if (its.length > 1) its.splice(+el.dataset.j, 1); else its[0] = { item: '', n: '', lmw: '' }; ui.mpl.dirty = true; render(); },
+    'mpl-dl': () => download(`melting-plan-${ui.mpl.plan.date}.html`, `<!doctype html><meta charset="utf-8"><title>Melting plan ${esc(ui.mpl.plan.date)}</title><style>body{font:13px system-ui;margin:14px}table{border-collapse:collapse}th,td{border:1px solid #888;padding:4px 10px;text-align:left}th{background:#eee}</style>${mplSheetHtml(ui.mpl.plan)}`, 'text/html'),
+    'mpl-log': (el) => { const heat = QI.heatNoFor(el.dataset.heat); if (!QI.furnaceLog(heat)) { if (!QI.can('melt')) { toast('Only the Melting department can start the furnace log.', 'bad'); return; } ui.ml = { log: QI.mlpNewLog(heat, ''), dirty: true, isNew: true }; } else mlLoad(heat); go('meltlog/' + heat); },
+    'mpl-charge': (el) => { const r = ui.mpl.plan.rows[+el.dataset.i], lm = n0(r.total) || QI.mlpRowLM(r); const rec = QI.cm().recipes;
+      modal(`Charge for heat ${r.heat}`, `<p class="muted sm">Opens the charge-mix calculator with the planned liquid metal of ${f2(lm, 0)} kg.</p>${sel('Recipe (customer – grade)', 'recipe', rec.map((x) => [x.id, x.name]), '')}`, (f) => { const x = rec.find((y) => y.id === val(f, 'recipe')); if (!x) return 'Choose a recipe.'; cmOpen(x); ui.cm.r.lm = lm; ui.cm.dirty = true; go('charge'); }, 'Open calculator'); },
+  };
+  document.addEventListener('input', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#mpl') || !ui.mpl) return;
+    if (t.dataset.other) { setPath(ui.mpl.plan, t.dataset.other, t.value); ui.mpl.dirty = true; return; }
+    if (!t.dataset.p || t.tagName === 'SELECT') return;
+    setPath(ui.mpl.plan, t.dataset.p, t.type === 'number' ? (t.value === '' ? '' : parseFloat(t.value)) : t.value); ui.mpl.dirty = true; mplUpdate();
+  });
+  document.addEventListener('change', (e) => {
+    const t = e.target; if (!t.closest || !t.closest('#mpl') || !ui.mpl) return;
+    if (t.dataset.other) { QI.learn(t.dataset.list, t.value.trim()); ui.mpl.dirty = true; render(); return; }
+    if (t.classList.contains('mplsel')) { const o = t.parentNode.querySelector('input[data-other]'); if (t.value === '__other') { o.hidden = false; o.focus(); return; } setPath(ui.mpl.plan, t.dataset.p, t.value); ui.mpl.dirty = true; mplUpdate(); }
   });
 
   /* ---- approvals queue ---- */
@@ -3393,7 +3518,7 @@ window.PLAN = {
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS);
   function download(name, text, type) {
     if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -3472,10 +3597,10 @@ window.PLAN = {
   }
 
   /* ================= router ================= */
-  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['melt', 'Melting log'], ['mould', 'Moulding log'], ['rm', 'Raw materials'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
+  const NAV = [['dashboard', 'Dashboard'], ['jobs', 'Work orders'], ['castings', 'Castings'], ['heats', 'Heats'], ['mplan', 'Melting plan'], ['melt', 'Melting log'], ['mould', 'Moulding log'], ['rm', 'Raw materials'], ['charge', 'Charge mix'], ['logs', 'Sand & calibration'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['settings', 'Settings']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -3491,7 +3616,7 @@ window.PLAN = {
     const view = parts[0]; const arg = decodeURIComponent(parts.slice(1).join('/'));
     const fn = booting || (QI.mode === 'shared' && !QI.ready) ? () => empty('Connecting to shared inspection data…') : (V[view] || V.dashboard);
     const open = $('#dlg').open;
-    const active = view === 'rmlot' ? 'rm' : view === 'mouldplan' ? 'mould' : view === 'meltlog' ? 'melt' : view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
+    const active = view === 'mplanedit' ? 'mplan' : view === 'rmlot' ? 'rm' : view === 'mouldplan' ? 'mould' : view === 'meltlog' ? 'melt' : view === 'job' ? 'jobs' : view === 'casting' || view === 'report' ? 'castings' : view === 'heat' ? 'heats' : view === 'log' ? 'logs' : view;
     $('#nav').innerHTML = NAV.map(([k, t]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${t}</a>`).join('');
     $('#who').textContent = QI.mode === 'shared' ? (QI.me.dept ? `👤 ${QI.me.name || 'You'} · ${QI.dept().name.split(' ')[0]}` : 'Choose department') : (S().settings.inspector ? '👤 ' + S().settings.inspector : 'Set inspector');
     $('#back').hidden = !hist.length;
@@ -3504,6 +3629,7 @@ window.PLAN = {
     if (view === 'meltlog' && ui.ml) mlUpdate();
     if (view === 'mouldplan' && ui.mp) mpUpdate();
     if (view === 'rmlot' && ui.rmx) rmUpdate();
+    if (view === 'mplanedit' && ui.mpl) mplUpdate();
     document.body.classList.toggle('printing', view === 'report');
     if (!open) $('#main').dataset.view = view;
     window.scrollTo(0, y);

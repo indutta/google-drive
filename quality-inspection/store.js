@@ -24,7 +24,7 @@
 
   /* ---------- state ---------- */
   const blank = () => ({ v: 1, seq: { ncr: 0, log: 0 }, settings: { inspector: '', overrides: {} },
-    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], mouldPlans: [], rmLots: [], results: {}, approvals: {}, ncrs: [] });
+    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], mouldPlans: [], meltPlans: [], rmLots: [], results: {}, approvals: {}, ncrs: [] });
   let S = blank();
   QI.persistent = true;
   try {
@@ -76,6 +76,7 @@
     if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
     if (action === 'charge' || action === 'melt') return d.id === 'melt';
     if (action === 'mould') return d.id === 'sand' || d.id === 'planning';
+    if (action === 'mplan') return ['melt', 'planning'].includes(d.id);
     if (action === 'rm') return ['qa', 'qcm', 'lab', 'planning'].includes(d.id);
     if (action === 'rmdecide') return d.id === 'qa' || d.id === 'qcm';
     return false;                                 // release, reject, ncr, plan, admin: quality only
@@ -85,7 +86,7 @@
   let DB = null, ready = true, synced = {}, queue = Promise.resolve();
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
-  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat', mouldPlans: 'date', rmLots: 'mrn' };
+  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat', mouldPlans: 'date', meltPlans: 'date', rmLots: 'mrn' };
   const cfgForm = () => ({ rm: S.settings.rm || {}, mould: S.settings.mould || {}, melt: S.settings.melt || {}, charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
