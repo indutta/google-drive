@@ -50,6 +50,7 @@ nav.tabs{display:flex;gap:2px;overflow-x:auto;padding:0 10px;scrollbar-width:non
 nav.tabs::-webkit-scrollbar{display:none}
 nav.tabs button{background:none;border:0;color:var(--bg);opacity:.7;padding:10px 12px 11px;font-weight:600;font-size:.9rem;white-space:nowrap;cursor:pointer;border-bottom:3px solid transparent;position:relative}
 nav.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--accent)}
+@media(max-width:820px){nav.tabs{flex-wrap:wrap;overflow-x:visible;padding:4px 8px 6px;gap:4px}nav.tabs button{padding:7px 10px;font-size:.85rem;border-bottom-width:2px;border-radius:6px}nav.tabs button[aria-selected="true"]{background:color-mix(in srgb,var(--bg) 14%,transparent)}}
 nav.tabs .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--crit);color:#fff;font-size:.7rem;line-height:18px;text-align:center}
 
 main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
@@ -555,7 +556,7 @@ function doRender(){
   const fn={home:vHome,machines:vMachines,bd:vBD,job:vJob,pm:vPM,spares:vSpares,src:vSrc,vendors:vVendors,dt:vDT,report:vReport,setup:vSetup}[TAB];
   const main=$('#main');const keep=document.activeElement&&main.contains(document.activeElement)&&document.activeElement.id;const val=keep&&document.activeElement.value;
   ALIDX.length=0;
-  const warn=(MODE==='blocked'||READONLY)?`<div class="advice" style="border-left-color:var(--crit);background:var(--crit-soft)"><b>View only — your entries will NOT be saved.</b><br><span class="small">${MODE==='blocked'?'This app needs a signed-in Claude account that has been given access.':'Your account can view but not edit.'} Ask the maintenance manager for access, or use the team's Google app link.</span></div>`:'';
+  const warn=(MODE==='blocked'||READONLY)?`<div class="advice" style="border-left-color:var(--crit);background:var(--crit-soft)"><b>View only — your entries will NOT be saved.</b><br><span class="small">${MODE==='blocked'?'You are not signed in to Claude, or this account has no access. Sign in with the email the CEO shared the app with, or use the team Google app link.':'Your account is set to view only. Ask the CEO to set your access to Contributor in the Share menu.'}</span></div>`:'';
   main.innerHTML='<div class="pane">'+warn+fn()+'</div>';
   bind[TAB]&&bind[TAB]();
   if(keep){const el=document.getElementById(keep);if(el){el.focus();if(val!=null&&el.value!==val)el.value=val;try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
