@@ -80,3 +80,6 @@ Together the chain *melting plan → moulding plan → charge mix → raw materi
 ## Navigation, dashboard and maintenance
 The top bar has main headings — **Dashboard, MELTING** (Melting plan, Melting log, Heats, Raw materials, Charge mix), **MOULDING** (Moulding log, Sand & calibration), **FETTLING** (stages 5–6), **INSPECTION** (Work orders, Castings, Approvals, NCRs, Inspection plan), **MAINTENANCE**, Settings — and the sub-headings of the selected heading appear in a second row.
 The Dashboard greets the user, offers quick-add buttons, and shows tiles per area (each tile opens its window). The Maintenance dashboard shows calibration / periodic-test schedule status (overdue, due soon, on time) and furnace condition (heats on lining against a relining limit, patching, refractory used in the last 30 days) from the Melting logs.
+
+## Responsible persons (Inspection Flow update)
+The updated `INS_Inspection_Flow.xlsx` adds **Inspector Sign** and **Final Sign of Approval Authority** columns. They are imported into `plan.js` per check, shown on the Inspection plan table, and displayed as "Assigned: …" on the Inspector and Factory Head boxes of each stage's approval strip.

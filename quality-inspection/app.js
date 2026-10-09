@@ -206,6 +206,8 @@
 
   /* ---- Inspector -> QC Manager -> Factory Head approval strip ---- */
   const STEPS = [['inspector', 'Inspector', 'review'], ['qc', 'QC Manager', 'qc'], ['head', 'Factory Head', 'head']];
+  const uniq = (a) => a.filter((x, i) => a.indexOf(x) === i);
+  const stagePeople = (no, key) => uniq(QI.stageOf[no].groups.flatMap((g) => g.steps.flatMap((sp) => sp.checks.flatMap((c) => c[key] || []))));
   function approvalStrip(scope, owner, no, jobs, jobNo) {
     if (!owner) return '';
     const os = QI.ownerStage(no, scope, owner, jobs);
@@ -216,7 +218,8 @@
     const boxes = STEPS.map(([k, label, role]) => {
       const s = a && a.steps && a.steps[k];
       const mine = cur === role && (role === 'review' ? QI.can('record', no) : QI.can('approve', role));
-      return `<div class="ap ${s ? 'done' : cur === role ? 'now' : ''}"><div class="apl">${label}</div>${s ? `<div><b>${esc(s.by)}</b></div><div class="muted sm">${fdt(s.ts)}${s.note ? ' · ' + esc(s.note) : ''}</div>`
+      const asg = k === 'inspector' ? stagePeople(no, 'inspectors') : k === 'head' ? stagePeople(no, 'approvers') : [];
+      return `<div class="ap ${s ? 'done' : cur === role ? 'now' : ''}"><div class="apl">${label}</div>${asg.length && !s ? `<div class="muted sm">Assigned: ${esc(asg.join(', '))}</div>` : ''}${s ? `<div><b>${esc(s.by)}</b></div><div class="muted sm">${fdt(s.ts)}${s.note ? ' · ' + esc(s.note) : ''}</div>`
         : cur === role ? (mine ? `<button class="btn primary sm" data-act="sign" data-role="${role}" ${data}>${role === 'review' ? 'Sign off checks' : 'Approve'}</button>${role !== 'review' ? `<button class="btn sm" data-act="return-stage" ${data}>Return</button>` : ''}` : '<div class="muted sm">Waiting…</div>')
         : '<div class="muted sm">–</div>'}</div>`;
     }).join('<span class="apa">›</span>');
@@ -945,9 +948,9 @@
         const c = QI.eff(c0.id);
         const hay = `${sp.id} ${sp.name} ${c.param} ${c.method} ${c.criteria}`.toLowerCase();
         if (q && !hay.includes(q)) return;
-        rows.push(`<tr><td><b>${c.id}</b></td><td>${esc(sp.name)}</td><td>${esc(c.sample)}</td><td>${esc(c.param)}</td><td>${esc(c.method)}</td><td>${esc(critText(c))} ${c.tbc ? badge('TBC', 'warn') : ''}${c.assumed && !c.tbc ? badge('assumed', 'warn') : ''}${S().settings.overrides[c.id] ? badge('edited', 'info') : ''}</td><td>${esc((c.actions || []).join(' / '))}</td><td><button class="btn sm ghost" data-act="edit-check" data-id="${c.id}">Edit</button></td></tr>`);
+        rows.push(`<tr><td><b>${c.id}</b></td><td>${esc(sp.name)}</td><td>${esc(c.sample)}</td><td>${esc(c.param)}</td><td>${esc(c.method)}</td><td>${esc(critText(c))} ${c.tbc ? badge('TBC', 'warn') : ''}${c.assumed && !c.tbc ? badge('assumed', 'warn') : ''}${S().settings.overrides[c.id] ? badge('edited', 'info') : ''}</td><td>${esc((c.actions || []).join(' / '))}</td><td class="sm">${esc((c.inspectors || []).join(', ')) || '–'}</td><td class="sm">${esc((c.approvers || []).join(', ')) || '–'}</td><td><button class="btn sm ghost" data-act="edit-check" data-id="${c.id}">Edit</button></td></tr>`);
       })));
-      return rows.length ? `<section class="card"><h3>Stage ${st.no} · ${esc(st.name)} <small class="muted">recorded per ${SCOPE_LABEL[st.scope].toLowerCase()}</small></h3>${table(['Check', 'Step', 'Sample / frequency', 'Parameter', 'Method / equipment', 'Acceptance', 'If Not OK', ''], rows)}</section>` : '';
+      return rows.length ? `<section class="card"><h3>Stage ${st.no} · ${esc(st.name)} <small class="muted">recorded per ${SCOPE_LABEL[st.scope].toLowerCase()}</small></h3>${table(['Check', 'Step', 'Sample / frequency', 'Parameter', 'Method / equipment', 'Acceptance', 'If Not OK', 'Inspector', 'Final approval', ''], rows)}</section>` : '';
     }).join('')}`;
   };
 

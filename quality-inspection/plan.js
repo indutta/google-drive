@@ -27,6 +27,13 @@ window.PLAN = {
           "Layout rectification"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Pijush Bera",
+          "Rakesh Halder"
+         ],
          "kind": "dim"
         }
        ],
@@ -49,6 +56,13 @@ window.PLAN = {
           "Rectification or remaking"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Pijush Bera",
+          "Rakesh Halder"
+         ],
          "kind": "yn"
         }
        ],
@@ -71,6 +85,13 @@ window.PLAN = {
           "Rectification"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Pijush Bera",
+          "Rakesh Halder"
+         ],
          "kind": "dim"
         },
         {
@@ -85,6 +106,13 @@ window.PLAN = {
           "Rectification"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Pijush Bera",
+          "Rakesh Halder"
+         ],
          "kind": "yn"
         }
        ],
@@ -107,6 +135,13 @@ window.PLAN = {
           "Rectification"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Pijush Bera",
+          "Rakesh Halder"
+         ],
          "kind": "dim"
         }
        ],
@@ -142,6 +177,13 @@ window.PLAN = {
           "Reject lot / return to supplier"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "yn",
          "freq": "shift"
         }
@@ -166,6 +208,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 5.0,
          "unit": "%",
@@ -184,6 +233,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 1.0,
          "unit": "%",
@@ -202,6 +258,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 3.5,
          "unit": "%",
@@ -228,6 +291,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 5.0,
          "unit": "%",
@@ -246,6 +316,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 1.0,
          "unit": "%",
@@ -264,6 +341,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 3.0,
          "unit": "%",
@@ -294,6 +378,13 @@ window.PLAN = {
           "Re-adjust"
          ],
          "tbc": false,
+         "inspectors": [
+          "Palash Ghosal",
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Rakesh Halder"
+         ],
          "kind": "range",
          "min": 1.8,
          "max": 2.0,
@@ -320,6 +411,13 @@ window.PLAN = {
           "Re-adjust"
          ],
          "tbc": false,
+         "inspectors": [
+          "Palash Ghosal",
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Rakesh Halder"
+         ],
          "kind": "range",
          "min": 18.0,
          "max": 21.0,
@@ -346,6 +444,13 @@ window.PLAN = {
           "Adjust sand gate opening"
          ],
          "tbc": false,
+         "inspectors": [
+          "Palash Ghosal",
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Rakesh Halder"
+         ],
          "kind": "range",
          "min": 60.0,
          "max": 70.0,
@@ -372,6 +477,13 @@ window.PLAN = {
           "Adjust sand gate opening"
          ],
          "tbc": false,
+         "inspectors": [
+          "Palash Ghosal",
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Rakesh Halder"
+         ],
          "kind": "range",
          "min": 60.0,
          "max": 70.0,
@@ -398,6 +510,13 @@ window.PLAN = {
           "Adjust sand gate opening"
          ],
          "tbc": false,
+         "inspectors": [
+          "Palash Ghosal",
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Rakesh Halder"
+         ],
          "kind": "range",
          "min": 20.0,
          "max": 25.0,
@@ -424,6 +543,13 @@ window.PLAN = {
           "Adjust sand gate opening"
          ],
          "tbc": false,
+         "inspectors": [
+          "Palash Ghosal",
+          "Sayak Kanji"
+         ],
+         "approvers": [
+          "Rakesh Halder"
+         ],
          "kind": "range",
          "min": 50.0,
          "max": 55.0,
@@ -455,6 +581,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "min",
          "min": 6.0,
          "unit": "kg/cm²",
@@ -472,6 +605,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "min",
          "min": 3.0,
          "unit": "kg/cm²",
@@ -489,6 +629,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 2.5,
          "unit": "mm",
@@ -515,6 +662,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "min",
          "min": 6.0,
          "unit": "kg/cm²",
@@ -532,6 +686,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "min",
          "min": 3.0,
          "unit": "kg/cm²",
@@ -550,6 +711,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 10.0,
          "unit": "cc/gm",
@@ -567,6 +735,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 2.6,
          "unit": "mm",
@@ -593,6 +768,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "min",
          "min": 6.0,
          "unit": "kg/cm²",
@@ -610,6 +792,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "min",
          "min": 3.0,
          "unit": "kg/cm²",
@@ -628,6 +817,13 @@ window.PLAN = {
           "Disposal of sand"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 10.0,
          "unit": "cc/gm",
@@ -645,6 +841,13 @@ window.PLAN = {
           "Adjust resin and catalyst %"
          ],
          "tbc": false,
+         "inspectors": [
+          "Baru Jana",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "max",
          "max": 2.7,
          "unit": "mm",
@@ -684,6 +887,10 @@ window.PLAN = {
           "Re-mix"
          ],
          "tbc": false,
+         "approvers": [
+          "Palash Ghosal",
+          "Rakesh Halder"
+         ],
          "kind": "range",
          "min": 55.0,
          "max": 65.0,
@@ -701,6 +908,10 @@ window.PLAN = {
           "Repainting"
          ],
          "tbc": false,
+         "approvers": [
+          "Palash Ghosal",
+          "Rakesh Halder"
+         ],
          "kind": "yn"
         }
        ],
@@ -723,6 +934,10 @@ window.PLAN = {
           "Destroyed"
          ],
          "tbc": false,
+         "approvers": [
+          "Palash Ghosal",
+          "Rakesh Halder"
+         ],
          "kind": "min",
          "min": 50.0,
          "unit": "scratch hardness"
@@ -747,6 +962,10 @@ window.PLAN = {
           "Repaired"
          ],
          "tbc": false,
+         "approvers": [
+          "Palash Ghosal",
+          "Rakesh Halder"
+         ],
          "kind": "yn"
         }
        ],
@@ -770,6 +989,13 @@ window.PLAN = {
           "Destroyed"
          ],
          "tbc": false,
+         "inspectors": [
+          "Mintu"
+         ],
+         "approvers": [
+          "Palash Ghosal",
+          "Rakesh Halder"
+         ],
          "kind": "yn"
         }
        ],
@@ -806,6 +1032,13 @@ window.PLAN = {
           "Pig the melt"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sagar Halder",
+          "Biswajit Halder"
+         ],
+         "approvers": [
+          "Barun Jana"
+         ],
          "kind": "chem"
         }
        ],
@@ -828,6 +1061,13 @@ window.PLAN = {
           "Reject all castings poured"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sagar Halder",
+          "Biswajit Halder"
+         ],
+         "approvers": [
+          "Barun Jana"
+         ],
          "kind": "chem"
         }
        ],
@@ -850,6 +1090,13 @@ window.PLAN = {
           "Adjust temperature"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sagar Halder",
+          "Biswajit Halder"
+         ],
+         "approvers": [
+          "Barun Jana"
+         ],
          "kind": "spec",
          "unit": "°C"
         }
@@ -874,6 +1121,13 @@ window.PLAN = {
           "Back to furnace (if low)"
          ],
          "tbc": false,
+         "inspectors": [
+          "Sagar Halder",
+          "Biswajit Halder"
+         ],
+         "approvers": [
+          "Barun Jana"
+         ],
          "kind": "spec",
          "unit": "°C"
         }
@@ -935,6 +1189,13 @@ window.PLAN = {
           "Reject"
          ],
          "tbc": false,
+         "inspectors": [
+          "Pijush Bera",
+          "Rakesh Mondal"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "dim"
         },
         {
@@ -950,6 +1211,13 @@ window.PLAN = {
           "Reject"
          ],
          "tbc": false,
+         "inspectors": [
+          "Soumitra Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia",
+          "Pijush Bera"
+         ],
          "kind": "yn"
         }
        ],
@@ -986,6 +1254,12 @@ window.PLAN = {
           "Reject"
          ],
          "tbc": false,
+         "inspectors": [
+          "Rajat"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "yn"
         }
        ],
@@ -1022,6 +1296,13 @@ window.PLAN = {
           "Reject"
          ],
          "tbc": false,
+         "inspectors": [
+          "Soumitra Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia",
+          "Pijush Bera"
+         ],
          "kind": "yn"
         }
        ],
@@ -1044,6 +1325,13 @@ window.PLAN = {
           "Rejected & remelted"
          ],
          "tbc": false,
+         "inspectors": [
+          "Soumitra Halder"
+         ],
+         "approvers": [
+          "Pijush Bera",
+          "Rajat Mondal"
+         ],
          "kind": "yn"
         }
        ],
@@ -1066,6 +1354,12 @@ window.PLAN = {
           "Rejected & remelted"
          ],
          "tbc": false,
+         "inspectors": [
+          "Dipankar Mondal"
+         ],
+         "approvers": [
+          "Sanjeeb Shaw"
+         ],
          "kind": "yn"
         }
        ],
@@ -1088,7 +1382,13 @@ window.PLAN = {
           "Salvaging",
           "Reject"
          ],
-         "tbc": true,
+         "tbc": false,
+         "inspectors": [
+          "Palash Kanji"
+         ],
+         "approvers": [
+          "Rajat Mondal"
+         ],
          "kind": "yn",
          "assumed": true
         }
@@ -1125,6 +1425,12 @@ window.PLAN = {
           "Rejected & returned to re-heat treatment"
          ],
          "tbc": false,
+         "inspectors": [
+          "Rajat Mondal"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "mech"
         }
        ],
@@ -1147,6 +1453,12 @@ window.PLAN = {
           "Rejected & returned to re-heat treatment"
          ],
          "tbc": false,
+         "inspectors": [
+          "Pijush Bera"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "yn"
         }
        ],
@@ -1169,6 +1481,12 @@ window.PLAN = {
           "Rejected & returned to re-heat treatment"
          ],
          "tbc": false,
+         "inspectors": [
+          "Rajat Mondal"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "spec",
          "unit": "HBW"
         }
@@ -1192,6 +1510,12 @@ window.PLAN = {
           "Re-heat treatment"
          ],
          "tbc": false,
+         "inspectors": [
+          "Rajat Mondal"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "spec",
          "unit": "J"
         }
@@ -1228,7 +1552,14 @@ window.PLAN = {
           "Re-machined",
           "Reject"
          ],
-         "tbc": true,
+         "tbc": false,
+         "inspectors": [
+          "Rajat Mondal",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "dim"
         }
        ],
@@ -1264,6 +1595,13 @@ window.PLAN = {
           "Rejected & returned for melting"
          ],
          "tbc": false,
+         "inspectors": [
+          "Rajat Mondal",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "yn"
         },
         {
@@ -1278,6 +1616,13 @@ window.PLAN = {
           "Rejected & returned for melting"
          ],
          "tbc": false,
+         "inspectors": [
+          "Rajat Mondal",
+          "Rakesh Halder"
+         ],
+         "approvers": [
+          "Tamal Mithia"
+         ],
          "kind": "dim"
         }
        ],
@@ -1300,6 +1645,12 @@ window.PLAN = {
           "Re-packing"
          ],
          "tbc": false,
+         "inspectors": [
+          "Samiran"
+         ],
+         "approvers": [
+          "Pijush Bera"
+         ],
          "kind": "yn"
         }
        ],

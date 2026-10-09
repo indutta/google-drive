@@ -66,13 +66,20 @@ def log_freq(sample):
         if re.search(rx, sample or '', re.I): return name
     return 'shift'
 
+def people(v):
+    out = []
+    for n in re.split(r'\s*(?:&|,| and )\s*', v or ''):
+        n = ' '.join(w[:1].upper() + w[1:] for w in n.split())
+        if n and n not in out: out.append(n)
+    return out
+
 def main():
     wb = openpyxl.load_workbook(SRC)
     ws = wb['Inspection Plan']
     stages, stage, group, step = [], None, None, None
     counters = {}
     for r in range(6, ws.max_row + 1):
-        a, b, c, d, e, f, g = [ws.cell(r, i).value for i in range(1, 8)]
+        a, b, c, d, e, f, g, h, i9 = [ws.cell(r, i).value for i in range(1, 10)]
         a = str(a).strip() if a is not None else None
         if a and a.startswith('STAGE'):
             m = re.match(r'STAGE (\d+):\s*(.*)', a)
@@ -94,7 +101,7 @@ def main():
         fills = {col: (ws.cell(r, col).fill.fgColor.rgb if ws.cell(r, col).fill.fill_type else None) for col in (6, 7)}
         tbc = any(v == '00FFF2A8' for v in fills.values())
         chk = dict(id=cid, step=step['id'], sample=c if d else None, param=d, method=e, criteria=f, action=g,
-                   actions=split_actions(g) if g else [], tbc=tbc)
+                   actions=split_actions(g) if g else [], tbc=tbc, inspectors=people(h), approvers=people(i9))
         if d is None:                                   # 2.1: whole-row reference to the incoming-material QAP
             chk.update(sample='Per incoming QAP', param='Incoming sand verified', method='Doc No. DCL/QAP/ICI',
                        criteria=c, action='Reject lot / return to supplier', actions=['Reject lot / return to supplier'])
@@ -126,7 +133,7 @@ def main():
         for k in ('min', 'max'):
             pass
         for k, v in list(chk.items()):
-            if v is None: del chk[k]
+            if v is None or v == []: del chk[k]
         step['checks'].append(chk)
         if cid == '10.1.1':                            # split visual and dimensional checks
             chk.update(param='Visual inspection', method='Visual', kind='yn')
