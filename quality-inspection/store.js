@@ -527,6 +527,7 @@
   /* ---------- calibration / sand-test schedule ---------- */
   const PERIOD = { shift: 0.4, daily: 1, weekly: 7, quarterly: 90 };
   QI.PERIOD_LABEL = { shift: 'every shift', daily: 'daily', weekly: 'weekly', quarterly: 'every 3 months' };
+  QI.PERIOD_DAYS = PERIOD;
   QI.lastDone = (checkId) => {
     let best = null;
     S.logs.forEach((l) => { const a = QI.last('log', l.id, checkId); if (a && (!best || a.ts > best)) best = a.ts; });

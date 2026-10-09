@@ -76,3 +76,7 @@ The **Melting plan** page mirrors the paper *Melting heat plan*: date; per heat 
 * **Charge mix:** *Charge…* opens the charge-mix calculator of a chosen recipe with LM set to the heat's planned liquid metal.
 * **Heat page:** shows the melting plan of the heat next to its furnace log, raw-material traceability and charge.
 Together the chain *melting plan → moulding plan → charge mix → raw material lots → furnace log → inspection results* is now linked by heat number, item and MRN, which is the base for output analysis.
+
+## Navigation, dashboard and maintenance
+The top bar has main headings — **Dashboard, MELTING** (Melting plan, Melting log, Heats, Raw materials, Charge mix), **MOULDING** (Moulding log, Sand & calibration), **FETTLING** (stages 5–6), **INSPECTION** (Work orders, Castings, Approvals, NCRs, Inspection plan), **MAINTENANCE**, Settings — and the sub-headings of the selected heading appear in a second row.
+The Dashboard greets the user, offers quick-add buttons, and shows tiles per area (each tile opens its window). The Maintenance dashboard shows calibration / periodic-test schedule status (overdue, due soon, on time) and furnace condition (heats on lining against a relining limit, patching, refractory used in the last 30 days) from the Melting logs.
