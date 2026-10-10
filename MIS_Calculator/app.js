@@ -244,6 +244,15 @@
       var vt = document.createElementNS(svgNS, 'text'); vt.setAttribute('x', x + bw / 2); vt.setAttribute('y', val < 0 ? y(val) + 12 : y(val) - 4); vt.setAttribute('text-anchor', 'middle'); vt.setAttribute('font-size', '10.5'); vt.style.fill = 'var(--fg)'; vt.textContent = (Math.round(val * 10) / 10).toFixed(1); svg.appendChild(vt);
     });
     pad.appendChild(svg); bc.appendChild(pad); v.appendChild(bc);
+    var fc = h('div', 'card'); var fh = h('div', 'hd'); fh.style.cursor = 'default'; var fl = h('div'); fl.appendChild(h('h2', '', 'Full MIS by month')); fl.appendChild(h('div', 'sub', 'Every line, Rs. lakh')); fh.appendChild(fl); fc.appendChild(fh);
+    var ftw = h('div', 'tw'), ft = h('table'), fth = h('thead'), ftr = h('tr'); ftr.appendChild(h('th', '', 'Particulars')); ms.forEach(function (m) { ftr.appendChild(h('th', '', SHORT[m - 1])); }); ftr.appendChild(h('th', '', 'Total')); fth.appendChild(ftr); ft.appendChild(fth); var ftb = h('tbody');
+    LINES.forEach(function (ln) { var r = h('tr', ln[0] === 'sec' ? 'sec' : ln[2] ? 'tot' : ''); if (ln[0] === 'sec') { var td = h('td', '', ln[1]); td.colSpan = ms.length + 2; r.appendChild(td); } else { r.appendChild(h('td', '', ln[1])); ms.forEach(function (m) { r.appendChild(h('td', Ls[m][ln[0]] < -0.005 ? 'neg' : '', fmt(Ls[m][ln[0]]))); }); r.appendChild(h('td', T[ln[0]] < -0.005 ? 'neg' : '', fmt(T[ln[0]]))); } ftb.appendChild(r); });
+    ft.appendChild(ftb); ftw.appendChild(ft); fc.appendChild(ftw); v.appendChild(fc);
+    var ic = h('div', 'card'); var ih = h('div', 'hd'); ih.style.cursor = 'default'; var il = h('div'); il.appendChild(h('h2', '', 'Every figure entered')); il.appendChild(h('div', 'sub', 'Factory PL feed, HO items, adjustments and statistics')); ih.appendChild(il); ic.appendChild(ih);
+    var itw = h('div', 'tw'), it = h('table'), ith = h('thead'), itr = h('tr'); itr.appendChild(h('th', '', 'Item')); ms.forEach(function (m) { itr.appendChild(h('th', '', SHORT[m - 1])); }); ith.appendChild(itr); it.appendChild(ith); var itb = h('tbody');
+    SECTIONS.forEach(function (sc) { var sr = h('tr', 'sec'); var sd = h('td', '', sc.title); sd.colSpan = ms.length + 1; sr.appendChild(sd); itb.appendChild(sr);
+      sc.fields.forEach(function (f) { if (!ms.some(function (m) { return has(((state.data[state.fy] || {})[m] || {})[f.k]); })) return; var r = h('tr'); r.appendChild(h('td', '', f.l)); ms.forEach(function (m) { var x = ((state.data[state.fy] || {})[m] || {})[f.k]; r.appendChild(h('td', has(x) && num(x) < 0 ? 'neg' : '', has(x) ? fmt(num(x)) : '–')); }); itb.appendChild(r); }); });
+    it.appendChild(itb); itw.appendChild(it); ic.appendChild(itw); v.appendChild(ic);
   }
 
   /* ---------- More view ---------- */
@@ -323,6 +332,34 @@
     var tot = 0; for (var i = 0; i < qs.length; i++) { var x = mval(prevFy, meas, 'q' + qs[i]); if (x === null) return { prev: null, label: prevFy }; tot += x; }
     return { prev: tot, label: prevFy + ' same quarters (Q' + qs[0] + (qs.length > 1 ? ' to Q' + qs[qs.length - 1] : '') + ')' };
   }
+  var HCOLS = [['m1', 'Apr'], ['m2', 'May'], ['m3', 'Jun'], ['q1', 'Q1'], ['m4', 'Jul'], ['m5', 'Aug'], ['m6', 'Sep'], ['q2', 'Q2'], ['q3', 'Q3'], ['q4', 'Q4'], ['fy', 'Total']];
+  function histTable(fy) {
+    var c = card2('Month by month, ' + fy, fyHasEntries(fy) ? 'From the figures entered. Rs. lakh or MT' : 'Published MIS comparison. Rs. lakh or MT');
+    var tw = h('div', 'tw'), t = h('table'), th = h('thead'), tr = h('tr'); tr.appendChild(h('th', '', 'Key output')); HCOLS.forEach(function (x) { tr.appendChild(h('th', '', x[1])); }); th.appendChild(tr); t.appendChild(th); var tb = h('tbody');
+    MEASURES.forEach(function (m) { var row = h('tr'); row.appendChild(h('td', '', m[1].replace(/ \(.*\)$/, ''))); HCOLS.forEach(function (x) { var q = mval(fy, m[0], x[0]); row.appendChild(h('td', q !== null && q < -0.005 ? 'neg' : (x[0].charAt(0) !== 'm' ? 'sum' : ''), q === null ? 'n/a' : fmt(q))); }); tb.appendChild(row); });
+    t.appendChild(tb); tw.appendChild(t); c._p.appendChild(tw); return c;
+  }
+  var CSLAB = { wt: 'Weight per casting (kg)', pn: 'Pouring (Nos)', t: 'Pouring (MT)', rn: 'In-house rejections (Nos)', dn: 'Destruct tests (Nos)', y: 'Effective yield %', mr: 'Melting raw material Rs/kg', rf: 'Melting refractories etc Rs/kg', ml: 'MLD material Rs/kg', ft: 'FTL material Rs/kg', cp: 'Component Rs/kg', ip: 'Inspection material Rs/kg', sp: 'Special material Rs/kg', pk: 'Packing and painting Rs/kg', tm: 'Total material Rs/kg', od: 'Other direct expenses Rs/kg', lb: 'Labour Rs/kg', pw: 'Power (variable) Rs/kg', tv: 'Total variable cost Rs/kg', sl: 'Effective sale price Rs/kg', ck: 'Contribution Rs/kg', k: 'Contribution Rs lakh', rl: 'Rejection loss Rs lakh', dl: 'Destruct test loss Rs lakh', l: 'Loss of contribution Rs lakh' };
+  var csQ = '', csSort = 'k', csLim = 25;
+  function renderCSList(box, rows, summ) {
+    var q = csQ.trim().toLowerCase(), list = rows.filter(function (r) { return !q || (r.p + ' ' + r.c).toLowerCase().indexOf(q) >= 0; });
+    var key = csSort;
+    list = list.slice().sort(function (a, b) { var x = a[key], y2 = b[key]; if (key === 'p') return String(x).localeCompare(String(y2)); if (key === 'm') return (a.f + ('0' + a.m).slice(-2)).localeCompare(b.f + ('0' + b.m).slice(-2)); if (key === 'rk') { x = a.t ? a.k * 100 / a.t : 0; y2 = b.t ? b.k * 100 / b.t : 0; } return y2 - x; });
+    var tk = 0, tt = 0; list.forEach(function (r) { tk += r.k; tt += r.t; });
+    summ.textContent = list.length + ' rows, ' + fmt(tt) + ' MT, contribution ' + fmt(tk) + ' Rs. lakh';
+    box.replaceChildren();
+    list.slice(0, csLim).forEach(function (r) {
+      var it = h('div', 'csr'); it.tabIndex = 0; it.setAttribute('role', 'button'); it.setAttribute('aria-expanded', 'false');
+      var top = h('div', 'csr-top'); var l = h('div'); l.appendChild(h('div', 'csr-p', r.p)); l.appendChild(h('div', 'csr-s', r.c + ' · ' + r.f + ' · ' + MONTHS[r.m - 1])); top.appendChild(l);
+      var rt = h('div', 'csr-v' + (r.k < 0 ? ' neg' : '')); rt.appendChild(h('b', '', fmt(r.k))); rt.appendChild(h('span', '', fmt(r.t) + ' MT' + (r.t ? ' · ' + fmt(r.k * 100 / r.t) + '/kg' : ''))); top.appendChild(rt); it.appendChild(top);
+      var det = h('div', 'csr-d'); det.hidden = true; Object.keys(CSLAB).forEach(function (k) { if (r[k] === undefined) return; var d = h('div'); d.appendChild(h('span', '', CSLAB[k])); d.appendChild(h('b', '', fmt(r[k]))); det.appendChild(d); }); it.appendChild(det);
+      var tg = function () { det.hidden = !det.hidden; it.setAttribute('aria-expanded', det.hidden ? 'false' : 'true'); };
+      it.addEventListener('click', tg); it.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tg(); } });
+      box.appendChild(it);
+    });
+    if (list.length > csLim) { var mb = h('button', 'btn alt', 'Show ' + Math.min(25, list.length - csLim) + ' more'); mb.type = 'button'; mb.style.marginTop = '.6rem'; mb.addEventListener('click', function () { csLim += 25; renderCSList(box, rows, summ); }); box.appendChild(mb); }
+    if (!list.length) box.appendChild(h('div', 'empty', 'No cost-sheet rows match'));
+  }
   function fyList() { return allFYs().filter(function (y) { return HIST.years[y] || fyHasEntries(y); }); }
   var YC = ['--y1', '--y2', '--y3', '--y4'];
   function ycol(i, n) { return 'var(' + YC[Math.max(0, 4 - n) + i] + ')'; }
@@ -388,6 +425,7 @@
       if (state.dy !== 'all' && prevFy) { var a = mval(state.dy, m[0], state.dp), b2 = lfl(state.dy, prevFy, m[0], state.dp).prev, p = a !== null && b2 !== null ? pct1(a, b2) : null; row.appendChild(h('td', p !== null && p < 0 ? 'neg' : '', p === null ? 'n/a' : (p > 0 ? '+' : '') + p.toFixed(1) + '%')); }
       tb.appendChild(row); });
     t.appendChild(tb); tw.appendChild(t); c3._p.appendChild(tw); v.appendChild(c3);
+    v.appendChild(histTable(focus));
 
     if (!HIST.contrib.length) return;
     var months = pMonths(state.dp), inP = function (r) { return months.indexOf(r.m) >= 0; };
@@ -408,12 +446,13 @@
     var c5 = card2('Contribution by year, ' + (state.dc || 'all customers'), 'Rs. lakh, cost sheet, ' + pname); var hb5 = h('div', 'chart'), bx5 = readoutBox(); c5._p.appendChild(hb5); c5._p.appendChild(bx5); v.appendChild(c5);
     gbars(hb5, bx5, fyc, [{ n: 'Contribution', c: 'var(--c1)', v: fyc.map(function (y) { var s4 = 0, n4 = 0; HIST.contrib.forEach(function (r) { if (r.f === y && inP(r) && (!state.dc || r.c === state.dc)) { s4 += r.k; n4++; } }); return n4 ? s4 : null; }) }, { n: 'Loss from rejections', c: 'var(--mute)', v: fyc.map(function (y) { var s4 = 0, n4 = 0; HIST.contrib.forEach(function (r) { if (r.f === y && inP(r) && (!state.dc || r.c === state.dc)) { s4 += r.l; n4++; } }); return n4 ? s4 : null; }) }]);
 
-    var pr = {}; base.filter(function (r) { return !state.dc || r.c === state.dc; }).forEach(function (r) { var key = r.c + '|' + r.p, o = pr[key] || (pr[key] = { c: r.c, p: r.p, k: 0, t: 0 }); o.k += r.k; o.t += r.t; });
-    var plist = Object.keys(pr).map(function (x) { return pr[x]; }).sort(function (a, b) { return b.k - a.k; }).slice(0, 10);
-    var c6 = card2('Top products by contribution', 'Top 10, ' + (state.dc || 'all customers') + ', ' + (state.dy === 'all' ? 'all years' : state.dy) + ', ' + pname);
-    if (plist.length) { var tw6 = h('div', 'tw'), t6 = h('table'), th6 = h('thead'), tr6 = h('tr'); ['Product', 'MT', 'Rs. lakh', 'Rs/kg'].forEach(function (x) { tr6.appendChild(h('th', '', x)); }); th6.appendChild(tr6); t6.appendChild(th6); var tb6 = h('tbody');
-      plist.forEach(function (r) { var row = h('tr'); row.appendChild(h('td', '', r.p + ' (' + r.c + ')')); row.appendChild(h('td', '', fmt(r.t))); row.appendChild(h('td', r.k < 0 ? 'neg' : '', fmt(r.k))); row.appendChild(h('td', '', r.t ? fmt(r.k * 100 / r.t) : 'n/a')); tb6.appendChild(row); });
-      t6.appendChild(tb6); tw6.appendChild(t6); c6._p.appendChild(tw6); } else c6._p.appendChild(h('div', 'empty', 'No products for this selection')); v.appendChild(c6);
+    var csRows = base.filter(function (r) { return !state.dc || r.c === state.dc; });
+    var c6 = card2('Cost sheet, all rows', (state.dc || 'all customers') + ', ' + (state.dy === 'all' ? 'all years' : state.dy) + ', ' + pname + '. Tap a row for every column.');
+    var cs1 = h('div', 'cs-tools'); var si = document.createElement('input'); si.type = 'search'; si.id = 'cs-search'; si.placeholder = 'Search product or customer'; si.value = csQ; si.setAttribute('aria-label', 'Search cost sheet');
+    var ss = document.createElement('select'); ss.id = 'cs-sort'; ss.setAttribute('aria-label', 'Sort cost sheet'); [['k', 'Sort: contribution'], ['t', 'Sort: tonnage'], ['rk', 'Sort: Rs per kg'], ['l', 'Sort: loss from rejections'], ['m', 'Sort: date'], ['p', 'Sort: product name']].forEach(function (o) { ss.appendChild(new Option(o[1], o[0])); }); ss.value = csSort;
+    cs1.appendChild(si); cs1.appendChild(ss); c6._p.appendChild(cs1); var csum = h('p', 'note'), cbox = h('div', 'cs-list'); c6._p.appendChild(csum); c6._p.appendChild(cbox);
+    si.addEventListener('input', function () { csQ = si.value; csLim = 25; renderCSList(cbox, csRows, csum); }); ss.addEventListener('change', function () { csSort = ss.value; csLim = 25; renderCSList(cbox, csRows, csum); });
+    renderCSList(cbox, csRows, csum); v.appendChild(c6);
   }
 
   /* ---------- shell ---------- */
@@ -423,8 +462,8 @@
     document.querySelectorAll('nav.tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === state.tab ? 'true' : 'false'); });
     var blocked = histOnly(state.fy) && (state.tab === 'in' || state.tab === 'out' || state.tab === 'yr');
     if (blocked) { var vv = $('#v-' + state.tab); vv.replaceChildren(); var nc = h('div', 'card'); var nh = h('div', 'hd'); nh.style.cursor = 'default'; nh.appendChild(h('h2', '', state.fy + ' key figures only')); nc.appendChild(nh);
-      var np = h('div', 'pad'); np.appendChild(h('p', 'note', 'For ' + state.fy + ' only the published key figures and the cost-sheet contribution are available, not line-by-line inputs. Open the Data tab to see and filter them.'));
-      var nb = h('button', 'btn', 'Open Data tab'); nb.type = 'button'; nb.style.marginTop = '.6rem'; nb.addEventListener('click', function () { state.dy = state.fy; state.tab = 'data'; save(); render(); window.scrollTo(0, 0); }); np.appendChild(nb); nc.appendChild(np); vv.appendChild(nc); }
+      var np = h('div', 'pad'); np.appendChild(h('p', 'note', 'For ' + state.fy + ' only the published key figures and the cost-sheet contribution are available, not line-by-line inputs. The published figures are below; the Data tab has filters and the cost sheet.'));
+      var nb = h('button', 'btn', 'Open Data tab'); nb.type = 'button'; nb.style.marginTop = '.6rem'; nb.addEventListener('click', function () { state.dy = state.fy; state.tab = 'data'; save(); render(); window.scrollTo(0, 0); }); np.appendChild(nb); nc.appendChild(np); vv.appendChild(nc); vv.appendChild(histTable(state.fy)); }
     else if (VIEWS[state.tab]) VIEWS[state.tab]();
     refresh();
   }
