@@ -47,6 +47,8 @@
   /* ---------- state ---------- */
   var state = { fy: '2026-27', month: 1, tab: 'in', theme: '', data: {}, ytd: false };
   try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv) for (var k in state) if (sv[k] !== undefined) state[k] = sv[k]; } catch (e) {}
+  var hadSaved = false; try { hadSaved = !!localStorage.getItem(KEY); } catch (e) {}
+  if (window.MIS_SEED && !hadSaved) { state.fy = window.MIS_SEED.fy; state.month = window.MIS_SEED.month; state.data = JSON.parse(JSON.stringify(window.MIS_SEED.data)); }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function applyTheme() { if (state.theme) document.documentElement.setAttribute('data-theme', state.theme); else document.documentElement.removeAttribute('data-theme'); }
   applyTheme();
@@ -269,6 +271,16 @@
     fi.addEventListener('change', function () { var f = fi.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { try { var o = JSON.parse(rd.result); if (typeof o !== 'object' || !o) throw 0; state.data = o; save(); buildInputs(); render(); toast('Backup loaded'); } catch (e) { toast('That file is not a valid backup'); } }; rd.readAsText(f); });
     b2.appendChild(fi); b2.appendChild(mk('alt', 'Load backup file', function () { fi.click(); }));
     c2.appendChild(b2); c2.appendChild(h('p', 'note pad', 'Figures stay on this phone only. Save a backup before clearing browser data.')); v.appendChild(c2);
+    if (window.MIS_SEED) {
+      var c5 = h('div', 'card'); var h5 = h('div', 'hd'); h5.style.cursor = 'default'; h5.appendChild(h('h2', '', 'Available data')); c5.appendChild(h5);
+      var b5 = h('div', 'btns'), a5 = h('div');
+      b5.appendChild(mk('alt', 'Reload the supplied figures', function () {
+        a5.replaceChildren(); var cf = h('div', 'confirm'); cf.appendChild(h('span', '', 'Replace everything on this phone with the supplied figures?'));
+        cf.appendChild(mk('danger', 'Yes, replace', function () { state.fy = window.MIS_SEED.fy; state.data = JSON.parse(JSON.stringify(window.MIS_SEED.data)); state.month = window.MIS_SEED.month; ms.value = state.month; $('#fy').value = state.fy; save(); loadInputs(); render(); toast('Supplied figures loaded'); }));
+        cf.appendChild(mk('alt', 'Cancel', function () { a5.replaceChildren(); })); a5.appendChild(cf);
+      }));
+      b5.appendChild(a5); c5.appendChild(b5); v.appendChild(c5);
+    }
     var c3 = h('div', 'card'); var h3 = h('div', 'hd'); h3.style.cursor = 'default'; h3.appendChild(h('h2', '', 'Clear figures')); c3.appendChild(h3);
     var b3 = h('div', 'btns'); var area = h('div');
     b3.appendChild(mk('danger', 'Clear ' + MONTHS[state.month - 1] + ' figures', function () {
