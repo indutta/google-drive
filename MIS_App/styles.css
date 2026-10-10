@@ -4,18 +4,15 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.4}
 #app{max-width:720px;margin:0 auto;min-height:100vh;padding-bottom:calc(4.5rem + env(safe-area-inset-bottom,0px))}
-.top{position:sticky;top:0;z-index:20;background:var(--head);color:var(--headfg);padding:calc(.7rem + env(safe-area-inset-top,0px)) 16px .7rem}
+.top{position:relative;z-index:20;background:var(--head);color:var(--headfg);padding:calc(.7rem + env(safe-area-inset-top,0px)) 16px .7rem}
 .top h1{margin:0;font-size:1.15rem;font-weight:650;letter-spacing:.01em;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
 .top h1 small{font-weight:400;font-size:.78rem;opacity:.8}
 .top .period{margin:.1rem 0 .55rem;font-size:.8rem;opacity:.8}
-.filters{display:grid;grid-template-columns:.8fr .8fr 1.6fr auto;gap:.4rem}
-.filters select,.filters button{font:inherit;font-size:.8rem;min-width:0;width:100%;color:var(--headfg);background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:.5rem .5rem}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:.45rem .5rem}
+.filters label{display:flex;flex-direction:column;gap:.15rem;font-size:.68rem;opacity:.9;min-width:0}
+.filters select,.filters button{font:inherit;font-size:.88rem;min-width:0;width:100%;color:var(--headfg);background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:.5rem .5rem}
 .filters select option{color:#10222a;background:#fff}
-.filters button{width:auto;padding:.5rem .8rem}
-.chips{display:flex;gap:.4rem;margin-top:.5rem;overflow-x:auto;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chips button{flex:none;font:inherit;font-size:.8rem;color:var(--headfg);background:transparent;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:.3rem .8rem}
-.chips button[aria-pressed=true]{background:var(--headfg);color:var(--head);border-color:var(--headfg)}
+.filters button{align-self:end;grid-column:1/-1;padding:.45rem .8rem}
 main{padding:16px;display:flex;flex-direction:column;gap:14px}
 .view{display:none;flex-direction:column;gap:14px}
 .view.on{display:flex}

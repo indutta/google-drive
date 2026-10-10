@@ -257,11 +257,12 @@
     [f, t].forEach(function (s) { s.replaceChildren(); MONTHS.forEach(function (m) { s.appendChild(new Option(m.label, m.month_no)); }); });
     f.value = state.from; t.value = state.to;
     c.replaceChildren(new Option('All customers', '')); CUSTS.forEach(function (x) { c.appendChild(new Option(x, x)); }); c.value = state.cust;
-    var ch = $('#chips'); ch.replaceChildren();
-    function add(label, a, z) { var b = h('button', '', label); b.type = 'button'; b.setAttribute('aria-pressed', state.from === a && state.to === z ? 'true' : 'false'); b.addEventListener('click', function () { state.from = a; state.to = z; save(); render(); }); ch.appendChild(b); }
+    var p = $('#f-period'); p.replaceChildren();
     var nos = MONTHS.map(function (m) { return m.month_no; });
-    for (var q = 0; q < 4; q++) { var a = q * 3 + 1, z = q * 3 + 3; if (nos.indexOf(a) >= 0 && nos.indexOf(z) >= 0) add('Q' + (q + 1), a, z); }
-    add('All months', FIRST, LAST);
+    var opts = [{ k: 'all', l: 'All months', a: FIRST, z: LAST }];
+    for (var q = 0; q < 4; q++) { var a = q * 3 + 1, z = q * 3 + 3; if (nos.indexOf(a) >= 0 && nos.indexOf(z) >= 0) opts.push({ k: 'q' + (q + 1), l: 'Q' + (q + 1) + ' (' + MONTHS[a - 1].label + ' to ' + MONTHS[z - 1].label + ')', a: a, z: z }); }
+    var cur = 'custom'; opts.forEach(function (o) { p.appendChild(new Option(o.l, o.k)); if (state.from === o.a && state.to === o.z && cur === 'custom') cur = o.k; });
+    p.appendChild(new Option('Custom range', 'custom')); p.value = cur; p._opts = opts;
     var s = sel();
     $('#period').textContent = (s.length === 1 ? s[0].label : s[0].label + ' to ' + s[s.length - 1].label) + ' 2026' + (state.cust ? ' · ' + state.cust : '') + ' · Rs. lakh';
   }
@@ -271,6 +272,7 @@
     document.querySelectorAll('nav.tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === state.tab ? 'true' : 'false'); });
     RENDER[state.tab]();
   }
+  $('#f-period').addEventListener('change', function (e) { var o = e.target._opts.find(function (x) { return x.k === e.target.value; }); if (o) { state.from = o.a; state.to = o.z; save(); render(); } });
   $('#f-from').addEventListener('change', function (e) { state.from = +e.target.value; if (state.to < state.from) state.to = state.from; save(); render(); });
   $('#f-to').addEventListener('change', function (e) { state.to = +e.target.value; if (state.from > state.to) state.from = state.to; save(); render(); });
   $('#f-cust').addEventListener('change', function (e) { state.cust = e.target.value; save(); render(); });

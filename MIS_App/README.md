@@ -15,10 +15,10 @@ For a quick look without hosting, open `Datre_MIS_standalone.html` (one file, no
 - Customers: contribution by customer and by month
 - P&L: full month-by-month MIS
 - Checks: cost sheet cross-check and items to confirm with HO Accounts
-- Filters: From and To month, quarter shortcuts, customer. Choices are remembered on the phone.
+- Filters: Period, Customer, From and To month (all dropdowns). Choices are remembered on the phone.
 
 ## Updating each month
-The figures are in `data.js` (a snapshot of the September 2026 MIS). Replace it with a new export from the MIS workbook, then raise the version in `sw.js` (`datre-mis-v1` to `v2`) so phones pick up the change.
+The figures are in `data.js` (a snapshot of the September 2026 MIS). Replace it with a new export from the MIS workbook, then raise the version in `sw.js` (`datre-mis-v2` to `v3`) so phones pick up the change.
 
 ## Native APK
 Not built: the build environment has no Android SDK. This folder can be wrapped as an APK (for example with Bubblewrap/TWA) once it is hosted over HTTPS.
