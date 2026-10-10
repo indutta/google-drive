@@ -8,6 +8,7 @@ No company figures are built into the app. Everything typed stays on the phone (
 - **Enter:** eight collapsible sections (sales, materials and stock, job work, power, other expenses, HO items, HO adjustments, statistics). Large number fields with a decimal keypad and a plus/minus button for adjustments. A bar at the bottom shows contribution, operating profit and PBT as you type.
 - **MIS:** the month or year-to-date profit and loss, statistics, and checks (blank items, copied-forward tonnage, adjustments needing a reason).
 - **Year:** all entered months side by side with a PBT chart.
+- **Data:** dropdown filters (Year, Period, Key output, Customer) for key outputs and cost-sheet contribution. Needs a private history file; without it only entered months show.
 - **More:** share a summary (WhatsApp, email), save or load a backup, clear a month.
 
 ## Install on Android

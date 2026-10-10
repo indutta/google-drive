@@ -1,6 +1,6 @@
-:root{--bg:#f3f6f7;--panel:#ffffff;--fg:#10222b;--muted:#5a6f79;--line:#dbe4e8;--head:#0b3a4a;--headfg:#ecf3f6;--c1:#0f6e8c;--c2:#c77d0a;--mute:#aebcc3;--good:#1a7f4b;--bad:#b3261e;--warn:#9a6700;--tab:#ffffff;--field:#eef3f5;--shadow:0 1px 2px rgba(16,34,43,.08)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c1a20;--panel:#13262e;--fg:#e6eff2;--muted:#93a9b3;--line:#24404b;--head:#071f28;--headfg:#e6eff2;--c1:#4fb3d1;--c2:#e8a045;--mute:#4b6572;--good:#4cc38a;--bad:#ff8a80;--warn:#e8b84a;--tab:#10222a;--field:#0c1a20;--shadow:none;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0c1a20;--panel:#13262e;--fg:#e6eff2;--muted:#93a9b3;--line:#24404b;--head:#071f28;--headfg:#e6eff2;--c1:#4fb3d1;--c2:#e8a045;--mute:#4b6572;--good:#4cc38a;--bad:#ff8a80;--warn:#e8b84a;--tab:#10222a;--field:#0c1a20;--shadow:none;color-scheme:dark}
+:root{--y1:#c3cfd5;--y2:#97aab4;--y3:#c77d0a;--y4:#0f6e8c;--bg:#f3f6f7;--panel:#ffffff;--fg:#10222b;--muted:#5a6f79;--line:#dbe4e8;--head:#0b3a4a;--headfg:#ecf3f6;--c1:#0f6e8c;--c2:#c77d0a;--mute:#aebcc3;--good:#1a7f4b;--bad:#b3261e;--warn:#9a6700;--tab:#ffffff;--field:#eef3f5;--shadow:0 1px 2px rgba(16,34,43,.08)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c1a20;--panel:#13262e;--fg:#e6eff2;--muted:#93a9b3;--line:#24404b;--head:#071f28;--headfg:#e6eff2;--c1:#4fb3d1;--c2:#e8a045;--mute:#4b6572;--good:#4cc38a;--bad:#ff8a80;--warn:#e8b84a;--tab:#10222a;--field:#0c1a20;--shadow:none;--y1:#3a5360;--y2:#5f7f8e;--y3:#e8a045;--y4:#4fb3d1;color-scheme:dark}}
+:root[data-theme="dark"]{--y1:#3a5360;--y2:#5f7f8e;--y3:#e8a045;--y4:#4fb3d1;--bg:#0c1a20;--panel:#13262e;--fg:#e6eff2;--muted:#93a9b3;--line:#24404b;--head:#071f28;--headfg:#e6eff2;--c1:#4fb3d1;--c2:#e8a045;--mute:#4b6572;--good:#4cc38a;--bad:#ff8a80;--warn:#e8b84a;--tab:#10222a;--field:#0c1a20;--shadow:none;color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.4}
 #app{max-width:640px;margin:0 auto;min-height:100vh;padding-bottom:calc(8.2rem + env(safe-area-inset-bottom,0px))}
@@ -72,3 +72,12 @@ nav.tabs button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-
 nav.tabs button[aria-selected=true]{color:var(--c1);font-weight:650}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--c2);outline-offset:2px}
 .empty{padding:1.2rem;text-align:center;color:var(--muted);font-size:.9rem}
+label.dd{display:flex;flex-direction:column;gap:.2rem;font-size:.74rem;color:var(--muted)}
+label.dd select{font:inherit;font-size:1rem;min-height:46px;width:100%;color:var(--fg);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:.5rem .6rem}
+.card .chart{width:100%}
+.card .leg{display:flex;flex-wrap:wrap;gap:.3rem .9rem;font-size:.75rem;color:var(--muted);margin-bottom:.4rem}
+.card .leg i{display:inline-block;width:.65rem;height:.65rem;border-radius:2px;margin-right:.35rem}
+.readout{margin-top:.5rem;min-height:2.6rem;padding:.5rem .7rem;border-radius:10px;background:var(--bg);font-size:.8rem;color:var(--muted)}
+.readout b{color:var(--fg);font-weight:600}
+.readout .r{display:flex;justify-content:space-between;gap:1rem;font-variant-numeric:tabular-nums}
+.readout i{display:inline-block;width:.6rem;height:.6rem;border-radius:2px;margin-right:.35rem}

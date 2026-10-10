@@ -45,7 +45,8 @@
   var ALLKEYS = []; SECTIONS.forEach(function (s) { s.fields.forEach(function (f) { ALLKEYS.push(f.k); }); });
 
   /* ---------- state ---------- */
-  var state = { fy: '2026-27', month: 1, tab: 'in', theme: '', data: {}, ytd: false };
+  var state = { fy: '2026-27', month: 1, tab: 'in', theme: '', data: {}, ytd: false, dy: 'all', dp: 'fy', dm: 'net_sales', dc: '' };
+  var HIST = window.MIS_HIST || { years: {}, contrib: [] };
   try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv) for (var k in state) if (sv[k] !== undefined) state[k] = sv[k]; } catch (e) {}
   var hadSaved = false; try { hadSaved = !!localStorage.getItem(KEY); } catch (e) {}
   if (window.MIS_SEED && !hadSaved) { state.fy = window.MIS_SEED.fy; state.month = window.MIS_SEED.month; state.data = JSON.parse(JSON.stringify(window.MIS_SEED.data)); }
@@ -57,11 +58,13 @@
   function has(v) { return v !== undefined && v !== null && String(v).trim() !== '' && !isNaN(parseFloat(v)); }
   function num(v) { return has(v) ? parseFloat(v) : 0; }
   function r2(v) { return Math.round(v * 100) / 100; }
+  function fyHasEntries(fy) { var o = state.data[fy] || {}; return Object.keys(o).some(function (m) { return hasData(o[m]); }); }
+  function histOnly(fy) { return !fyHasEntries(fy) && !!HIST.years[fy]; }
   function hasData(d) { return ALLKEYS.some(function (k) { return has(d[k]); }); }
 
   /* ---------- the MIS formulas (same as the Excel template) ---------- */
-  function calc(m) {
-    var d = md(m), prev = (state.data[state.fy] || {})[m - 1] || {};
+  function calc(m, fy) {
+    var fk = fy || state.fy, d = (state.data[fk] || {})[m] || {}, prev = (state.data[fk] || {})[m - 1] || {};
     var g = function (k) { return num(d[k]); };
     var gst = has(d.gst) ? num(d.gst) : 18;
     var L = {};
@@ -188,9 +191,9 @@
   }
   function renderOut() {
     var v = $('#v-out'); v.replaceChildren(); var m = state.month, L = state.ytd ? ytd(m) : calc(m);
-    var seg = h('div', 'card'); var sb = h('div', 'btns'); sb.style.flexDirection = 'row'; sb.style.paddingTop = '14px';
-    [['Month', false], ['Year to date', true]].forEach(function (x) { var b = h('button', 'btn' + (state.ytd === x[1] ? '' : ' alt'), x[0]); b.style.flex = '1'; b.type = 'button'; b.addEventListener('click', function () { state.ytd = x[1]; save(); renderOut(); }); sb.appendChild(b); });
-    seg.appendChild(sb); v.appendChild(seg);
+    var seg = h('div', 'card'); var sbx = h('div', 'pad'); sbx.style.paddingTop = '14px';
+    var vl = h('label', 'dd', 'View'); var vs = document.createElement('select'); vs.id = 'mis-view'; vs.appendChild(new Option('This month only', 'm')); vs.appendChild(new Option('Year to date (Apr to this month)', 'y')); vs.value = state.ytd ? 'y' : 'm';
+    vs.addEventListener('change', function () { state.ytd = vs.value === 'y'; save(); renderOut(); }); vl.appendChild(vs); sbx.appendChild(vl); seg.appendChild(sbx); v.appendChild(seg);
     var title = state.ytd ? 'Apr to ' + SHORT[m - 1] + ' ' + state.fy + (L._n ? ' (' + L._n + ' month' + (L._n > 1 ? 's' : '') + ' with figures)' : '') : MONTHS[m - 1] + ' ' + state.fy;
     var k = h('div', 'kpis');
     var kp = function (label, val, note, wide) { var c = h('div', 'kpi' + (wide ? ' wide' : '')); c.appendChild(h('div', 'l', label)); c.appendChild(h('div', 'v' + (val < -0.005 ? ' neg' : ''), fmt(val))); c.appendChild(h('div', 'n', note)); return c; };
@@ -268,7 +271,7 @@
       try { var blob = new Blob([JSON.stringify(state.data)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'datre-mis-backup-' + state.fy + '.json'; document.body.appendChild(a); a.click(); a.remove(); toast('Backup saved'); } catch (e) { toast('Could not save'); }
     }));
     var fi = document.createElement('input'); fi.type = 'file'; fi.accept = 'application/json,.json'; fi.hidden = true; fi.id = 'imp';
-    fi.addEventListener('change', function () { var f = fi.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { try { var o = JSON.parse(rd.result); if (typeof o !== 'object' || !o) throw 0; state.data = o; save(); buildInputs(); render(); toast('Backup loaded'); } catch (e) { toast('That file is not a valid backup'); } }; rd.readAsText(f); });
+    fi.addEventListener('change', function () { var f = fi.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { try { var o = JSON.parse(rd.result); if (typeof o !== 'object' || !o) throw 0; state.data = o; save(); buildInputs(); buildFY(); render(); toast('Backup loaded'); } catch (e) { toast('That file is not a valid backup'); } }; rd.readAsText(f); });
     b2.appendChild(fi); b2.appendChild(mk('alt', 'Load backup file', function () { fi.click(); }));
     c2.appendChild(b2); c2.appendChild(h('p', 'note pad', 'Figures stay on this phone only. Save a backup before clearing browser data.')); v.appendChild(c2);
     if (window.MIS_SEED) {
@@ -276,7 +279,7 @@
       var b5 = h('div', 'btns'), a5 = h('div');
       b5.appendChild(mk('alt', 'Reload the supplied figures', function () {
         a5.replaceChildren(); var cf = h('div', 'confirm'); cf.appendChild(h('span', '', 'Replace everything on this phone with the supplied figures?'));
-        cf.appendChild(mk('danger', 'Yes, replace', function () { state.fy = window.MIS_SEED.fy; state.data = JSON.parse(JSON.stringify(window.MIS_SEED.data)); state.month = window.MIS_SEED.month; ms.value = state.month; $('#fy').value = state.fy; save(); loadInputs(); render(); toast('Supplied figures loaded'); }));
+        cf.appendChild(mk('danger', 'Yes, replace', function () { state.fy = window.MIS_SEED.fy; state.data = JSON.parse(JSON.stringify(window.MIS_SEED.data)); state.month = window.MIS_SEED.month; ms.value = state.month; buildFY(); save(); loadInputs(); render(); toast('Supplied figures loaded'); }));
         cf.appendChild(mk('alt', 'Cancel', function () { a5.replaceChildren(); })); a5.appendChild(cf);
       }));
       b5.appendChild(a5); c5.appendChild(b5); v.appendChild(c5);
@@ -298,18 +301,139 @@
     c4.appendChild(p); v.appendChild(c4);
   }
 
+
+  /* ---------- Data tab: key outputs and cost-sheet contribution, all years ---------- */
+  var MEASURES = [['net_sales', 'Net sales (Rs. lakh)'], ['pbt', 'PBT (Rs. lakh)'], ['npo', 'Net profit from operations (Rs. lakh)'], ['storage', 'Storage facility income (Rs. lakh)'], ['production', 'Production (MT)'], ['despatch', 'Despatch (MT)'], ['rejection', 'In-house rejections (MT)'], ['collections', 'Collections incl GST (Rs. lakh)'], ['contribution', 'Contribution, ledger (Rs. lakh)']];
+  var CURMAP = { net_sales: 'net', pbt: 'pbt', npo: 'npo', storage: 'stor', production: 'prod', despatch: 'desp', rejection: 'rej', collections: 'coll', contribution: 'contr' };
+  var PERIODS = [['fy', 'Full year'], ['q1', 'Q1 (Apr to Jun)'], ['q2', 'Q2 (Jul to Sep)'], ['q3', 'Q3 (Oct to Dec)'], ['q4', 'Q4 (Jan to Mar)']].concat(MONTHS.map(function (n, i) { return ['m' + (i + 1), n]; }));
+  var HIDX = { fy: 10, q1: 3, q2: 7, q3: 8, q4: 9, m1: 0, m2: 1, m3: 2, m4: 4, m5: 5, m6: 6 };
+  function pMonths(p) { if (p === 'fy') return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]; if (p.charAt(0) === 'q') { var q = +p.slice(1); return [q * 3 - 2, q * 3 - 1, q * 3]; } return [+p.slice(1)]; }
+  function mval(fy, meas, p) {
+    if (fyHasEntries(fy)) { var tot = 0, n = 0; pMonths(p).forEach(function (m) { var d = (state.data[fy] || {})[m]; if (d && hasData(d)) { tot += calc(m, fy)[CURMAP[meas]]; n++; } }); return n ? tot : null; }
+    var y = HIST.years[fy]; if (!y || !y[meas]) return null; var i = HIDX[p]; var v = i === undefined ? null : y[meas][i]; return v === undefined ? null : v;
+  }
+  function hasMonth(fy, m) { var d = (state.data[fy] || {})[m]; return !!(d && hasData(d)); }
+  function partialFY(fy, p) { return fyHasEntries(fy) && pMonths(p).some(function (m) { return !hasMonth(fy, m); }); }
+  function lfl(fy, prevFy, meas, p) {
+    if (!partialFY(fy, p)) return { prev: mval(prevFy, meas, p), label: prevFy };
+    var cov = pMonths(p).filter(function (m) { return hasMonth(fy, m); }), qs = [];
+    for (var q = 1; q <= 4; q++) { var qm = [q * 3 - 2, q * 3 - 1, q * 3]; if (qm.every(function (m) { return cov.indexOf(m) >= 0; })) qs.push(q); }
+    var inQ = cov.every(function (m) { return qs.indexOf(Math.ceil(m / 3)) >= 0; });
+    if (!qs.length || !inQ) return { prev: null, label: prevFy };
+    var tot = 0; for (var i = 0; i < qs.length; i++) { var x = mval(prevFy, meas, 'q' + qs[i]); if (x === null) return { prev: null, label: prevFy }; tot += x; }
+    return { prev: tot, label: prevFy + ' same quarters (Q' + qs[0] + (qs.length > 1 ? ' to Q' + qs[qs.length - 1] : '') + ')' };
+  }
+  function fyList() { return allFYs().filter(function (y) { return HIST.years[y] || fyHasEntries(y); }); }
+  var YC = ['--y1', '--y2', '--y3', '--y4'];
+  function ycol(i, n) { return 'var(' + YC[Math.max(0, 4 - n) + i] + ')'; }
+  function sel2(id, label, opts, val, fn) { var l = h('label', 'dd', label), s2 = document.createElement('select'); s2.id = id; opts.forEach(function (o) { s2.appendChild(new Option(o[1], o[0])); }); s2.value = val; s2.addEventListener('change', function () { fn(s2.value); save(); renderData(); }); l.appendChild(s2); return l; }
+  function readoutBox() { var r = h('div', 'readout', 'Tap a bar.'); return r; }
+  function tapRead(box, title, rows) { box.replaceChildren(); box.appendChild(h('b', '', title)); rows.forEach(function (x) { var d = h('div', 'r'); var l = h('span'); if (x.c) { var i = h('i'); i.style.background = x.c; l.appendChild(i); } l.appendChild(document.createTextNode(x.n)); d.appendChild(l); d.appendChild(h('span', '', x.v)); box.appendChild(d); }); }
+  function gbars(host, box, cats, series) {
+    var NS = 'http://www.w3.org/2000/svg', w = Math.max(240, host.clientWidth || 320), hg = 210, svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', '0 0 ' + w + ' ' + hg); svg.style.width = '100%'; svg.style.display = 'block'; host.appendChild(svg);
+    var all = []; series.forEach(function (x) { x.v.forEach(function (q) { if (q !== null) all.push(q); }); });
+    if (!all.length) { host.appendChild(h('div', 'empty', 'No figures for this selection')); svg.remove(); return; }
+    var lo = Math.min(0, Math.min.apply(null, all)), hi = Math.max(0, Math.max.apply(null, all)) || 1, y = function (q) { return 10 + (hi - q) / (hi - lo || 1) * (hg - 36); };
+    var ml = 56, band = (w - ml - 4) / cats.length, inner = band * 0.8, bw = inner / series.length - 1.5;
+    var mk = function (tag, at, tx) { var e = document.createElementNS(NS, tag); for (var k in at) e.setAttribute(k, at[k]); if (tx !== undefined) e.textContent = tx; svg.appendChild(e); return e; };
+    var z = mk('line', { x1: ml, x2: w - 4, y1: y(0), y2: y(0) }); z.style.stroke = 'var(--muted)';
+    var top = mk('text', { x: ml - 5, y: y(hi) + 4, 'text-anchor': 'end', 'font-size': 10.5 }, Math.round(hi).toLocaleString('en-IN')); top.style.fill = 'var(--muted)';
+    cats.forEach(function (c, ci) {
+      var x0 = ml + ci * band + (band - inner) / 2;
+      series.forEach(function (sr, si) { var q = sr.v[ci]; if (q === null) return; var r = mk('rect', { x: x0 + si * (bw + 1.5), y: Math.min(y(q), y(0)), width: Math.max(2, bw), height: Math.max(1.5, Math.abs(y(q) - y(0))), rx: 3 }); r.style.fill = sr.c; });
+      var t = mk('text', { x: ml + ci * band + band / 2, y: hg - 8, 'text-anchor': 'middle', 'font-size': 10.5 }, c); t.style.fill = 'var(--muted)';
+      var hit = mk('rect', { x: ml + ci * band, y: 0, width: band, height: hg - 18, fill: 'transparent' });
+      hit.addEventListener('pointerdown', function () { tapRead(box, c, series.map(function (sr) { return { c: sr.c, n: sr.n, v: sr.v[ci] === null ? 'n/a' : fmt(sr.v[ci]) }; })); });
+    });
+  }
+  function legendY(box, items) { var l = h('div', 'leg'); items.forEach(function (it) { var s3 = h('span'); var i = h('i'); i.style.background = it.c; s3.appendChild(i); s3.appendChild(document.createTextNode(it.n)); l.appendChild(s3); }); return l; }
+  function card2(title, sub) { var c = h('section', 'card'); var hd = h('div', 'hd'); hd.style.cursor = 'default'; var l = h('div'); l.appendChild(h('h2', '', title)); if (sub) l.appendChild(h('div', 'sub', sub)); hd.appendChild(l); c.appendChild(hd); var p = h('div', 'pad'); c.appendChild(p); c._p = p; return c; }
+  function pct1(a, b) { return b ? ((a - b) / Math.abs(b)) * 100 : null; }
+
+  function renderData() {
+    var v = $('#v-data'); v.replaceChildren();
+    var fys = fyList();
+    if (!fys.length) { v.appendChild(h('div', 'card empty', 'No figures yet. Enter a month on the first tab.')); return; }
+    if (state.dy !== 'all' && fys.indexOf(state.dy) < 0) state.dy = 'all';
+    var fcard = h('section', 'card'); var fp = h('div', 'pad'); fp.style.paddingTop = '14px'; fp.style.display = 'grid'; fp.style.gap = '.6rem';
+    fp.appendChild(sel2('d-year', 'Year', [['all', 'All years']].concat(fys.map(function (y) { return [y, y]; })), state.dy, function (x) { state.dy = x; }));
+    fp.appendChild(sel2('d-per', 'Period', PERIODS, state.dp, function (x) { state.dp = x; }));
+    fp.appendChild(sel2('d-meas', 'Key output', MEASURES, state.dm, function (x) { state.dm = x; }));
+    var custs = Array.from(new Set(HIST.contrib.map(function (r) { return r.c; }))).sort();
+    if (custs.length) fp.appendChild(sel2('d-cust', 'Customer (cost-sheet contribution)', [['', 'All customers']].concat(custs.map(function (c) { return [c, c]; })), state.dc, function (x) { state.dc = x; }));
+    var rb = h('button', 'btn alt', 'Reset filters'); rb.type = 'button'; rb.addEventListener('click', function () { state.dy = 'all'; state.dp = 'fy'; state.dm = 'net_sales'; state.dc = ''; save(); renderData(); }); fp.appendChild(rb);
+    fcard.appendChild(fp); v.appendChild(fcard);
+
+    var mname = MEASURES.filter(function (m) { return m[0] === state.dm; })[0][1], pname = PERIODS.filter(function (p) { return p[0] === state.dp; })[0][1];
+    var focus = state.dy === 'all' ? fys[fys.length - 1] : state.dy, fi = fys.indexOf(focus), prevFy = fi > 0 ? fys[fi - 1] : null;
+    var cur = mval(focus, state.dm, state.dp), pv = prevFy ? lfl(focus, prevFy, state.dm, state.dp) : { prev: null, label: '' }, prv = pv.prev;
+    var k = h('div', 'kpis'); var kc = h('div', 'kpi wide'); kc.appendChild(h('div', 'l', mname + ', ' + pname + ', ' + focus + (partialFY(focus, state.dp) ? ' (months entered so far)' : '')));
+    kc.appendChild(h('div', 'v' + (cur !== null && cur < -0.005 ? ' neg' : ''), cur === null ? 'n/a' : fmt(cur)));
+    var ch = cur !== null && prv !== null ? pct1(cur, prv) : null;
+    kc.appendChild(h('div', 'n', ch === null ? (prevFy ? 'No figure for ' + prevFy : 'No earlier year') : (ch > 0 ? '+' : '') + ch.toFixed(1) + '% vs ' + pv.label + ' (' + fmt(prv) + ')')); k.appendChild(kc); v.appendChild(k);
+
+    var shown = state.dy === 'all' ? fys : fys.filter(function (y) { return y === state.dy || y === prevFy; });
+    var c1 = card2(mname + ' by year', pname); var hb = h('div', 'chart'); var bx = readoutBox(); c1._p.appendChild(hb); c1._p.appendChild(bx); v.appendChild(c1);
+    gbars(hb, bx, shown.map(function (y) { return partialFY(y, state.dp) ? y + '*' : y; }), [{ n: mname, c: 'var(--c1)', v: shown.map(function (y) { return mval(y, state.dm, state.dp); }) }]);
+
+    if (shown.some(function (y) { return partialFY(y, state.dp); })) c1._p.appendChild(h('p', 'note', '* Part year: only the months entered so far.'));
+    var c2 = card2(mname + ' by quarter', 'Quarter totals for each year'); var yl = shown.map(function (y, i) { return { n: y, c: ycol(i, shown.length) }; }); c2._p.appendChild(legendY(null, yl));
+    var hb2 = h('div', 'chart'), bx2 = readoutBox(); c2._p.appendChild(hb2); c2._p.appendChild(bx2); v.appendChild(c2);
+    gbars(hb2, bx2, ['Q1', 'Q2', 'Q3', 'Q4'], shown.map(function (y, i) { return { n: y, c: ycol(i, shown.length), v: ['q1', 'q2', 'q3', 'q4'].map(function (q) { return mval(y, state.dm, q); }) }; }));
+
+    var c3 = card2('All key outputs', pname + ', Rs. lakh or MT'); var tw = h('div', 'tw'), t = h('table'), th = h('thead'), tr = h('tr'); tr.appendChild(h('th', '', 'Key output')); shown.forEach(function (y) { tr.appendChild(h('th', '', y)); });
+    if (state.dy !== 'all' && prevFy) tr.appendChild(h('th', '', 'Change')); th.appendChild(tr); t.appendChild(th); var tb = h('tbody');
+    MEASURES.forEach(function (m) { var row = h('tr', m[0] === state.dm ? 'tot' : ''); row.appendChild(h('td', '', m[1].replace(/ \(.*\)$/, '')));
+      shown.forEach(function (y) { var q = mval(y, m[0], state.dp); row.appendChild(h('td', q !== null && q < -0.005 ? 'neg' : '', q === null ? 'n/a' : fmt(q))); });
+      if (state.dy !== 'all' && prevFy) { var a = mval(state.dy, m[0], state.dp), b2 = lfl(state.dy, prevFy, m[0], state.dp).prev, p = a !== null && b2 !== null ? pct1(a, b2) : null; row.appendChild(h('td', p !== null && p < 0 ? 'neg' : '', p === null ? 'n/a' : (p > 0 ? '+' : '') + p.toFixed(1) + '%')); }
+      tb.appendChild(row); });
+    t.appendChild(tb); tw.appendChild(t); c3._p.appendChild(tw); v.appendChild(c3);
+
+    if (!HIST.contrib.length) return;
+    var months = pMonths(state.dp), inP = function (r) { return months.indexOf(r.m) >= 0; };
+    var base = HIST.contrib.filter(function (r) { return inP(r) && (state.dy === 'all' || r.f === state.dy); });
+    var by = {}; base.forEach(function (r) { var o = by[r.c] || (by[r.c] = { c: r.c, k: 0, t: 0 }); o.k += r.k; o.t += r.t; });
+    var rank = Object.keys(by).map(function (x) { return by[x]; }).sort(function (a, b) { return b.k - a.k; });
+    var c4 = card2('Contribution by customer', 'Rs. lakh, cost sheet, ' + (state.dy === 'all' ? 'all years' : state.dy) + ', ' + pname + '. Tap a bar to pick a customer.');
+    var NS = 'http://www.w3.org/2000/svg', rh = 36, w = Math.max(240, window.innerWidth - 64), hg = Math.max(70, rank.length * rh + 8), svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', '0 0 ' + w + ' ' + hg); svg.style.width = '100%'; svg.style.display = 'block';
+    var max = Math.max.apply(null, rank.map(function (r) { return Math.max(r.k, 0); }).concat([1])), ml = 118;
+    rank.forEach(function (r, i) { var yy = 6 + i * rh, wd = Math.max(3, (w - ml - 50) * Math.max(r.k, 0) / max);
+      var tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', ml - 6); tx.setAttribute('y', yy + 16); tx.setAttribute('text-anchor', 'end'); tx.setAttribute('font-size', 11); tx.style.fill = 'var(--muted)'; tx.textContent = r.c.length > 17 ? r.c.slice(0, 16) + '…' : r.c; svg.appendChild(tx);
+      var rc = document.createElementNS(NS, 'rect'); rc.setAttribute('x', ml); rc.setAttribute('y', yy); rc.setAttribute('width', wd); rc.setAttribute('height', 24); rc.setAttribute('rx', 4); rc.style.fill = !state.dc || state.dc === r.c ? 'var(--c1)' : 'var(--mute)'; svg.appendChild(rc);
+      var vt = document.createElementNS(NS, 'text'); vt.setAttribute('x', ml + wd + 5); vt.setAttribute('y', yy + 16); vt.setAttribute('font-size', 11); vt.style.fill = 'var(--fg)'; vt.textContent = (Math.round(r.k * 10) / 10).toFixed(1); svg.appendChild(vt);
+      var hit = document.createElementNS(NS, 'rect'); hit.setAttribute('x', 0); hit.setAttribute('y', yy - 4); hit.setAttribute('width', w); hit.setAttribute('height', rh); hit.setAttribute('fill', 'transparent'); hit.addEventListener('pointerdown', function () { state.dc = state.dc === r.c ? '' : r.c; save(); renderData(); }); svg.appendChild(hit); });
+    if (rank.length) c4._p.appendChild(svg); else c4._p.appendChild(h('div', 'empty', 'No cost-sheet rows for this selection')); v.appendChild(c4);
+
+    var fyc = Array.from(new Set(HIST.contrib.map(function (r) { return r.f; }))).sort();
+    var c5 = card2('Contribution by year, ' + (state.dc || 'all customers'), 'Rs. lakh, cost sheet, ' + pname); var hb5 = h('div', 'chart'), bx5 = readoutBox(); c5._p.appendChild(hb5); c5._p.appendChild(bx5); v.appendChild(c5);
+    gbars(hb5, bx5, fyc, [{ n: 'Contribution', c: 'var(--c1)', v: fyc.map(function (y) { var s4 = 0, n4 = 0; HIST.contrib.forEach(function (r) { if (r.f === y && inP(r) && (!state.dc || r.c === state.dc)) { s4 += r.k; n4++; } }); return n4 ? s4 : null; }) }, { n: 'Loss from rejections', c: 'var(--mute)', v: fyc.map(function (y) { var s4 = 0, n4 = 0; HIST.contrib.forEach(function (r) { if (r.f === y && inP(r) && (!state.dc || r.c === state.dc)) { s4 += r.l; n4++; } }); return n4 ? s4 : null; }) }]);
+
+    var pr = {}; base.filter(function (r) { return !state.dc || r.c === state.dc; }).forEach(function (r) { var key = r.c + '|' + r.p, o = pr[key] || (pr[key] = { c: r.c, p: r.p, k: 0, t: 0 }); o.k += r.k; o.t += r.t; });
+    var plist = Object.keys(pr).map(function (x) { return pr[x]; }).sort(function (a, b) { return b.k - a.k; }).slice(0, 10);
+    var c6 = card2('Top products by contribution', 'Top 10, ' + (state.dc || 'all customers') + ', ' + (state.dy === 'all' ? 'all years' : state.dy) + ', ' + pname);
+    if (plist.length) { var tw6 = h('div', 'tw'), t6 = h('table'), th6 = h('thead'), tr6 = h('tr'); ['Product', 'MT', 'Rs. lakh', 'Rs/kg'].forEach(function (x) { tr6.appendChild(h('th', '', x)); }); th6.appendChild(tr6); t6.appendChild(th6); var tb6 = h('tbody');
+      plist.forEach(function (r) { var row = h('tr'); row.appendChild(h('td', '', r.p + ' (' + r.c + ')')); row.appendChild(h('td', '', fmt(r.t))); row.appendChild(h('td', r.k < 0 ? 'neg' : '', fmt(r.k))); row.appendChild(h('td', '', r.t ? fmt(r.k * 100 / r.t) : 'n/a')); tb6.appendChild(row); });
+      t6.appendChild(tb6); tw6.appendChild(t6); c6._p.appendChild(tw6); } else c6._p.appendChild(h('div', 'empty', 'No products for this selection')); v.appendChild(c6);
+  }
+
   /* ---------- shell ---------- */
-  var VIEWS = { in: null, out: renderOut, yr: renderYr, more: renderMore };
+  var VIEWS = { in: null, out: renderOut, yr: renderYr, data: renderData, more: renderMore };
   function render() {
     document.querySelectorAll('.view').forEach(function (e) { e.classList.toggle('on', e.id === 'v-' + state.tab); });
     document.querySelectorAll('nav.tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === state.tab ? 'true' : 'false'); });
-    if (VIEWS[state.tab]) VIEWS[state.tab]();
+    var blocked = histOnly(state.fy) && (state.tab === 'in' || state.tab === 'out' || state.tab === 'yr');
+    if (blocked) { var vv = $('#v-' + state.tab); vv.replaceChildren(); var nc = h('div', 'card'); var nh = h('div', 'hd'); nh.style.cursor = 'default'; nh.appendChild(h('h2', '', state.fy + ' key figures only')); nc.appendChild(nh);
+      var np = h('div', 'pad'); np.appendChild(h('p', 'note', 'For ' + state.fy + ' only the published key figures and the cost-sheet contribution are available, not line-by-line inputs. Open the Data tab to see and filter them.'));
+      var nb = h('button', 'btn', 'Open Data tab'); nb.type = 'button'; nb.style.marginTop = '.6rem'; nb.addEventListener('click', function () { state.dy = state.fy; state.tab = 'data'; save(); render(); window.scrollTo(0, 0); }); np.appendChild(nb); nc.appendChild(np); vv.appendChild(nc); }
+    else if (VIEWS[state.tab]) VIEWS[state.tab]();
     refresh();
   }
   var ms = $('#month'); MONTHS.forEach(function (n, i) { ms.appendChild(new Option(n, i + 1)); }); ms.value = state.month;
-  $('#fy').value = state.fy;
+  function allFYs() { var set = {}; Object.keys(HIST.years).forEach(function (k) { set[k] = 1; }); Object.keys(state.data).forEach(function (k) { set[k] = 1; }); set['2026-27'] = 1; set['2027-28'] = 1; set[state.fy] = 1; return Object.keys(set).sort(); }
+  function buildFY() { var f = $('#fy'); f.replaceChildren(); allFYs().forEach(function (y) { f.appendChild(new Option(y, y)); }); f.value = state.fy; }
+  buildFY();
   ms.addEventListener('change', function () { state.month = +ms.value; save(); loadInputs(); render(); });
-  $('#fy').addEventListener('change', function () { var v = $('#fy').value.trim() || '2026-27'; state.fy = v; save(); loadInputs(); render(); });
+  $('#fy').addEventListener('change', function () { state.fy = $('#fy').value; save(); loadInputs(); render(); });
   document.querySelectorAll('nav.tabs button').forEach(function (b) { b.addEventListener('click', function () { state.tab = b.dataset.tab; save(); render(); window.scrollTo(0, 0); }); });
   $('#theme').addEventListener('click', function () {
     var dark = document.documentElement.getAttribute('data-theme') === 'dark' || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
