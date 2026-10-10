@@ -1,0 +1,16 @@
+{
+  "name": "Plant Pulse — Datre",
+  "short_name": "Plant Pulse",
+  "description": "Live plant status for the CEO: melting, moulding, heat treatment, quality, maintenance and raw material purchase.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14171c",
+  "theme_color": "#14171c",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

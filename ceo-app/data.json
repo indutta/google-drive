@@ -1,0 +1,97 @@
+{
+  "sample": true,
+  "plant": "Datre Corporation Limited · Falta",
+  "updated": "2026-10-10T09:30:00+05:30",
+  "areas": [
+    {
+      "id": "melting", "name": "Melting", "icon": "flame", "status": "good",
+      "headline": { "value": "4.1", "unit": "t poured today", "sub": "target 4.3 t" },
+      "kpis": [
+        { "label": "Heats done", "value": "5 / 6", "status": "good" },
+        { "label": "Metal poured", "value": "4.1 t", "target": "target 4.3 t", "status": "good" },
+        { "label": "Power use", "value": "780 kWh/t", "target": "target ≤ 800", "status": "good" },
+        { "label": "Furnace lining", "value": "62 / 80 heats", "target": "relining at 80", "status": "good" }
+      ],
+      "trend": { "label": "Metal poured, last 7 days", "unit": "t", "points": [3.8, 4.4, 4.0, 4.5, 3.9, 4.2, 4.1] },
+      "items": [
+        { "status": "good", "text": "Heat 5 tapped on temperature, chemistry within spec", "time": "09:05" },
+        { "status": "good", "text": "Heat 6 charging started", "time": "09:20" }
+      ]
+    },
+    {
+      "id": "moulding", "name": "Moulding", "icon": "layers", "status": "warning",
+      "headline": { "value": "86", "unit": "% of plan", "sub": "310 of 360 moulds" },
+      "kpis": [
+        { "label": "Moulds made", "value": "310 / 360", "status": "warning" },
+        { "label": "Line utilisation", "value": "81 %", "target": "target ≥ 80", "status": "good" },
+        { "label": "Mould scrap", "value": "3.2 %", "target": "target ≤ 2.5", "status": "warning" },
+        { "label": "Pattern changeovers", "value": "3", "status": "good" }
+      ],
+      "trend": { "label": "Moulds vs plan, last 7 days", "unit": "%", "points": [95, 92, 98, 90, 88, 91, 86] },
+      "items": [
+        { "status": "warning", "text": "Sand mixer stoppage cost 40 minutes on the morning shift", "time": "08:10" },
+        { "status": "warning", "text": "Mould scrap above target for 3 days running", "time": "Today" }
+      ]
+    },
+    {
+      "id": "heat", "name": "Heat Treatment", "icon": "thermo", "status": "good",
+      "headline": { "value": "4 / 5", "unit": "batches done", "sub": "1 in furnace" },
+      "kpis": [
+        { "label": "Batches completed", "value": "4 / 5", "status": "good" },
+        { "label": "In furnace now", "value": "Batch HT-117", "target": "soaking at 900 °C", "status": "good" },
+        { "label": "Furnace load", "value": "88 %", "status": "good" },
+        { "label": "Temperature deviations", "value": "1", "target": "target 0", "status": "warning" }
+      ],
+      "trend": { "label": "Batches completed, last 7 days", "unit": "", "points": [5, 5, 4, 5, 5, 4, 4] },
+      "items": [
+        { "status": "warning", "text": "Batch HT-115 overshot by 12 °C for 6 minutes, held for review", "time": "07:40" }
+      ]
+    },
+    {
+      "id": "quality", "name": "Quality Inspection", "icon": "check", "status": "critical",
+      "headline": { "value": "10.1", "unit": "% rejection", "sub": "target ≤ 5 %" },
+      "kpis": [
+        { "label": "Rejection rate", "value": "10.1 %", "target": "target ≤ 5 %", "status": "critical" },
+        { "label": "Castings inspected", "value": "182", "status": "good" },
+        { "label": "Open NCRs", "value": "7", "target": "2 older than 7 days", "status": "warning" },
+        { "label": "Top defect", "value": "Shrinkage", "target": "38 % of rejects", "status": "warning" }
+      ],
+      "trend": { "label": "Rejection rate, last 7 days", "unit": "%", "points": [8.6, 9.1, 9.4, 9.8, 9.9, 10.0, 10.1] },
+      "items": [
+        { "status": "critical", "text": "Rejection has risen every day this week and is at a record high", "time": "Today" },
+        { "status": "warning", "text": "2 NCRs open for more than 7 days, still without a root cause", "time": "Today" },
+        { "status": "good", "text": "Customer audit documents ready for the railway line", "time": "08:30" }
+      ]
+    },
+    {
+      "id": "maintenance", "name": "Maintenance", "icon": "wrench", "status": "serious",
+      "headline": { "value": "2", "unit": "breakdowns open", "sub": "1 on a critical machine" },
+      "kpis": [
+        { "label": "Open breakdowns", "value": "2", "status": "serious" },
+        { "label": "Downtime this month", "value": "18 h", "target": "target ≤ 15 h", "status": "warning" },
+        { "label": "Preventive maintenance done", "value": "88 %", "target": "target ≥ 90", "status": "warning" },
+        { "label": "Spares below minimum", "value": "4 items", "status": "warning" }
+      ],
+      "trend": { "label": "Downtime hours per day, last 7 days", "unit": "h", "points": [0.5, 1.0, 0.0, 2.5, 0.8, 1.5, 2.2] },
+      "items": [
+        { "status": "serious", "text": "Furnace cooling-water pump failed. Standby pump running, repair expected by evening", "time": "06:50" },
+        { "status": "warning", "text": "Shot blast machine drive belt worn, part ordered", "time": "Yesterday" }
+      ]
+    },
+    {
+      "id": "purchase", "name": "Raw Material Purchase", "icon": "truck", "status": "warning",
+      "headline": { "value": "9", "unit": "days of scrap cover", "sub": "reorder level 10 days" },
+      "kpis": [
+        { "label": "Scrap and pig iron cover", "value": "9 days", "target": "reorder at 10", "status": "warning" },
+        { "label": "Open purchase orders", "value": "12", "status": "good" },
+        { "label": "Deliveries due today", "value": "3", "status": "good" },
+        { "label": "Waiting for your approval", "value": "2 POs", "target": "₹ 18.4 L total", "status": "warning" }
+      ],
+      "trend": { "label": "Days of scrap cover, last 7 days", "unit": "d", "points": [14, 13, 12, 11, 11, 10, 9] },
+      "items": [
+        { "status": "warning", "text": "Scrap cover has fallen below the reorder level. Two POs need approval", "time": "Today" },
+        { "status": "good", "text": "Ferro-alloy delivery received and cleared", "time": "08:45" }
+      ]
+    }
+  ]
+}
