@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Datre MIS</title>
+<meta name="theme-color" content="#0b3a4a">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#f3f6f7;--panel:#ffffff;--fg:#10222b;--muted:#5a6f79;--line:#dbe4e8;--head:#0b3a4a;--headfg:#ecf3f6;--c1:#0f6e8c;--c2:#c77d0a;--mute:#aebcc3;--good:#1a7f4b;--bad:#b3261e;--warn:#9a6700;--tab:#ffffff;--shadow:0 1px 2px rgba(16,34,43,.08)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c1a20;--panel:#13262e;--fg:#e6eff2;--muted:#93a9b3;--line:#24404b;--head:#071f28;--headfg:#e6eff2;--c1:#4fb3d1;--c2:#e8a045;--mute:#4b6572;--good:#4cc38a;--bad:#ff8a80;--warn:#e8b84a;--tab:#10222a;--shadow:none;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1a20;--panel:#13262e;--fg:#e6eff2;--muted:#93a9b3;--line:#24404b;--head:#071f28;--headfg:#e6eff2;--c1:#4fb3d1;--c2:#e8a045;--mute:#4b6572;--good:#4cc38a;--bad:#ff8a80;--warn:#e8b84a;--tab:#10222a;--shadow:none;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.4}
+#app{max-width:720px;margin:0 auto;min-height:100vh;padding-bottom:calc(4.5rem + env(safe-area-inset-bottom,0px))}
+.top{position:sticky;top:0;z-index:20;background:var(--head);color:var(--headfg);padding:calc(.7rem + env(safe-area-inset-top,0px)) 16px .7rem}
+.top h1{margin:0;font-size:1.15rem;font-weight:650;letter-spacing:.01em;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.top h1 small{font-weight:400;font-size:.78rem;opacity:.8}
+.top .period{margin:.1rem 0 .55rem;font-size:.8rem;opacity:.8}
+.filters{display:grid;grid-template-columns:.8fr .8fr 1.6fr auto;gap:.4rem}
+.filters select,.filters button{font:inherit;font-size:.8rem;min-width:0;width:100%;color:var(--headfg);background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:.5rem .5rem}
+.filters select option{color:#10222a;background:#fff}
+.filters button{width:auto;padding:.5rem .8rem}
+.chips{display:flex;gap:.4rem;margin-top:.5rem;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;font:inherit;font-size:.8rem;color:var(--headfg);background:transparent;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:.3rem .8rem}
+.chips button[aria-pressed=true]{background:var(--headfg);color:var(--head);border-color:var(--headfg)}
+main{padding:16px;display:flex;flex-direction:column;gap:14px}
+.view{display:none;flex-direction:column;gap:14px}
+.view.on{display:flex}
+.take{margin:0;font-size:.95rem;color:var(--fg)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow);min-width:0}
+.kpi.wide{grid-column:1/-1}
+.kpi .l{font-size:.75rem;color:var(--muted)}
+.kpi .v{font-size:1.55rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15;margin:.1rem 0}
+.kpi .d{font-size:.8rem;font-variant-numeric:tabular-nums;min-height:1.1em}
+.d.up{color:var(--good)}.d.down{color:var(--bad)}.d.flat{color:var(--muted)}
+.kpi .n{font-size:.7rem;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);min-width:0}
+.card h2{margin:0;font-size:1rem;font-weight:600}
+.card .note{margin:.15rem 0 .6rem;font-size:.78rem;color:var(--muted)}
+.leg{display:flex;flex-wrap:wrap;gap:.3rem .9rem;font-size:.75rem;color:var(--muted);margin-bottom:.4rem}
+.leg i{display:inline-block;width:.65rem;height:.65rem;border-radius:2px;margin-right:.35rem;vertical-align:-1px}
+.chart{width:100%;position:relative}
+.chart svg{display:block;width:100%;touch-action:pan-y}
+.tick{font-size:10.5px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.val{font-size:10.5px;fill:var(--fg);font-variant-numeric:tabular-nums}
+.readout{margin-top:.5rem;min-height:2.6rem;padding:.5rem .7rem;border-radius:10px;background:var(--bg);font-size:.8rem;color:var(--muted)}
+.readout b{color:var(--fg);font-weight:600}
+.readout .r{display:flex;justify-content:space-between;gap:1rem;font-variant-numeric:tabular-nums}
+.readout i{display:inline-block;width:.6rem;height:.6rem;border-radius:2px;margin-right:.35rem}
+.tw{overflow-x:auto;margin:0 -14px;padding:0 14px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:.82rem;font-variant-numeric:tabular-nums}
+th,td{padding:.45rem .55rem;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:.74rem;position:sticky;top:0;background:var(--panel)}
+td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:var(--panel);white-space:normal;min-width:9.5rem;max-width:11rem}
+tr.tot td{font-weight:650;background:color-mix(in srgb,var(--c1) 8%,var(--panel))}
+td.neg{color:var(--bad)}
+.notes{margin:0;padding-left:1.1rem;font-size:.85rem;display:flex;flex-direction:column;gap:.5rem}
+.notes li::marker{color:var(--warn)}
+.theme{font:inherit;font-size:.75rem;color:var(--headfg);background:transparent;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:.2rem .65rem}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--tab);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tabs div{display:flex;width:100%;max-width:720px}
+nav.tabs button{flex:1;font:inherit;font-size:.7rem;color:var(--muted);background:none;border:0;padding:.55rem .1rem .5rem;display:flex;flex-direction:column;align-items:center;gap:.15rem}
+nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button[aria-selected=true]{color:var(--c1);font-weight:600}
+button:focus-visible,select:focus-visible{outline:2px solid var(--c2);outline-offset:2px}
+.empty{padding:1.2rem;text-align:center;color:var(--muted);font-size:.85rem}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <h1><span>Datre MIS <small>FY 2026-27</small></span><button class="theme" id="theme" type="button" aria-label="Switch light or dark theme">Theme</button></h1>
+    <p class="period" id="period"></p>
+    <div class="filters">
+      <select id="f-from" aria-label="From month"></select>
+      <select id="f-to" aria-label="To month"></select>
+      <select id="f-cust" aria-label="Customer"></select>
+      <button id="f-reset" type="button">Reset</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </header>
+  <main>
+    <section class="view" id="v-home"></section>
+    <section class="view" id="v-trends"></section>
+    <section class="view" id="v-cust"></section>
+    <section class="view" id="v-pl"></section>
+    <section class="view" id="v-check"></section>
+  </main>
+  <nav class="tabs" aria-label="Sections"><div>
+    <button data-tab="home" aria-selected="true" type="button"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>Home</button>
+    <button data-tab="trends" aria-selected="false" type="button"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Trends</button>
+    <button data-tab="cust" aria-selected="false" type="button"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 010 6.4M18 14.8c2 .6 3.3 2.3 3.6 5.2"/></svg>Customers</button>
+    <button data-tab="pl" aria-selected="false" type="button"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>P&amp;L</button>
+    <button data-tab="check" aria-selected="false" type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>Checks</button>
+  </div></nav>
+</div>
+<script>
+/* Datre MIS data, April-September 2026 (Rs. lakh). Replace this file each month. */
+window.DATA={"mis_monthly":[{"month":"2026-04-01","label":"Apr","month_no":1,"net_sales":127.48,"contribution":13.06,"fixed_costs":30.7,"npo":-17.64,"storage":6.89,"pbt":-10.75,"material":47.91,"stock":31.72,"power_var":10.61,"job":9.1,"production_mt":33.56,"despatch_mt":50.44,"rejection_mt":5.73,"collections":149.75,"realisation":2.53,"pouring_mt":39.09,"contrib_sheet":20.96,"sales_incl_gst":150.43},{"month":"2026-05-01","label":"May","month_no":2,"net_sales":150.3,"contribution":35.85,"fixed_costs":30.36,"npo":5.49,"storage":6.89,"pbt":12.38,"material":159.27,"stock":-71.63,"power_var":15.14,"job":9.61,"production_mt":84.62,"despatch_mt":36.67,"rejection_mt":6.9,"collections":126.8,"realisation":2.45,"pouring_mt":91.31,"contrib_sheet":47.26,"sales_incl_gst":183.09},{"month":"2026-06-01","label":"Jun","month_no":3,"net_sales":206.48,"contribution":51.28,"fixed_costs":33.15,"npo":18.13,"storage":6.89,"pbt":25.02,"material":153.67,"stock":-32.47,"power_var":17.79,"job":12.19,"production_mt":83,"despatch_mt":106.07,"rejection_mt":9.39,"collections":238.95,"realisation":2.63,"pouring_mt":92.14,"contrib_sheet":55.89,"sales_incl_gst":252.08},{"month":"2026-07-01","label":"Jul","month_no":4,"net_sales":275.62,"contribution":58.26,"fixed_costs":38.75,"npo":19.51,"storage":6.95,"pbt":26.46,"material":160.21,"stock":22.62,"power_var":18.01,"job":12.73,"production_mt":84.62,"despatch_mt":36.67,"rejection_mt":6.9,"collections":269.64,"realisation":7.55,"pouring_mt":106.77,"contrib_sheet":57.05,"sales_incl_gst":326.82},{"month":"2026-08-01","label":"Aug","month_no":5,"net_sales":229.24,"contribution":50.51,"fixed_costs":36.14,"npo":14.37,"storage":7.91,"pbt":22.28,"material":109.64,"stock":43.89,"power_var":17.14,"job":11.56,"production_mt":77.44,"despatch_mt":94.58,"rejection_mt":9.16,"collections":302.91,"realisation":2.43,"pouring_mt":85.14,"contrib_sheet":47.98,"sales_incl_gst":271.68},{"month":"2026-09-01","label":"Sep","month_no":6,"net_sales":217.78,"contribution":66.84,"fixed_costs":43.1,"npo":23.74,"storage":7.39,"pbt":31.13,"material":174.02,"stock":-48.76,"power_var":18.37,"job":12.67,"production_mt":105.48,"despatch_mt":89.34,"rejection_mt":9.04,"collections":284.24,"realisation":2.44,"pouring_mt":113.84,"contrib_sheet":72.02,"sales_incl_gst":257.64}],"mis_lines":[{"line":"Sales domestic (incl GST)","apr":150.43,"may":183.09,"jun":252.08,"jul":326.82,"aug":271.68,"sep":257.64,"h1":1441.74},{"line":"Less GST","apr":22.95,"may":27.93,"jun":38.45,"jul":49.85,"aug":41.44,"sep":39.3,"h1":219.92},{"line":"Sales domestic (ex GST)","apr":127.48,"may":155.16,"jun":213.63,"jul":276.97,"aug":230.24,"sep":218.34,"h1":1221.82},{"line":"Less: sales return","apr":0,"may":4.86,"jun":7.15,"jul":1.35,"aug":1,"sep":0.56,"h1":14.92},{"line":"Net sales","apr":127.48,"may":150.3,"jun":206.48,"jul":275.62,"aug":229.24,"sep":217.78,"h1":1206.9},{"line":"Other business income","apr":0,"may":1.5,"jun":0,"jul":0,"aug":2.5,"sep":4.8,"h1":8.8},{"line":"Stock of return goods","apr":-15.08,"may":-3.56,"jun":-4.02,"jul":-3.79,"aug":1,"sep":0.56,"h1":-24.89},{"line":"Net turnover for contribution","apr":112.4,"may":148.24,"jun":202.46,"jul":271.83,"aug":232.74,"sep":223.14,"h1":1190.81},{"line":"Material consumed","apr":47.91,"may":159.27,"jun":153.67,"jul":160.21,"aug":109.64,"sep":174.02,"h1":804.72},{"line":"(Increase)/decrease in stock","apr":31.72,"may":-71.63,"jun":-32.47,"jul":22.62,"aug":43.89,"sep":-48.76,"h1":-54.63},{"line":"Power & fuel (variable)","apr":10.61,"may":15.14,"jun":17.79,"jul":18.01,"aug":17.14,"sep":18.37,"h1":97.06},{"line":"Job-work charges","apr":9.1,"may":9.61,"jun":12.19,"jul":12.73,"aug":11.56,"sep":12.67,"h1":67.86},{"line":"Total net variable costs","apr":99.34,"may":112.39,"jun":151.18,"jul":213.57,"aug":182.23,"sep":156.3,"h1":915.01},{"line":"Contribution","apr":13.06,"may":35.85,"jun":51.28,"jul":58.26,"aug":50.51,"sep":66.84,"h1":275.8},{"line":"Administrative expenses","apr":3.21,"may":4.13,"jun":4.5,"jul":7.52,"aug":6.07,"sep":7.13,"h1":32.56},{"line":"Repair & maintenance","apr":1.38,"may":2.28,"jun":2.31,"jul":3.41,"aug":2.28,"sep":1.97,"h1":13.63},{"line":"Other mfg overhead (fixed)","apr":4.62,"may":5.7,"jun":5.93,"jul":5.44,"aug":4.71,"sep":6.92,"h1":33.32},{"line":"Salary & wages","apr":15.91,"may":12.37,"jun":14.85,"jul":16.85,"aug":15.87,"sep":16.61,"h1":92.46},{"line":"Power & fuel (fixed)","apr":5.58,"may":5.88,"jun":5.56,"jul":5.53,"aug":7.21,"sep":7.25,"h1":37.01},{"line":"Selling expenses","apr":0,"may":0,"jun":0,"jul":0,"aug":0,"sep":3.22,"h1":3.22},{"line":"Total fixed costs","apr":30.7,"may":30.36,"jun":33.15,"jul":38.75,"aug":36.14,"sep":43.1,"h1":212.2},{"line":"Net profit from operations","apr":-17.64,"may":5.49,"jun":18.13,"jul":19.51,"aug":14.37,"sep":23.74,"h1":63.6},{"line":"Storage facility income","apr":6.89,"may":6.89,"jun":6.89,"jul":6.95,"aug":7.91,"sep":7.39,"h1":42.92},{"line":"EBITDA","apr":-10.75,"may":12.38,"jun":25.02,"jul":26.46,"aug":22.28,"sep":31.13,"h1":106.52},{"line":"PBT","apr":-10.75,"may":12.38,"jun":25.02,"jul":26.46,"aug":22.28,"sep":31.13,"h1":106.52}],"contrib_cust":[{"customer":"Hensley","label":"May","month_no":2,"pouring_mt":0.32,"contribution":0.43,"loss":0.0},{"customer":"Tega","label":"Apr","month_no":1,"pouring_mt":22.48,"contribution":8.58,"loss":3.52},{"customer":"Tega","label":"Aug","month_no":5,"pouring_mt":38.56,"contribution":14.57,"loss":6.32},{"customer":"Tega","label":"Jul","month_no":4,"pouring_mt":74.65,"contribution":33.82,"loss":6.16},{"customer":"Tega","label":"Jun","month_no":3,"pouring_mt":92.14,"contribution":55.89,"loss":5.1},{"customer":"Tega","label":"May","month_no":2,"pouring_mt":88.99,"contribution":45.44,"loss":3.89},{"customer":"Tega","label":"Sep","month_no":6,"pouring_mt":82.62,"contribution":49.48,"loss":6.11},{"customer":"Thejo Engineering","label":"Apr","month_no":1,"pouring_mt":16.61,"contribution":12.38,"loss":0.05},{"customer":"Thejo Engineering","label":"Aug","month_no":5,"pouring_mt":46.58,"contribution":33.41,"loss":0.0},{"customer":"Thejo Engineering","label":"Jul","month_no":4,"pouring_mt":32.12,"contribution":23.23,"loss":0.0},{"customer":"Thejo Engineering","label":"May","month_no":2,"pouring_mt":2.0,"contribution":1.39,"loss":0.0},{"customer":"Thejo Engineering","label":"Sep","month_no":6,"pouring_mt":31.22,"contribution":22.54,"loss":0.03}],"py_monthly":[{"fy":"2025-26","month_no":1,"label":"Apr","net_sales":236.73,"pbt":19.43,"production_mt":136.43,"despatch_mt":112.94},{"fy":"2025-26","month_no":2,"label":"May","net_sales":364.16,"pbt":53.85,"production_mt":136.51,"despatch_mt":163.13},{"fy":"2025-26","month_no":3,"label":"Jun","net_sales":238.11,"pbt":20.71,"production_mt":117.91,"despatch_mt":109.15},{"fy":"2025-26","month_no":4,"label":"Jul","net_sales":248.19,"pbt":18.58,"production_mt":66.14,"despatch_mt":116.85},{"fy":"2025-26","month_no":5,"label":"Aug","net_sales":217.83,"pbt":17.01,"production_mt":118.32,"despatch_mt":98.79},{"fy":"2025-26","month_no":6,"label":"Sep","net_sales":170.98,"pbt":11.21,"production_mt":90.49,"despatch_mt":82},{"fy":"2024-25","month_no":1,"label":"Apr","net_sales":122.88,"pbt":6.45,"production_mt":40.62,"despatch_mt":56.02},{"fy":"2024-25","month_no":2,"label":"May","net_sales":92.55,"pbt":2.65,"production_mt":73.14,"despatch_mt":49.56},{"fy":"2024-25","month_no":3,"label":"Jun","net_sales":171.82,"pbt":2.51,"production_mt":69.12,"despatch_mt":81.16},{"fy":"2024-25","month_no":4,"label":"Jul","net_sales":150.66,"pbt":0.65,"production_mt":85.86,"despatch_mt":74.52},{"fy":"2024-25","month_no":5,"label":"Aug","net_sales":173.4,"pbt":5.73,"production_mt":90.06,"despatch_mt":82.03},{"fy":"2024-25","month_no":6,"label":"Sep","net_sales":152.25,"pbt":-3.39,"production_mt":55.05,"despatch_mt":75.21},{"fy":"2023-24","month_no":1,"label":"Apr","net_sales":190.22,"pbt":11.56,"production_mt":75.11,"despatch_mt":68.03},{"fy":"2023-24","month_no":2,"label":"May","net_sales":154.24,"pbt":4.13,"production_mt":12.03,"despatch_mt":58.52},{"fy":"2023-24","month_no":3,"label":"Jun","net_sales":25.11,"pbt":-24.14,"production_mt":52.1,"despatch_mt":14.31},{"fy":"2023-24","month_no":4,"label":"Jul","net_sales":220.08,"pbt":21.87,"production_mt":112.13,"despatch_mt":99.37},{"fy":"2023-24","month_no":5,"label":"Aug","net_sales":204.74,"pbt":37.93,"production_mt":107.08,"despatch_mt":97.33},{"fy":"2023-24","month_no":6,"label":"Sep","net_sales":209.19,"pbt":39.33,"production_mt":84.64,"despatch_mt":100.89}]};
+</script>
+<script>
+(function () {
+  'use strict';
+  var D = window.DATA;
+  var MONTHS = D.mis_monthly.slice().sort(function (a, b) { return a.month_no - b.month_no; });
+  var FIRST = MONTHS[0].month_no, LAST = MONTHS[MONTHS.length - 1].month_no;
+  var CUSTS = Array.from(new Set(D.contrib_cust.map(function (r) { return r.customer; }))).sort();
+  var COLS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep'];
+  var TOTALS = ['Net sales', 'Net turnover for contribution', 'Total net variable costs', 'Contribution', 'Total fixed costs', 'Net profit from operations', 'EBITDA', 'PBT'];
+  var nf = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var n1 = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var KEY = 'datre-mis-state-v1';
+
+  var state = { from: FIRST, to: LAST, cust: '', tab: 'home', theme: '' };
+  try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv) { for (var k in state) if (sv[k] !== undefined) state[k] = sv[k]; } } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function clamp() {
+    state.from = Math.min(Math.max(+state.from || FIRST, FIRST), LAST);
+    state.to = Math.min(Math.max(+state.to || LAST, FIRST), LAST);
+    if (state.to < state.from) state.to = state.from;
+    if (state.cust && CUSTS.indexOf(state.cust) < 0) state.cust = '';
+  }
+  clamp();
+  function applyTheme() { if (state.theme) document.documentElement.setAttribute('data-theme', state.theme); else document.documentElement.removeAttribute('data-theme'); }
+  applyTheme();
+
+  function sel() { return MONTHS.filter(function (m) { return m.month_no >= state.from && m.month_no <= state.to; }); }
+  function ly(m, k) { var r = D.py_monthly.find(function (x) { return x.fy === '2025-26' && x.month_no === m.month_no; }); return r ? r[k] : null; }
+  function sum(rows, f) { return rows.reduce(function (a, r) { return a + (+f(r) || 0); }, 0); }
+  function pct(v, b) { return b ? ((v - b) / Math.abs(b)) * 100 : null; }
+  function css(n) { return 'var(--' + n + ')'; }
+  function svgEl(tag, attrs, text) { var e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; return e; }
+  function h(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+
+  /* ---------- charts ---------- */
+  function ticks(lo, hi, n) {
+    var span = hi - lo || 1, step = Math.pow(10, Math.floor(Math.log10(span / n))), err = (span / n) / step;
+    step *= err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+    var a = Math.floor(lo / step) * step, z = Math.ceil(hi / step) * step, out = [];
+    for (var v = a; v <= z + step / 2; v += step) out.push(Math.round(v * 1e6) / 1e6);
+    return out;
+  }
+  function textW(svg, strs) {
+    var t = svgEl('text', { 'class': 'tick' }); svg.appendChild(t); var m = 0;
+    strs.forEach(function (s) { t.textContent = s; m = Math.max(m, t.getComputedTextLength()); });
+    svg.removeChild(t); return m;
+  }
+  function frame(host, hgt) {
+    host.replaceChildren();
+    var w = Math.max(240, host.clientWidth || 320);
+    var svg = svgEl('svg', { viewBox: '0 0 ' + w + ' ' + hgt, role: 'img' });
+    host.appendChild(svg); return { svg: svg, w: w };
+  }
+  function yscale(lo, hi, top, bottom) { return function (v) { return bottom - ((v - lo) / (hi - lo || 1)) * (bottom - top); }; }
+  function grid(svg, tk, y, ml, w, mr) {
+    tk.forEach(function (v) {
+      svg.appendChild(svgEl('line', { x1: ml, x2: w - mr, y1: y(v), y2: y(v), stroke: v === 0 ? css('muted') : css('line'), 'stroke-width': 1 }));
+      svg.appendChild(svgEl('text', { 'class': 'tick', x: ml - 6, y: y(v) + 3.5, 'text-anchor': 'end' }, n1.format(v)));
+    });
+  }
+  function readout(host, title, rows) {
+    var r = host.parentNode.querySelector('.readout'); if (!r) return;
+    r.replaceChildren();
+    var t = h('b', '', title); r.appendChild(t);
+    rows.forEach(function (x) {
+      var d = h('div', 'r'); var l = h('span'); if (x.color) { var i = h('i'); i.style.background = x.color; l.appendChild(i); } l.appendChild(document.createTextNode(x.name));
+      d.appendChild(l); d.appendChild(h('span', '', x.val)); r.appendChild(d);
+    });
+  }
+  function grouped(host, cats, series, o) {
+    o = o || {}; var hgt = o.h || 220, f = frame(host, hgt), svg = f.svg, w = f.w;
+    var all = []; series.forEach(function (s) { s.values.forEach(function (v) { if (v !== null && v !== undefined) all.push(v); }); });
+    if (!all.length) { host.appendChild(h('div', 'empty', 'No data for this selection')); return; }
+    var tk = ticks(Math.min(0, Math.min.apply(null, all)), Math.max(0, Math.max.apply(null, all)), 4);
+    var lo = tk[0], hi = tk[tk.length - 1], y = yscale(lo, hi, 8, hgt - 24);
+    var ml = textW(svg, tk.map(function (v) { return n1.format(v); })) + 12, mr = 4;
+    grid(svg, tk, y, ml, w, mr);
+    var band = (w - ml - mr) / cats.length, inner = band * 0.78, bw = inner / series.length - 2;
+    cats.forEach(function (c, ci) {
+      var x0 = ml + ci * band + (band - inner) / 2;
+      series.forEach(function (s, si) {
+        var v = s.values[ci]; if (v === null || v === undefined) return;
+        var top = Math.min(y(v), y(0)), bh = Math.max(1.5, Math.abs(y(v) - y(0)));
+        svg.appendChild(svgEl('rect', { x: x0 + si * (bw + 2), y: top, width: Math.max(2, bw), height: bh, rx: 3, style: 'fill:' + s.color, opacity: o.dim && o.dim(ci) ? 0.45 : 1 }));
+      });
+      svg.appendChild(svgEl('text', { 'class': 'tick', x: ml + ci * band + band / 2, y: hgt - 8, 'text-anchor': 'middle' }, c));
+      var hit = svgEl('rect', { x: ml + ci * band, y: 0, width: band, height: hgt - 18, fill: 'transparent' });
+      hit.addEventListener('pointerdown', function () { readout(host, c, series.map(function (s) { return { color: s.color, name: s.name, val: s.values[ci] == null ? 'n/a' : nf.format(s.values[ci]) }; })); });
+      svg.appendChild(hit);
+    });
+  }
+  function lines(host, cats, series) {
+    var hgt = 220, f = frame(host, hgt), svg = f.svg, w = f.w, all = [];
+    series.forEach(function (s) { s.values.forEach(function (v) { if (v != null) all.push(v); }); });
+    if (!all.length) { host.appendChild(h('div', 'empty', 'No data for this selection')); return; }
+    var tk = ticks(Math.min(0, Math.min.apply(null, all)), Math.max(0, Math.max.apply(null, all)), 4), y = yscale(tk[0], tk[tk.length - 1], 8, hgt - 24);
+    var ml = textW(svg, tk.map(function (v) { return n1.format(v); })) + 12, mr = 10;
+    grid(svg, tk, y, ml, w, mr);
+    var step = (w - ml - mr) / cats.length, xs = cats.map(function (c, i) { return ml + step * (i + 0.5); });
+    series.forEach(function (s) {
+      var d = '', pts = [];
+      cats.forEach(function (c, i) { if (s.values[i] != null) { d += (d ? 'L' : 'M') + xs[i] + ' ' + y(s.values[i]); pts.push(i); } });
+      svg.appendChild(svgEl('path', { d: d, fill: 'none', style: 'stroke:' + s.color, 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+      pts.forEach(function (i) { svg.appendChild(svgEl('circle', { cx: xs[i], cy: y(s.values[i]), r: 4, style: 'fill:' + s.color + ';stroke:var(--panel);stroke-width:2' })); });
+    });
+    cats.forEach(function (c, i) {
+      svg.appendChild(svgEl('text', { 'class': 'tick', x: xs[i], y: hgt - 8, 'text-anchor': 'middle' }, c));
+      var hit = svgEl('rect', { x: xs[i] - step / 2, y: 0, width: step, height: hgt - 18, fill: 'transparent' });
+      hit.addEventListener('pointerdown', function () { readout(host, c, series.map(function (s) { return { color: s.color, name: s.name, val: s.values[i] == null ? 'n/a' : nf.format(s.values[i]) }; })); });
+      svg.appendChild(hit);
+    });
+  }
+  function waterfall(host, rows) {
+    var hgt = 230, f = frame(host, hgt), svg = f.svg, w = f.w, vals = [0];
+    rows.forEach(function (r) { vals.push(r.start, r.end); });
+    var tk = ticks(Math.min.apply(null, vals), Math.max.apply(null, vals), 4), y = yscale(tk[0], tk[tk.length - 1], 18, hgt - 42);
+    var ml = textW(svg, tk.map(function (v) { return n1.format(v); })) + 12, mr = 4;
+    grid(svg, tk, y, ml, w, mr);
+    var band = (w - ml - mr) / rows.length, bw = band * 0.62;
+    rows.forEach(function (r, i) {
+      var x = ml + i * band + (band - bw) / 2, top = Math.min(y(r.start), y(r.end)), bh = Math.max(1.5, Math.abs(y(r.start) - y(r.end)));
+      var fill = r.kind === 'total' ? css('c1') : css('mute');
+      var rect = svgEl('rect', { x: x, y: top, width: bw, height: bh, rx: 3, style: 'fill:' + fill });
+      rect.addEventListener('pointerdown', function () { readout(host, r.step, [{ color: fill, name: r.kind === 'total' ? 'Total' : 'Change', val: nf.format(r.value) }]); });
+      svg.appendChild(rect);
+      svg.appendChild(svgEl('text', { 'class': 'val', x: x + bw / 2, y: top - 4, 'text-anchor': 'middle' }, n1.format(r.value)));
+      var words = r.step.split(' '), lines2 = [''], maxc = Math.max(7, Math.floor(band / 5.6));
+      words.forEach(function (wd) { var cur = lines2[lines2.length - 1]; if ((cur + ' ' + wd).trim().length > maxc) lines2.push(wd); else lines2[lines2.length - 1] = (cur + ' ' + wd).trim(); });
+      lines2.slice(0, 3).forEach(function (ln, li) { svg.appendChild(svgEl('text', { 'class': 'tick', x: x + bw / 2, y: hgt - 26 + li * 11, 'text-anchor': 'middle' }, ln)); });
+    });
+  }
+  function hbars(host, rows, selected) {
+    var rh = 38, hgt = Math.max(90, rows.length * rh + 8), f = frame(host, hgt), svg = f.svg, w = f.w;
+    if (!rows.length) { host.appendChild(h('div', 'empty', 'No data for this selection')); return; }
+    var ml = textW(svg, rows.map(function (r) { return r.customer; })) + 12, mr = 46, max = Math.max.apply(null, rows.map(function (r) { return r.contribution; })) || 1;
+    rows.forEach(function (r, i) {
+      var yy = 6 + i * rh, wd = Math.max(3, (w - ml - mr) * Math.max(r.contribution, 0) / max);
+      var fill = selected ? (r.customer === selected ? css('c1') : css('mute')) : (i === 0 ? css('c1') : css('mute'));
+      svg.appendChild(svgEl('text', { 'class': 'tick', x: ml - 8, y: yy + 16, 'text-anchor': 'end' }, r.customer));
+      var rect = svgEl('rect', { x: ml, y: yy, width: wd, height: 24, rx: 4, style: 'fill:' + fill });
+      svg.appendChild(rect);
+      svg.appendChild(svgEl('text', { 'class': 'val', x: ml + wd + 5, y: yy + 16 }, n1.format(r.contribution)));
+      var hit = svgEl('rect', { x: 0, y: yy - 4, width: w, height: rh, fill: 'transparent' });
+      hit.addEventListener('pointerdown', function () { state.cust = state.cust === r.customer ? '' : r.customer; save(); render(); });
+      svg.appendChild(hit);
+    });
+  }
+  function legend(el, items) { el.replaceChildren(); items.forEach(function (it) { var s = h('span'); var i = h('i'); i.style.background = it.color; s.appendChild(i); s.appendChild(document.createTextNode(it.name)); el.appendChild(s); }); }
+
+  /* ---------- views ---------- */
+  function rangeCust(f, t) {
+    var m = {};
+    D.contrib_cust.forEach(function (r) {
+      if (r.month_no < f || r.month_no > t) return;
+      m[r.customer] = m[r.customer] || { customer: r.customer, contribution: 0, pouring_mt: 0 };
+      m[r.customer].contribution += r.contribution; m[r.customer].pouring_mt += r.pouring_mt;
+    });
+    return Object.keys(m).map(function (k) { return m[k]; }).sort(function (a, b) { return b.contribution - a.contribution; });
+  }
+  function kpi(label, value, delta, note, wide) {
+    var c = h('div', 'kpi' + (wide ? ' wide' : '')); c.appendChild(h('div', 'l', label)); c.appendChild(h('div', 'v', value));
+    var d = h('div', 'd ' + (delta && delta.cls || ''), delta ? delta.text : ''); c.appendChild(d); c.appendChild(h('div', 'n', note)); return c;
+  }
+  function dlt(v, b) { var p = pct(v, b); if (p === null) return null; return { text: (p > 0 ? '+' : '') + p.toFixed(1) + '% vs last year', cls: p > 0 ? 'up' : p < 0 ? 'down' : 'flat' }; }
+
+  function renderHome() {
+    var s = sel(), v = $('#v-home'); v.replaceChildren();
+    var ns = sum(s, function (m) { return m.net_sales; }), ct = sum(s, function (m) { return m.contribution; }), pb = sum(s, function (m) { return m.pbt; }), pr = sum(s, function (m) { return m.production_mt; }), ds = sum(s, function (m) { return m.despatch_mt; });
+    var lns = sum(s, function (m) { return ly(m, 'net_sales'); }), lpb = sum(s, function (m) { return ly(m, 'pbt'); }), lpr = sum(s, function (m) { return ly(m, 'production_mt'); }), lds = sum(s, function (m) { return ly(m, 'despatch_mt'); });
+    var losses = s.filter(function (m) { return m.pbt < 0; }).map(function (m) { return m.label; });
+    var pbp = pct(pb, lpb), nsp = pct(ns, lns), dsp = pct(ds, lds);
+    v.appendChild(h('p', 'take', 'Profit before tax is ' + (pbp < 0 ? 'below' : 'above') + ' the same months last year, with net sales ' + (nsp < 0 ? 'down' : 'up') + ' and despatches ' + (dsp < 0 ? 'down' : 'up') + '. ' + (losses.length === 0 ? 'Every month in this range was profitable.' : losses.length === s.length ? 'Every month in this range made a loss.' : 'Loss months: ' + losses.join(', ') + '.')));
+    var g = h('div', 'kpis');
+    g.appendChild(kpi('Net sales', nf.format(ns), dlt(ns, lns), 'Rs. lakh, ex GST, net of returns', true));
+    g.appendChild(kpi('Profit before tax', nf.format(pb), dlt(pb, lpb), 'Rs. lakh'));
+    g.appendChild(kpi('Contribution', nf.format(ct), { text: ns ? (ct / ns * 100).toFixed(1) + '% of net sales' : '', cls: 'flat' }, 'Rs. lakh'));
+    g.appendChild(kpi('Production', nf.format(pr), dlt(pr, lpr), 'MT, as published'));
+    g.appendChild(kpi('Despatch', nf.format(ds), dlt(ds, lds), 'MT, as published'));
+    v.appendChild(g);
+    var c1 = h('section', 'card'); c1.appendChild(h('h2', '', 'Net sales by month')); c1.appendChild(h('p', 'note', 'Rs. lakh. Tap a month for the figures.'));
+    var l1 = h('div', 'leg'); c1.appendChild(l1); var ch1 = h('div', 'chart'); c1.appendChild(ch1); c1.appendChild(h('div', 'readout', 'Tap a bar.')); v.appendChild(c1);
+    legend(l1, [{ name: '2026-27', color: css('c1') }, { name: '2025-26', color: css('mute') }]);
+    var cats = s.map(function (m) { return m.label; });
+    grouped(ch1, cats, [{ name: '2025-26', color: css('mute'), values: s.map(function (m) { return ly(m, 'net_sales'); }) }, { name: '2026-27', color: css('c1'), values: s.map(function (m) { return m.net_sales; }) }]);
+    var c2 = h('section', 'card'); c2.appendChild(h('h2', '', 'Profit before tax by month')); c2.appendChild(h('p', 'note', 'Rs. lakh. Loss months sit below the zero line.'));
+    var l2 = h('div', 'leg'); c2.appendChild(l2); var ch2 = h('div', 'chart'); c2.appendChild(ch2); c2.appendChild(h('div', 'readout', 'Tap a month.')); v.appendChild(c2);
+    legend(l2, [{ name: '2026-27', color: css('c1') }, { name: '2025-26', color: css('mute') }]);
+    lines(ch2, cats, [{ name: '2025-26', color: css('mute'), values: s.map(function (m) { return ly(m, 'pbt'); }) }, { name: '2026-27', color: css('c1'), values: s.map(function (m) { return m.pbt; }) }]);
+  }
+  function renderTrends() {
+    var s = sel(), v = $('#v-trends'); v.replaceChildren();
+    var c = function (k) { return sum(s, function (m) { return m[k]; }); };
+    var rows = [
+      { step: 'Contribution', start: 0, end: c('contribution'), value: c('contribution'), kind: 'total' },
+      { step: 'Fixed costs', start: c('contribution'), end: c('contribution') - c('fixed_costs'), value: -c('fixed_costs'), kind: 'delta' },
+      { step: 'Net profit from operations', start: 0, end: c('npo'), value: c('npo'), kind: 'total' },
+      { step: 'Storage income', start: c('npo'), end: c('npo') + c('storage'), value: c('storage'), kind: 'delta' },
+      { step: 'PBT', start: 0, end: c('pbt'), value: c('pbt'), kind: 'total' }];
+    var a = h('section', 'card'); a.appendChild(h('h2', '', 'From contribution to PBT')); a.appendChild(h('p', 'note', 'Rs. lakh, selected months. Fixed costs come off, storage income is added back.'));
+    var ca = h('div', 'chart'); a.appendChild(ca); a.appendChild(h('div', 'readout', 'Tap a bar.')); v.appendChild(a); waterfall(ca, rows);
+    var b = h('section', 'card'); b.appendChild(h('h2', '', 'Production and despatch')); b.appendChild(h('p', 'note', 'MT per month. July repeats May in the published MIS, so treat July as unconfirmed.'));
+    var lb = h('div', 'leg'); b.appendChild(lb); var cb = h('div', 'chart'); b.appendChild(cb); b.appendChild(h('div', 'readout', 'Tap a month.')); v.appendChild(b);
+    legend(lb, [{ name: 'Production', color: css('c1') }, { name: 'Despatch', color: css('c2') }]);
+    grouped(cb, s.map(function (m) { return m.label; }), [{ name: 'Production', color: css('c1'), values: s.map(function (m) { return m.production_mt; }) }, { name: 'Despatch', color: css('c2'), values: s.map(function (m) { return m.despatch_mt; }) }], { dim: function (i) { return s[i].label === 'Jul'; } });
+  }
+  function renderCust() {
+    var s = sel(), v = $('#v-cust'); v.replaceChildren();
+    var a = h('section', 'card'); a.appendChild(h('h2', '', 'Contribution by customer')); a.appendChild(h('p', 'note', 'Rs. lakh, selected months, product-wise cost sheet. Tap a bar to pick a customer.'));
+    var ca = h('div', 'chart'); a.appendChild(ca); v.appendChild(a);
+    hbars(ca, rangeCust(state.from, state.to), state.cust);
+    var rows = D.contrib_cust.filter(function (r) { return !state.cust || r.customer === state.cust; });
+    var val = function (m, k) { return sum(rows.filter(function (r) { return r.month_no === m.month_no; }), function (r) { return r[k]; }); };
+    var b = h('section', 'card'); b.appendChild(h('h2', '', 'Contribution by month, ' + (state.cust || 'all customers'))); b.appendChild(h('p', 'note', 'Rs. lakh. The grey bar is contribution lost to in-house rejections.'));
+    var lb = h('div', 'leg'); b.appendChild(lb); var cb = h('div', 'chart'); b.appendChild(cb); b.appendChild(h('div', 'readout', 'Tap a month.')); v.appendChild(b);
+    legend(lb, [{ name: 'Contribution', color: css('c1') }, { name: 'Loss from rejections', color: css('mute') }]);
+    grouped(cb, s.map(function (m) { return m.label; }), [{ name: 'Contribution', color: css('c1'), values: s.map(function (m) { return val(m, 'contribution'); }) }, { name: 'Loss from rejections', color: css('mute'), values: s.map(function (m) { return val(m, 'loss'); }) }]);
+  }
+  function table(head, rows, totalFn) {
+    var w = h('div', 'tw'), t = h('table'), th = h('thead'), tr = h('tr');
+    head.forEach(function (x) { tr.appendChild(h('th', '', x)); }); th.appendChild(tr); t.appendChild(th);
+    var tb = h('tbody');
+    rows.forEach(function (r) {
+      var row = h('tr', totalFn && totalFn(r) ? 'tot' : '');
+      r.forEach(function (c, i) { var td = h('td', typeof c === 'number' && c < 0 ? 'neg' : '', typeof c === 'number' ? nf.format(c) : c); row.appendChild(td); });
+      tb.appendChild(row);
+    });
+    t.appendChild(tb); w.appendChild(t); return w;
+  }
+  function renderPL() {
+    var v = $('#v-pl'); v.replaceChildren();
+    var full = state.from === FIRST && state.to === LAST;
+    var idx = []; COLS.forEach(function (c, i) { if (i + 1 >= state.from && i + 1 <= state.to) idx.push(i); });
+    var head = ['Particulars'].concat(idx.map(function (i) { return MONTHS[i] ? MONTHS[i].label : COLS[i]; }));
+    if (full) head.push('Total');
+    var rows = D.mis_lines.map(function (r) { var o = [r.line]; idx.forEach(function (i) { o.push(r[COLS[i]]); }); if (full) o.push(r.h1); return o; });
+    var c = h('section', 'card'); c.appendChild(h('h2', '', 'Profit and loss, month by month')); c.appendChild(h('p', 'note', 'Rs. lakh, based on sales. Swipe sideways for more months. The total shows when all months are selected.'));
+    c.appendChild(table(head, rows, function (r) { return TOTALS.indexOf(r[0]) >= 0; })); v.appendChild(c);
+  }
+  function renderCheck() {
+    var s = sel(), v = $('#v-check'); v.replaceChildren();
+    var c = h('section', 'card'); c.appendChild(h('h2', '', 'Cross-check with the cost sheet')); c.appendChild(h('p', 'note', 'Pouring MT on the cost sheet is higher than MIS production every month. The gap is unexplained until the definitions are confirmed.'));
+    c.appendChild(table(['Month', 'MIS production', 'Pouring MT', 'Gap'], s.map(function (m) { return [m.label, m.production_mt, m.pouring_mt, Math.round((m.production_mt - m.pouring_mt) * 100) / 100]; }))); v.appendChild(c);
+    var n = h('section', 'card'); n.appendChild(h('h2', '', 'To confirm with HO Accounts'));
+    var ul = h('ul', 'notes');
+    ['July production, despatch and rejection figures repeat May in the published MIS.',
+      'Several HO adjustments (material, stock, job-work) were worked out from the published MIS and need their reasons documented.',
+      'The 0.06 pattern income in July is shown under storage income.',
+      'Transport on sales returns sits in other overheads in June but in selling expenses in September.',
+      'Data is a snapshot of the September 2026 MIS. Replace data.js each month to update the app.'].forEach(function (t) { ul.appendChild(h('li', '', t)); });
+    n.appendChild(ul); v.appendChild(n);
+  }
+  var RENDER = { home: renderHome, trends: renderTrends, cust: renderCust, pl: renderPL, check: renderCheck };
+
+  /* ---------- shell ---------- */
+  function setupFilters() {
+    var f = $('#f-from'), t = $('#f-to'), c = $('#f-cust');
+    [f, t].forEach(function (s) { s.replaceChildren(); MONTHS.forEach(function (m) { s.appendChild(new Option(m.label, m.month_no)); }); });
+    f.value = state.from; t.value = state.to;
+    c.replaceChildren(new Option('All customers', '')); CUSTS.forEach(function (x) { c.appendChild(new Option(x, x)); }); c.value = state.cust;
+    var ch = $('#chips'); ch.replaceChildren();
+    function add(label, a, z) { var b = h('button', '', label); b.type = 'button'; b.setAttribute('aria-pressed', state.from === a && state.to === z ? 'true' : 'false'); b.addEventListener('click', function () { state.from = a; state.to = z; save(); render(); }); ch.appendChild(b); }
+    var nos = MONTHS.map(function (m) { return m.month_no; });
+    for (var q = 0; q < 4; q++) { var a = q * 3 + 1, z = q * 3 + 3; if (nos.indexOf(a) >= 0 && nos.indexOf(z) >= 0) add('Q' + (q + 1), a, z); }
+    add('All months', FIRST, LAST);
+    var s = sel();
+    $('#period').textContent = (s.length === 1 ? s[0].label : s[0].label + ' to ' + s[s.length - 1].label) + ' 2026' + (state.cust ? ' · ' + state.cust : '') + ' · Rs. lakh';
+  }
+  function render() {
+    clamp(); setupFilters();
+    document.querySelectorAll('.view').forEach(function (e) { e.classList.toggle('on', e.id === 'v-' + state.tab); });
+    document.querySelectorAll('nav.tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === state.tab ? 'true' : 'false'); });
+    RENDER[state.tab]();
+  }
+  $('#f-from').addEventListener('change', function (e) { state.from = +e.target.value; if (state.to < state.from) state.to = state.from; save(); render(); });
+  $('#f-to').addEventListener('change', function (e) { state.to = +e.target.value; if (state.from > state.to) state.from = state.to; save(); render(); });
+  $('#f-cust').addEventListener('change', function (e) { state.cust = e.target.value; save(); render(); });
+  $('#f-reset').addEventListener('click', function () { state.from = FIRST; state.to = LAST; state.cust = ''; save(); render(); });
+  document.querySelectorAll('nav.tabs button').forEach(function (b) { b.addEventListener('click', function () { state.tab = b.dataset.tab; save(); render(); window.scrollTo(0, 0); }); });
+  $('#theme').addEventListener('click', function () {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark' || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+    state.theme = dark ? 'light' : 'dark'; applyTheme(); save(); render();
+  });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 150); });
+  render();
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) navigator.serviceWorker.register('sw.js').catch(function () {});
+})();
+</script>
+</body>
+</html>
