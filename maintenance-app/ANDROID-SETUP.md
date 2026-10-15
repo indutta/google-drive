@@ -4,6 +4,13 @@ One-time setup takes about 10 minutes on a PC. After that each technician only
 opens a link in Chrome and adds it to the home screen. It opens full screen like
 an app. Every phone shares the same records, stored in a Google Sheet you own.
 
+## A0. Quickest setup (one file)
+
+1. Open the Google Sheet *Datre Maintenance Desk (data)* in Drive (or any new sheet) → **Extensions → Apps Script**.
+2. In `Code.gs` select all, delete, paste the whole of [`google-apps-script/Datre_App_Code.gs`](google-apps-script/Datre_App_Code.gs). Save.
+3. **Deploy → New deployment → Web app**, Execute as **Me**, Who has access **Anyone** → Deploy → Authorize.
+4. Share the Web app URL on WhatsApp.
+
 ## A. One-time setup (on a PC, signed in as **purchase@datre.com**)
 
 Deploy while signed in as `purchase@datre.com`, so that vendor enquiry mails go
