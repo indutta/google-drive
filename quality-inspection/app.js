@@ -1207,17 +1207,22 @@
   $('#back').addEventListener('click', () => { if (hist.length) { route = hist.pop(); window.scrollTo(0, 0); render(); } });
   $('#stale').addEventListener('click', () => render());
   QI.onChange = (first) => {
-    if (first) { booting = false; render(); if (!QI.me.dept || !QI.me.name) profileModal(); return; }
+    if (first) { booting = false; render(); if (QI.mode === 'shared' && (!QI.me.dept || !QI.me.name)) profileModal(); return; }
     if ($('#dlg').open || $('form.chkform')) { ui.stale = true; $('#stale').hidden = false; } else render();
   };
   QI.onError = (e) => toast('Not saved: ' + ((e && e.code === 'not_writer') || (e && /permission|writer|denied/i.test(e.message || '')) ? 'you have view-only access.' : (e && e.message) || 'connection problem.'), 'bad');
   if (!HOSTED) QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed();
   render();
   if (HOSTED) {
-    Promise.all([window.claude.use('db'), window.claude.use('user'), window.claude.use('downloads')]).then(([db, user, dl]) => {
+    const use = (n) => Promise.race([Promise.resolve().then(() => window.claude.use(n)).catch(() => null), new Promise((r) => setTimeout(() => r(null), 5000))]);
+    const local = (why) => { booting = false; if (QI.mode === 'shared') { QI.detach(); } else { QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); } if (why) toast(why, 'bad'); };
+    (async () => {
+      const db = await use('db');
+      if (!db) return local('Shared data is not available here – working on this device only.');
+      const [user, dl] = await Promise.all([use('user'), use('downloads')]);
       DL = dl;
-      if (db) QI.attach(db, user).catch((e) => { booting = false; QI.mode = 'local'; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); QI.onError(e); }); else { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); }
-    }).catch(() => { booting = false; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); });
+      try { await QI.attach(db, user); } catch (e) { local('Shared data could not be opened – working on this device only.'); }
+    })();
   }
   if (!QI.persistent) toast('Browser storage unavailable – data will not be saved. Use Settings → Backup.', 'bad');
   window.QIApp = { render, demoData };

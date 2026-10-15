@@ -112,23 +112,34 @@
     Object.keys(cur).forEach((k) => delete cur[k]); Object.assign(cur, body);
     return { item: cur, changed: true };
   }
+  let unsubs = [], failed = 0, watchdog = null;
   function listen(path, handler, firstDone) {
     let first = true;
-    DB.collection(path).onSnapshot((snap) => {
+    const un = DB.collection(path).onSnapshot((snap) => {
       let changed = false;
       snap.docChanges().forEach((ch) => { if (handler(ch)) changed = true; });
       if (first) { first = false; firstDone(); } else if (changed) QI.onChange();
-    }, (e) => QI.onError(e));
+    }, (e) => { if (first) { first = false; failed++; firstDone(); } QI.onError(e); });
+    if (typeof un === 'function') unsubs.push(un);
   }
+  /* shared data unreachable (e.g. viewer without database access): fall back to this device so the app still opens */
+  QI.detach = () => {
+    clearTimeout(watchdog); unsubs.forEach((u) => { try { u(); } catch (e) {} }); unsubs = []; DB = null;
+    QI.mode = 'local'; ready = false; QI.ready = false; S = blank();
+    try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
+    QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed();
+    QI.onChange(true);
+  };
   QI.attach = async (db, user) => {
-    DB = db; QI.mode = 'shared'; ready = false; QI.ready = false; S = blank(); synced = {};
+    DB = db; QI.mode = 'shared'; ready = false; QI.ready = false; S = blank(); synced = {}; failed = 0; unsubs = []; clearTimeout(watchdog);
     if (user) {
       try { QI.me.uid = await user.id(); const m = await user.me(); QI.me.name = (m && m.name) || ''; } catch (e) {}
       const w = user.can ? user.can('data.write') : null; QI.me.canWrite = w !== false;
     }
     let pending = 0;
-    const done = () => { if (--pending === 0) { ready = true; QI.ready = true; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); pushDiff(); QI.onChange(true); } };
-    const reg = (path, handler) => { pending++; listen(path, handler, done); };
+    const done = () => { if (--pending === 0) { clearTimeout(watchdog); if (failed >= total) return QI.detach(); ready = true; QI.ready = true; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); pushDiff(); QI.onChange(true); } };
+    let total = 0;
+    const reg = (path, handler) => { pending++; total++; listen(path, handler, done); };
     Object.keys(COLS).forEach((col) => reg(col, (ch) => {
       const body = clone(ch.doc.data() || {}), p = col + '/' + ch.doc.id;
       if (ch.type === 'removed') { const i = S[col].findIndex((x) => x[COLS[col]] === body[COLS[col]]); if (i >= 0) S[col].splice(i, 1); delete synced[p]; return true; }
@@ -164,6 +175,7 @@
       if (QI.me.uid && ch.doc.id === enc(QI.me.uid)) { QI.me.dept = QI.people[ch.doc.id].dept || null; if (QI.people[ch.doc.id].name) QI.me.name = QI.people[ch.doc.id].name; S.settings.inspector = QI.me.name; }
       return true;
     });
+    watchdog = setTimeout(() => { if (!ready) QI.detach(); }, 9000);
   };
   QI.setPerson = (name, dept) => {
     QI.me.name = name; QI.me.dept = dept; S.settings.inspector = name;
