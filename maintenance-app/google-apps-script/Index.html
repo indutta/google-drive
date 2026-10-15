@@ -173,7 +173,8 @@ pre.report{white-space:pre-wrap;background:var(--surface);border:1px solid var(-
 <main id="main"></main>
 <button class="fab noprint" id="fab" type="button">+ Report breakdown</button>
 
-<script>
+<script>/*dmd-iife*/(function(){
+
 /* ======================= REFERENCE DATA (from Datre maintenance files) ======================= */
 // Equipment health & predictive drivers: Datre_Predictive_Maintenance_Mech_Elect_Dashboard.xlsx (Aug-2026)
 // PM checklist items: Datre_PM_Checklist_Critical_Equipment.xlsx (Ref DCL/MAINT/ID/25-26)
@@ -1255,7 +1256,8 @@ if(inFrame){
     });
   })();
 }
-</script>
+
+})();</script>
 
 </body>
 </html>
