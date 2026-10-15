@@ -1,5 +1,8 @@
 # Datre Maintenance Desk
 
+**Team app link (Android, no login):** https://script.google.com/macros/s/AKfycbx5yCShtFjgGFcSc16IuEh3HNHyL_NCfbGsIwIDJIhocGrJp7AWp6M_XkyPpu1i5yqcBA/exec
+
+
 A single-file maintenance app for the Falta foundry. It needs no ChatGPT/Claude
 and no installation. Open `index.html` in Chrome on a phone or PC.
 

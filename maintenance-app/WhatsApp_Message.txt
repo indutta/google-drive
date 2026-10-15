@@ -1,0 +1,16 @@
+*DATRE MAINTENANCE DESK – new app for the maintenance team* 🛠️
+
+Open this link on your Android phone:
+https://script.google.com/macros/s/AKfycbx5yCShtFjgGFcSc16IuEh3HNHyL_NCfbGsIwIDJIhocGrJp7AWp6M_XkyPpu1i5yqcBA/exec
+
+No login or password needed.
+
+*First time only:*
+1️⃣ If it opens inside WhatsApp, tap ⋮ → *Open in Chrome*
+2️⃣ In Chrome tap ⋮ → *Add to Home screen* → Add
+3️⃣ Open the new icon and pick *YOUR NAME* at the top right
+
+*Every shift:* Job Card → tick OK / NOT OK for each check.
+*Machine stopped?* Press the red *Report breakdown* button.
+
+Help: Pallab Haldar (Maintenance Manager)

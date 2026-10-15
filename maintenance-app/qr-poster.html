@@ -1350,7 +1350,7 @@ function draw(){
   x.fillStyle=MUT;x.font='400 30px '+BD;x.fillText('Help: '+($('#help').value||''),110,H-30);
   x.textAlign='right';x.fillText(qr?shortUrl($('#url').value.trim()):'',W-110,H-30);x.textAlign='left';
 }
-function shortUrl(u){try{const p=new URL(u);const s=p.host+p.pathname;return s.length>58?s.slice(0,28)+'…'+s.slice(-26):s}catch(e){return''}}
+function shortUrl(u){try{const p=new URL(u);const s=p.host+p.pathname;return s.length>40?s.slice(0,18)+'…'+s.slice(-12):s}catch(e){return''}}
 function update(){const u=$('#url').value.trim();const m=$('#m');
   if(!u){qr=null;m.className='msg';m.textContent='Waiting for the link. The preview shows where the QR code will go.'}
   else if(!okUrl(u)){qr=null;m.className='msg err';m.textContent='That does not look like a full https:// link. Copy the Web app URL from Apps Script → Deploy.'}
@@ -1364,7 +1364,7 @@ $('#dlq').onclick=()=>{const k=document.createElement('canvas');k.width=k.height
 $('#pr').onclick=()=>window.print();
 $('#url').addEventListener('input',update);$('#help').addEventListener('input',update);
 $('#f').addEventListener('submit',e=>e.preventDefault());
-$('#url').value='https://claude.ai/artifact/RKYnYVS4smYefE71dCaLv8';try{const u=localStorage.getItem('dmd-qr-url');if(u)$('#url').value=u;const h=localStorage.getItem('dmd-qr-help');if(h)$('#help').value=h}catch(e){}
+$('#url').value='https://script.google.com/macros/s/AKfycbx5yCShtFjgGFcSc16IuEh3HNHyL_NCfbGsIwIDJIhocGrJp7AWp6M_XkyPpu1i5yqcBA/exec';try{const u=localStorage.getItem('dmd-qr-url');if(u)$('#url').value=u;const h=localStorage.getItem('dmd-qr-help');if(h)$('#help').value=h}catch(e){}
 update();
 if(document.fonts){Promise.all(['700 150px "Barlow Condensed"','600 40px "IBM Plex Sans"','500 40px "Noto Sans Bengali"','700 40px "Noto Sans Bengali"'].map(f=>document.fonts.load(f,f.includes('Bengali')?'মেশিন':'A').catch(()=>{}))).then(draw);document.fonts.ready.then(draw)}
 </script>
