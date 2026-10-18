@@ -1927,8 +1927,13 @@ window.PLAN = {
   QI.attach = async (db, user) => {
     DB = db; QI.mode = 'shared'; ready = false; QI.ready = false; S = blank(); synced = {}; failed = 0; unsubs = []; clearTimeout(watchdog);
     if (user) {
-      try { QI.me.uid = await user.id(); const m = await user.me(); QI.me.name = (m && m.name) || ''; } catch (e) {}
-      const w = user.can ? user.can('data.write') : null; QI.me.canWrite = w !== false;
+      try { QI.me.uid = await user.id(); } catch (e) {}
+      try { const m = await user.me(); QI.me.name = (m && m.name) || ''; } catch (e) {}
+      QI.me.canWrite = true;                // try the write; a refused save shows a clear message (see QI.onError)
+    }
+    if (!QI.me.uid) {                      // viewers who are not signed in: a stable id for this phone / browser
+      try { QI.me.uid = localStorage.getItem('dcl_qi_uid') || ''; if (!QI.me.uid) { QI.me.uid = 'dev-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('dcl_qi_uid', QI.me.uid); } }
+      catch (e) { QI.me.uid = 'dev-' + Math.random().toString(36).slice(2, 10); }
     }
     let pending = 0;
     const done = () => { if (--pending === 0) { clearTimeout(watchdog); if (failed >= total) return QI.detach(); ready = true; QI.ready = true; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); pushDiff(); QI.onChange(true); } };
