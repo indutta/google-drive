@@ -694,6 +694,15 @@ function vBD(){
 bind.bd=()=>{bindCommon();document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{bdFilter=b.dataset.bf;render()})};
 
 const APP_LINK='https://script.google.com/macros/s/AKfycbx5yCShtFjgGFcSc16IuEh3HNHyL_NCfbGsIwIDJIhocGrJp7AWp6M_XkyPpu1i5yqcBA/exec';
+function waPrompt(text,title){const wa='https://wa.me/?text='+encodeURIComponent(text);
+  try{window.open(wa,'_blank','noopener')}catch(e){}
+  sheet(title,`<div class="form"><p style="margin:0">Saved. Now send it to the <b>maintenance WhatsApp group</b>:</p><a class="btn pri" style="background:#1f9d55;border-color:#1f9d55;font-size:17px;padding:14px;text-align:center" href="${wa}" target="_blank" rel="noopener">Send on WhatsApp</a><p class="small muted" style="margin:0">WhatsApp opens with the details filled in. Pick the group, then tap Send.</p></div>`)}
+function bdUpdateText(b,prev){const m=MBY[b.m]||{n:b.m,a:''};const cl=b.status==='Closed';
+ return [cl?'✅ *BREAKDOWN CLOSED – MACHINE BACK IN SERVICE*':'🔄 *BREAKDOWN UPDATE – '+b.status.toUpperCase()+'*',
+  '*Machine:* '+m.n+(m.a?' ('+m.a+')':''),'*Problem:* '+(b.sym||''),'*Status:* '+(prev||'—')+' → '+b.status,
+  '*Assigned to:* '+(b.assigned||'Not assigned'),b.spares?'*Spares:* '+b.spares:'',b.work?'*Work done:* '+b.work:'',
+  cl&&b.root?'*Root cause:* '+b.root:'',b.stopped?'*Downtime:* '+hrs(bdDur(b))+' h'+(cl?'':' so far'):'*Machine running with defect*',
+  '*Updated by:* '+me()+' · '+fmtDT(Date.now()),'\u200b','Open the app: '+APP_LINK].filter(x=>x!=='').join('\n').replace('\u200b','')}
 function bdAlertText(b){const m=MBY[b.m]||{n:b.m,a:''};return ['🚨 *'+(b.stopped?'BREAKDOWN – MACHINE STOPPED':'DEFECT – MACHINE RUNNING')+'*',
  '*Machine:* '+m.n+(m.a?' ('+m.a+')':''),'*Type:* '+(b.d==='E'?'Electrical':'Mechanical'),'*Problem:* '+(b.sym||''),
  b.desc?'*Details:* '+b.desc:'','*Priority:* '+(b.prio||''),'*Since:* '+fmtDT(b.start||Date.now()),'*Reported by:* '+(b.by||''),
@@ -725,9 +734,8 @@ function newBD(pre){
       put('breakdowns',id,{id,m:mid,d:disc,stopped,sym,desc:$('#bdesc').value.trim(),start:fromInput($('#bst').value)||Date.now(),prio:$('#bpr').value,by:$('#brb').value,assigned:asg,status:asg?'Attending':'Reported',log:[{t:Date.now(),by:me(),s:asg?'Attending':'Reported'}]});
       if(pre.fromTick){const j=S.jobcards[pre.fromTick.jc];if(j){const nj=JSON.parse(JSON.stringify(j));nj.ticks[pre.fromTick.task].raised=id;put('jobcards',j.id,nj)}}
       const wa='https://wa.me/?text='+encodeURIComponent(bdAlertText(S.breakdowns[id]||{m:mid,d:disc,stopped,sym,desc:$('#bdesc').value.trim(),start:Date.now(),prio:$('#bpr').value,by:$('#brb').value,assigned:asg}));
-      try{window.open(wa,'_blank','noopener')}catch(e){}
       closeSheet();toast((stopped?'Breakdown':'Defect')+' reported on '+MBY[mid].n);
-      sheet('Send WhatsApp alert',`<div class="form"><p style="margin:0">Saved. Now send the alert to the <b>maintenance WhatsApp group</b>:</p><a class="btn pri" style="background:#1f9d55;border-color:#1f9d55;font-size:17px;padding:14px;text-align:center" href="${wa}" target="_blank" rel="noopener">Send alert on WhatsApp</a><p class="small muted" style="margin:0">WhatsApp opens with the details filled in. Pick the group, then tap Send.</p></div>`);
+      waPrompt(decodeURIComponent(wa.split('text=')[1]),'Send WhatsApp alert');
     };
   });
 }
@@ -754,7 +762,8 @@ function bdSheet(id){
       Object.assign(nb,{assigned:$('#bas').value,stopped:$('#bstp').value==='1',spares:$('#bsp').value.trim(),work:$('#bwk').value.trim(),root:$('#brc').value,start:fromInput($('#bstart').value)||b.start,end:status==='Closed'?fromInput($('#ben').value):(fromInput($('#ben').value)||null)});
       if(nb.end&&nb.end<nb.start){toast('End time is before start time');return}
       if(status!==b.status){nb.status=status;nb.log=(nb.log||[]).concat({t:Date.now(),by:me(),s:status})}
-      put('breakdowns',id,nb);closeSheet();toast(status==='Closed'?'Closed · downtime '+hrs(bdDur(nb))+' h':'Updated')};
+      const changed=nb.status!==b.status;put('breakdowns',id,nb);closeSheet();toast(status==='Closed'?'Closed · downtime '+hrs(bdDur(nb))+' h':'Updated');
+      if(changed)waPrompt(bdUpdateText(nb,b.status),'Send status update');};
     $('#bsave').onclick=()=>save(false);
     if($('#bclose'))$('#bclose').onclick=()=>save(true);
     if($('#bind'))$('#bind').onclick=()=>srcSheet(null,{item:b.spares,m:b.m,bd:id,prio:b.prio});
