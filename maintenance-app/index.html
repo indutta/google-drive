@@ -693,6 +693,11 @@ function vBD(){
 }
 bind.bd=()=>{bindCommon();document.querySelectorAll('[data-bf]').forEach(b=>b.onclick=()=>{bdFilter=b.dataset.bf;render()})};
 
+const APP_LINK='https://script.google.com/macros/s/AKfycbx5yCShtFjgGFcSc16IuEh3HNHyL_NCfbGsIwIDJIhocGrJp7AWp6M_XkyPpu1i5yqcBA/exec';
+function bdAlertText(b){const m=MBY[b.m]||{n:b.m,a:''};return ['🚨 *'+(b.stopped?'BREAKDOWN – MACHINE STOPPED':'DEFECT – MACHINE RUNNING')+'*',
+ '*Machine:* '+m.n+(m.a?' ('+m.a+')':''),'*Type:* '+(b.d==='E'?'Electrical':'Mechanical'),'*Problem:* '+(b.sym||''),
+ b.desc?'*Details:* '+b.desc:'','*Priority:* '+(b.prio||''),'*Since:* '+fmtDT(b.start||Date.now()),'*Reported by:* '+(b.by||''),
+ '*Assigned to:* '+(b.assigned||'Not assigned'),'','Update status in the app: '+APP_LINK].filter((x,i)=>x!==''||i>8).join('\n')}
 function newBD(pre){
   const mOpts=MACHINES.map(m=>`<option value="${m.id}" ${pre.m===m.id?'selected':''}>${esc(m.n)} — ${m.a}</option>`).join('');
   const techs=team().map(t=>`<option>${esc(t.n)}</option>`).join('');
@@ -719,7 +724,10 @@ function newBD(pre){
       const id=uid('bd');const asg=$('#bas').value;
       put('breakdowns',id,{id,m:mid,d:disc,stopped,sym,desc:$('#bdesc').value.trim(),start:fromInput($('#bst').value)||Date.now(),prio:$('#bpr').value,by:$('#brb').value,assigned:asg,status:asg?'Attending':'Reported',log:[{t:Date.now(),by:me(),s:asg?'Attending':'Reported'}]});
       if(pre.fromTick){const j=S.jobcards[pre.fromTick.jc];if(j){const nj=JSON.parse(JSON.stringify(j));nj.ticks[pre.fromTick.task].raised=id;put('jobcards',j.id,nj)}}
+      const wa='https://wa.me/?text='+encodeURIComponent(bdAlertText(S.breakdowns[id]||{m:mid,d:disc,stopped,sym,desc:$('#bdesc').value.trim(),start:Date.now(),prio:$('#bpr').value,by:$('#brb').value,assigned:asg}));
+      try{window.open(wa,'_blank','noopener')}catch(e){}
       closeSheet();toast((stopped?'Breakdown':'Defect')+' reported on '+MBY[mid].n);
+      sheet('Send WhatsApp alert',`<div class="form"><p style="margin:0">Saved. Now send the alert to the <b>maintenance WhatsApp group</b>:</p><a class="btn pri" style="background:#1f9d55;border-color:#1f9d55;font-size:17px;padding:14px;text-align:center" href="${wa}" target="_blank" rel="noopener">Send alert on WhatsApp</a><p class="small muted" style="margin:0">WhatsApp opens with the details filled in. Pick the group, then tap Send.</p></div>`);
     };
   });
 }
