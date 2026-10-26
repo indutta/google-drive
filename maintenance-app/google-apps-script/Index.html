@@ -53,7 +53,7 @@ nav.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--accent
 @media(max-width:820px){nav.tabs{flex-wrap:wrap;overflow-x:visible;padding:4px 8px 6px;gap:4px}nav.tabs button{padding:7px 10px;font-size:.85rem;border-bottom-width:2px;border-radius:6px}nav.tabs button[aria-selected="true"]{background:color-mix(in srgb,var(--bg) 14%,transparent)}}
 nav.tabs .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--crit);color:#fff;font-size:.7rem;line-height:18px;text-align:center}
 
-main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}.pane{grid-template-columns:minmax(0,1fr)}.pane>*{min-width:0}
 .pane{display:grid;gap:16px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
@@ -174,7 +174,7 @@ pre.report{white-space:pre-wrap;background:var(--surface);border:1px solid var(-
 <button class="fab noprint" id="fab" type="button">+ Report breakdown</button>
 
 <div id="dmd-loading" style="padding:24px;font:15px sans-serif;color:#555">Loading app… please wait</div>
-<script>(function(){var S=["https://cdn.jsdelivr.net/gh/indutta/google-drive@03d77625a24c44e89006900cea0aa6319a75c76b/maintenance-app/app.js", "https://rawcdn.githack.com/indutta/google-drive/03d77625a24c44e89006900cea0aa6319a75c76b/maintenance-app/app.js", "https://cdn.statically.io/gh/indutta/google-drive/03d77625a24c44e89006900cea0aa6319a75c76b/maintenance-app/app.js"],i=0;function next(){if(i>=S.length){var d=document.getElementById('dmd-loading');if(d)d.innerHTML='<b style="color:#b42318">The app could not load.</b> Check mobile data / Wi-Fi and open the link again.';return}var s=document.createElement('script');s.src=S[i++];s.onload=function(){var d=document.getElementById('dmd-loading');if(d)d.remove()};s.onerror=next;document.body.appendChild(s)}next()})();</script>
+<script>(function(){var S=["https://cdn.jsdelivr.net/gh/indutta/google-drive@5fca11b03bd3bf97bd870c55e12a6710e8325460/maintenance-app/app.js", "https://rawcdn.githack.com/indutta/google-drive/5fca11b03bd3bf97bd870c55e12a6710e8325460/maintenance-app/app.js", "https://cdn.statically.io/gh/indutta/google-drive/5fca11b03bd3bf97bd870c55e12a6710e8325460/maintenance-app/app.js"],i=0;function next(){if(i>=S.length){var d=document.getElementById('dmd-loading');if(d)d.innerHTML='<b style="color:#b42318">The app could not load.</b> Check mobile data / Wi-Fi and open the link again.';return}var s=document.createElement('script');s.src=S[i++];s.onload=function(){var d=document.getElementById('dmd-loading');if(d)d.remove()};s.onerror=next;document.body.appendChild(s)}next()})();</script>
 
 </body>
 </html>
