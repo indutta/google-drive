@@ -53,7 +53,7 @@ nav.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--accent
 @media(max-width:820px){nav.tabs{flex-wrap:wrap;overflow-x:visible;padding:4px 8px 6px;gap:4px}nav.tabs button{padding:7px 10px;font-size:.85rem;border-bottom-width:2px;border-radius:6px}nav.tabs button[aria-selected="true"]{background:color-mix(in srgb,var(--bg) 14%,transparent)}}
 nav.tabs .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--crit);color:#fff;font-size:.7rem;line-height:18px;text-align:center}
 
-main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}.pane{grid-template-columns:minmax(0,1fr)}.pane>*{min-width:0}
 .pane{display:grid;gap:16px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
@@ -571,7 +571,7 @@ function vHome(){
   const al=alerts();const open=al.filter(a=>!a.ack),acked=al.filter(a=>a.ack);
   const d=new Date();
   return `<div class="spread"><div><div class="lbl">${DOW[d.getDay()]} · ${fmtD(td)}</div><h2>Plant maintenance today</h2></div>
-   <div class="row noprint"><button class="btn sm" data-go="report">Send daily update</button></div></div>
+   <div class="row noprint"><button class="btn sm" data-go="report">Send daily update</button><button class="btn sm" data-go="dt">Downtime report</button></div></div>
   <div class="kpis">
    <button class="kpi ok" data-go="machines"><span class="lbl">Running</span><span class="v">${c('Running')}</span><span class="small muted">of ${MACHINES.length} machines</span></button>
    <button class="kpi ${c('Breakdown')?'crit':''}" data-go="bd"><span class="lbl">Breakdown</span><span class="v">${c('Breakdown')}</span><span class="small muted">${openBD().length} open job${openBD().length===1?'':'s'}</span></button>
@@ -1109,6 +1109,23 @@ function vVendors(){
 bind.vendors=()=>{bindCommon();const i=$('#vq');if(i)i.oninput=e=>{vQ=e.target.value;render()};const b=$('#vind');if(b)b.onclick=()=>srcSheet(null,{item:vQ.trim().toUpperCase()})};
 
 /* ----- DOWNTIME ----- */
+function dayDT(ds){const s0=parseD(ds).getTime(),s1=s0+864e5,now=Date.now();const out={};
+  Object.values(S.breakdowns).forEach(b=>{if(!b.stopped||!b.start)return;const e=Math.min(b.end||now,s1),s=Math.max(b.start,s0);if(e<=s)return;
+    const o=out[b.m]=out[b.m]||{h:0,bd:[]};o.h+=(e-s)/36e5;o.bd.push(b)});return out}
+function dtReportText(ds){
+  const d=parseD(ds);const dd=dayDT(ds);const ym=ds.slice(0,7);const mt=downtime();const isToday=ds===today();
+  const rows=MACHINES.filter(m=>dd[m.id]).sort((a,b)=>dd[b.id].h-dd[a.id].h);const tot=rows.reduce((a,m)=>a+dd[m.id].h,0);
+  let mtd=0;MACHINES.forEach(m=>mtd+=(mt[m.id]||{})[ym]||0);
+  const L=['📉 *DATRE FALTA — DAILY DOWNTIME REPORT*',DOW[d.getDay()]+', '+fmtD(ds)+(isToday?' (till '+fmtDT(Date.now()).slice(-5)+')':'')+' · by '+me(),'',
+    '*Total downtime:* '+hrs(tot)+' h on '+rows.length+' machine'+(rows.length===1?'':'s'),'*'+MON[d.getMonth()]+' to date:* '+hrs(mtd)+' h (all machines)',''];
+  if(!rows.length)L.push('✅ No machine downtime on this day.');
+  else{L.push('*Machine-wise:*');rows.forEach((m,i)=>{const o=dd[m.id];const md=(mt[m.id]||{})[ym]||0;
+    L.push((i+1)+'. *'+m.n+'* — '+hrs(o.h)+' h'+(o.bd.length>1?' ('+o.bd.length+' stops)':'')+' · month '+hrs(md)+' h');
+    o.bd.forEach(b=>L.push('   ↳ '+(b.d==='E'?'Elec':'Mech')+': '+b.sym+' — '+(b.status==='Closed'?'Closed '+fmtDT(b.end).slice(-5)+(b.root?' ('+b.root+')':''):'*STILL DOWN* · '+b.status)+(b.assigned?' · '+b.assigned:'')))})}
+  const none=MACHINES.filter(m=>!dd[m.id]).length;L.push('','*No downtime:* '+none+' of '+MACHINES.length+' machines');
+  const top=MACHINES.map(m=>[m,(mt[m.id]||{})[ym]||0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(top.length){L.push('','*Top downtime this month:*');top.forEach(([m,h])=>L.push('• '+m.n+' — '+hrs(h)+' h'))}
+  L.push('','Details in the app: '+APP_LINK);return L.join('\n')}
 function vDT(){
   const fy=fyMonths();const dt=downtime();const curYM=today().slice(0,7);
   const tot=fy.map(ym=>MACHINES.reduce((a,m)=>a+((dt[m.id]||{})[ym]||0),0));
@@ -1124,6 +1141,8 @@ function vDT(){
    <line x1="${L}" x2="${W-6}" y1="${yv(histAvg)}" y2="${yv(histAvg)}" stroke="var(--crit)" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${W-8}" y="${yv(histAvg)-5}" text-anchor="end" font-size="11" style="fill:var(--crit)">FY23–26 avg ${histAvg.toFixed(1)} h/month</text></svg>`;
   const ytd=tot.reduce((a,b)=>a+b,0);
   return `<div class="spread"><h2>Machine downtime — FY ${fy[0].slice(0,4)}-${fy[11].slice(2,4)}</h2><div class="row"><button class="btn sm" id="dtcsv">Copy as CSV</button></div></div>
+  <section class="panel" style="min-width:0"><h3 style="margin-top:0">Daily downtime report — machine-wise</h3><div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px"><label class="small">Day <input type="date" id="dtday" value="${dstr(new Date(Date.now()-864e5))}" max="${today()}"></label><a class="btn sm pri" id="dtwa" style="background:#1f9d55;border-color:#1f9d55" href="https://wa.me/?text=${encodeURIComponent(dtReportText(dstr(new Date(Date.now()-864e5))))}" target="_blank" rel="noopener">Send on WhatsApp</a><button class="btn sm" id="dtcp">Copy</button></div>
+  <pre class="report" id="dtpre" style="max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere">${esc(dtReportText(dstr(new Date(Date.now()-864e5))))}</pre><p class="small muted" style="margin:0">Yesterday is selected by default (a full day). Pick today to send the position so far.</p></section>
   <div class="kpis"><div class="kpi"><span class="lbl">FY to date</span><span class="v">${hrs(ytd)}<span class="small muted"> h</span></span><span class="small muted">all machines</span></div>
   <div class="kpi"><span class="lbl">This month</span><span class="v">${hrs(tot[fy.indexOf(curYM)]||0)}<span class="small muted"> h</span></span><span class="small muted">${ymLabel(curYM)}</span></div>
   <div class="kpi"><span class="lbl">Breakdowns this FY</span><span class="v">${Object.values(S.breakdowns).filter(b=>b.stopped&&dstr(new Date(b.start)).slice(0,7)>=fy[0]).length}</span><span class="small muted">machine stopped</span></div></div>
@@ -1138,6 +1157,8 @@ function vDT(){
   <section class="panel"><h3>Maintenance spend FY 2025-26 (₹, for reference)</h3><div class="tblwrap"><table><thead><tr>${['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'].map(x=>`<th class="n">${x}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody><tr>${CONS_FY26.map(v=>`<td class="n">${(v/1e5).toFixed(2)} L</td>`).join('')}<td class="n"><b>${(CONS_FY26.reduce((a,b)=>a+b,0)/1e5).toFixed(2)} L</b></td></tr></tbody></table></div></section>`;
 }
 bind.dt=()=>{bindCommon();
+  const dtUpd=()=>{const ds=$('#dtday').value||today();const t=dtReportText(ds);$('#dtpre').textContent=t;$('#dtwa').href='https://wa.me/?text='+encodeURIComponent(t)};
+  $('#dtday').onchange=dtUpd;$('#dtcp').onclick=()=>copyText(dtReportText($('#dtday').value||today()),'Downtime report copied');
   document.querySelectorAll('[data-dt]').forEach(c=>c.onclick=()=>{const[mid,ym]=c.dataset.dt.split('|');const rid=mid+'_'+ym;const cur=S.dtmanual[rid];const auto=((downtime()[mid]||{})[ym]||0)-(cur?+cur.h:0);
     sheet('Downtime — '+MBY[mid].n,`<form class="form" id="df"><p class="small muted" style="margin:0">${ymLabel(ym)} · from breakdown records: <b>${hrs(auto)} h</b></p>
      <label class="f">Additional hours (manual)<input type="number" id="dh" min="0" step="0.5" value="${cur?cur.h:''}" inputmode="decimal"></label>
