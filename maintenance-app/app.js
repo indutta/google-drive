@@ -506,7 +506,7 @@ const ROOT=['Wear & tear','Lubrication failure','Electrical fault','Hydraulic / 
 let bdFilter='open';
 function bdDur(b){if(!b.start)return 0;return((b.end||Date.now())-b.start)/36e5}
 function bdRow(b){const m=MBY[b.m]||{n:b.m};const sev=b.status==='Closed'?'ok':b.stopped?'crit':'warn';
- return `<div class="item s-${sev}" data-bd="${b.id}" style="cursor:pointer"><span class="stripe"></span><div class="body"><div class="t">${esc(m.n)} <span class="small muted">· ${b.d==='E'?'Elec':'Mech'}</span></div><div class="d">${esc(b.sym)}${b.assigned?' · '+esc(b.assigned):''}</div><div class="d">${fmtDT(b.start)}${b.stopped?' · down '+hrs(bdDur(b))+' h':' · running with defect'}</div></div><span class="pill ${b.status==='Closed'?'p-ok':b.status==='Waiting for spares'?'p-acc':b.stopped?'p-crit':'p-warn'}">${b.status}</span></div>`}
+ return `<div class="item s-${sev}" data-bd="${b.id}" style="cursor:pointer"><span class="stripe"></span><div class="body"><div class="t">${esc(m.n)} <span class="small muted">· ${b.d==='E'?'Elec':'Mech'}</span></div><div class="d">${esc(b.sym)}${b.assigned?' · '+esc(b.assigned):''}</div><div class="d">${fmtDT(b.start)}${b.stopped?' · down '+hrs(bdDur(b))+' h':' · running with defect · no downtime counted'}</div></div><span class="pill ${b.status==='Closed'?'p-ok':b.status==='Waiting for spares'?'p-acc':b.stopped?'p-crit':'p-warn'}">${b.status}</span></div>`}
 function vBD(){
   const all=Object.values(S.breakdowns).sort((a,b)=>b.start-a.start);
   const list=bdFilter==='open'?all.filter(b=>b.status!=='Closed'):bdFilter==='closed'?all.filter(b=>b.status==='Closed'):all;
@@ -538,7 +538,7 @@ function newBD(pre){
   const html=`<form class="form" id="bdf">
    <label class="f">Machine<select id="bm" required><option value="">Select machine…</option>${mOpts}</select></label>
    <div class="two"><div><div class="lbl">Type</div><div class="seg" id="bdd">${[['M','Mechanical'],['E','Electrical']].map(([k,l])=>`<button type="button" aria-pressed="${(pre.d||'M')===k}" data-v="${k}">${l}</button>`).join('')}</div></div>
-   <div><div class="lbl">Is the machine stopped?</div><div class="seg" id="bds">${[['1','Yes — stopped'],['0','No — running']].map(([k,l])=>`<button type="button" aria-pressed="${(pre.stopped===false?'0':'1')===k}" data-v="${k}">${l}</button>`).join('')}</div></div></div>
+   <div><div class="lbl">Is the machine stopped? <span class="muted">(only “stopped” counts as downtime)</span></div><div class="seg" id="bds">${[['1','Yes — stopped'],['0','No — running']].map(([k,l])=>`<button type="button" aria-pressed="${pre.stopped===true&&k==='1'||pre.stopped===false&&k==='0'}" data-v="${k}">${l}</button>`).join('')}</div></div></div>
    <label class="f">Problem<select id="bsym"></select></label>
    <label class="f" id="bsymo" hidden>Describe the problem<input type="text" id="bsymt" placeholder="Short description"></label>
    <label class="f">Details / observation<textarea id="bdesc" placeholder="What happened, readings, location">${esc(pre.desc||'')}</textarea></label>
@@ -548,12 +548,13 @@ function newBD(pre){
    <label class="f">Assign to<select id="bas"><option value="">Not assigned</option>${techs}</select></label></div>
    <button class="btn danger" type="submit">Report now</button></form>`;
   sheet('Report breakdown',html,()=>{
-    let disc=pre.d||'M',stopped=pre.stopped!==false;
+    let disc=pre.d||'M',stopped=typeof pre.stopped==='boolean'?pre.stopped:null;
     const fillSym=()=>{const mid=$('#bm').value;const opts=mid?predOpts(mid,disc).map(o=>o.s):GEN[disc].map(o=>o.s);if(pre.sym&&!opts.includes(pre.sym))opts.unshift(pre.sym);$('#bsym').innerHTML=opts.map(o=>`<option ${o===pre.sym?'selected':''}>${esc(o)}</option>`).join('')+'<option value="__o">Other (type it)</option>';$('#bsymo').hidden=$('#bsym').value!=='__o'};
     fillSym();$('#bm').onchange=fillSym;$('#bsym').onchange=()=>$('#bsymo').hidden=$('#bsym').value!=='__o';
     document.querySelectorAll('#bdd button').forEach(b=>b.onclick=()=>{disc=b.dataset.v;document.querySelectorAll('#bdd button').forEach(x=>x.setAttribute('aria-pressed',x===b));fillSym()});
     document.querySelectorAll('#bds button').forEach(b=>b.onclick=()=>{stopped=b.dataset.v==='1';document.querySelectorAll('#bds button').forEach(x=>x.setAttribute('aria-pressed',x===b))});
     $('#bdf').onsubmit=e=>{e.preventDefault();const mid=$('#bm').value;if(!mid){toast('Pick the machine first');return}
+      if(stopped===null){toast('Answer: is the machine stopped? (Yes / No)');const s=$('#bds');s.style.outline='3px solid var(--crit)';s.style.borderRadius='10px';s.scrollIntoView({block:'center'});return}
       const sym=$('#bsym').value==='__o'?($('#bsymt').value.trim()||'Other'):$('#bsym').value;
       const id=uid('bd');const asg=$('#bas').value;
       put('breakdowns',id,{id,m:mid,d:disc,stopped,sym,desc:$('#bdesc').value.trim(),start:fromInput($('#bst').value)||Date.now(),prio:$('#bpr').value,by:$('#brb').value,assigned:asg,status:asg?'Attending':'Reported',log:[{t:Date.now(),by:me(),s:asg?'Attending':'Reported'}]});
@@ -577,12 +578,16 @@ function bdSheet(id){
    <div class="two"><label class="f">Root cause<select id="brc"><option value="">—</option>${ROOT.map(r=>`<option ${r===b.root?'selected':''}>${r}</option>`).join('')}</select></label>
    <label class="f">End time (when back in service)<input type="datetime-local" id="ben" value="${b.end?nowLocalInput(b.end):''}"></label></div>
    <label class="f">Start time<input type="datetime-local" id="bstart" value="${nowLocalInput(b.start)}"></label>
+   <div id="brunq" hidden style="border:2px solid var(--warn);border-radius:10px;padding:10px 12px"><b>This job is marked “No — running”, so NO downtime will be counted.</b><p class="small" style="margin:4px 0 8px">Was the machine stopped during this breakdown or repair?</p><div class="row"><button type="button" class="btn danger" id="brun1">Yes — it was stopped (count downtime)</button><button type="button" class="btn" id="brun0">No — it kept running</button></div><p class="small muted" style="margin:6px 0 0">If it was stopped only for part of the time, correct the Start time above first.</p></div>
    <div class="row"><button class="btn pri" id="bsave">Save update</button>${b.status!=='Closed'?'<button class="btn" id="bclose">Close — machine back in service</button>':''}${b.spares&&b.status!=='Closed'?'<button class="btn" id="bind">Raise indent for spares</button>':''}<button class="btn ghost" id="bdel">Delete</button></div>
    <div><div class="lbl">History</div><ul class="small muted" style="margin:6px 0;padding-left:18px">${(b.log||[]).map(l=>`<li>${fmtDT(l.t)} · ${esc(l.s)} · ${esc(l.by)}</li>`).join('')}</ul></div></div>`;
   sheet(m.n,html,()=>{
     let status=b.status;
     document.querySelectorAll('#bst button').forEach(x=>x.onclick=()=>{status=x.dataset.v;const ci=BD_ST.indexOf(status);document.querySelectorAll('#bst button').forEach((y,i)=>y.className=i<ci?'past':i===ci?'cur':'');if(status==='Closed'&&!$('#ben').value)$('#ben').value=nowLocalInput()});
-    const save=(close)=>{const nb=JSON.parse(JSON.stringify(b));if(close){status='Closed';if(!$('#ben').value)$('#ben').value=nowLocalInput()}
+    let runOk=false;
+    const save=(close)=>{if((close||status==='Closed')&&$('#bstp').value==='0'&&!runOk){const q=$('#brunq');q.hidden=false;q.scrollIntoView({block:'center'});
+        $('#brun1').onclick=()=>{$('#bstp').value='1';runOk=true;q.hidden=true;save(close)};$('#brun0').onclick=()=>{runOk=true;q.hidden=true;save(close)};return}
+      const nb=JSON.parse(JSON.stringify(b));if(close){status='Closed';if(!$('#ben').value)$('#ben').value=nowLocalInput()}
       if(status==='Closed'&&!$('#brc').value){toast('Pick a root cause before closing');return}
       Object.assign(nb,{assigned:$('#bas').value,stopped:$('#bstp').value==='1',spares:$('#bsp').value.trim(),work:$('#bwk').value.trim(),root:$('#brc').value,start:fromInput($('#bstart').value)||b.start,end:status==='Closed'?fromInput($('#ben').value):(fromInput($('#ben').value)||null)});
       if(nb.end&&nb.end<nb.start){toast('End time is before start time');return}
@@ -947,6 +952,8 @@ function dtReportText(ds){
   else{L.push('*Machine-wise:*');rows.forEach((m,i)=>{const o=dd[m.id];const md=(mt[m.id]||{})[ym]||0;
     L.push((i+1)+'. *'+m.n+'* — '+hrs(o.h)+' h'+(o.bd.length>1?' ('+o.bd.length+' stops)':'')+' · month '+hrs(md)+' h');
     o.bd.forEach(b=>L.push('   ↳ '+(b.d==='E'?'Elec':'Mech')+': '+b.sym+' — '+(b.status==='Closed'?'Closed '+fmtDT(b.end).slice(-5)+(b.root?' ('+b.root+')':''):'*STILL DOWN* · '+b.status)+(b.assigned?' · '+b.assigned:'')))})}
+  const s0=parseD(ds).getTime(),s1=s0+864e5;const run=Object.values(S.breakdowns).filter(x=>!x.stopped&&x.start&&x.start<s1&&(x.end||Date.now())>s0);
+  if(run.length){L.push('','⚠️ *Running with defect — NO downtime counted ('+run.length+'):*');run.forEach(x=>L.push('• '+((MBY[x.m]||{}).n||x.m)+' — '+x.sym+' — '+x.status+' · reported '+fmtDT(x.start)));L.push('_If any of these machines was actually stopped, open the job and set “Machine stopped? = Yes”._')}
   const none=MACHINES.filter(m=>!dd[m.id]).length;L.push('','*No downtime:* '+none+' of '+MACHINES.length+' machines');
   const top=MACHINES.map(m=>[m,(mt[m.id]||{})[ym]||0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
   if(top.length){L.push('','*Top downtime this month:*');top.forEach(([m,h])=>L.push('• '+m.n+' — '+hrs(h)+' h'))}
