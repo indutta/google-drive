@@ -233,9 +233,9 @@ const MACHINES=[
   E:{risk:'HIGH',h:40,drv:'Coil / element ageing',act:'Inspect element supports, coil bushings and panel cooling'}},
  {id:'WQ',n:'Water Quenching Set Up',a:'Heat Treatment',dt:null,spend:31176,
   M:{risk:'HIGH',h:46,drv:'Pump / piping / agitation',act:'Inspect pump, pipe leakage and agitation system after spike'},E:null},
- {id:'CP',n:'Compressor GA37/75',a:'Utilities',dt:null,spend:104601,
-  M:{risk:'MEDIUM',h:55,drv:'Oil separator / filters / bearing',act:'Monthly filters/oil separator; bearing temperature check'},
-  E:{risk:'HIGH',h:47,drv:'Elektronikon controller / motor',act:'Controller alarms + motor bearing/current monitoring'}},
+ {id:'CP',n:'Compressor 55 kW',a:'Utilities',dt:null,spend:0,note:'Almost new; replaced the defunct 75 kW compressor (Oct-26)',
+  M:{risk:'LOW',h:85,drv:'Air/oil filters, oil level, belt / coupling',act:'Daily oil level & condensate drain; service filters and oil at OEM hours'},
+  E:{risk:'LOW',h:85,drv:'Controller alarms / motor current',act:'Log controller alarms and running hours weekly; monthly motor current check'}},
  {id:'TR',n:'Transformer',a:'Utilities',dt:null,spend:21420,M:null,
   E:{risk:'MEDIUM',h:60,drv:'Oil level / silica gel / cooling',act:'Weekly oil/silica gel; monthly fan and connection inspection'}},
  {id:'CT',n:'Cooling Towers',a:'Utilities',dt:null,spend:0,
@@ -344,8 +344,8 @@ const PRED={
  HT5N:{E:[P('Element terminal hot / burnt','Replace element terminal and lugs','HIGH')]},
  HT5O:{E:[P('Element sagging / support broken','Replace element supports and coil bushing','HIGH')]},
  WQ:{M:[P('Pump not delivering / leaking','Check pump seal, impeller and suction strainer','HIGH')]},
- CP:{M:[P('Oil carry-over / high oil consumption','Replace oil separator kit 2901056602','HIGH','Oil separator kit'),P('High discharge temperature','Clean cooler, check oil level and filter','HIGH')],
-     E:[P('Elektronikon alarm / shutdown','Read alarm code; check sensor and controller','HIGH','Elektronikon controller')]},
+ CP:{M:[P('Oil carry-over / high oil consumption','Check oil level; replace oil separator element as per OEM hours','HIGH'),P('High discharge temperature','Clean cooler, check oil level and filter','HIGH'),P('Low air pressure / slow loading','Check air filter, inlet valve and air leaks in line','MEDIUM')],
+     E:[P('Controller alarm / shutdown','Read alarm code; check sensor, wiring and controller','HIGH'),P('Motor tripping / high current','Check supply voltage, starter contacts and motor bearings','HIGH')]},
  TR:{E:[P('Silica gel turned pink','Replace silica gel in breather','MEDIUM','Silica gel'),P('Oil below level mark','Top up transformer oil; check for leak','HIGH'),P('Abnormal temperature','Check cooling fans and loading','HIGH')]},
  CT:{M:[P('Poor cooling / scaling','Descale fill, check fan blades and belt tension','MEDIUM')]},
  GM:{E:[P('Thyristor overheating / frequent trips','Check cooling fan, heat sink and earthing','HIGH')]},
@@ -364,8 +364,6 @@ const CRIT=[
  {k:'b22216',pr:'HIGH',d:'M',m:'E75',n:'Bearing 22216E',spec:'Double roller',min:6,u:'Nos',cost:21528,lead:7,re:/22216/},
  {k:'skkt',pr:'HIGH',d:'E',m:'HT10',n:'Thyristor SKKT330/16E',spec:'Semikron',min:2,u:'Nos',cost:16000,lead:21,re:/SKKT|THYRISTOR/},
  {k:'tcwire',pr:'HIGH',d:'E',m:'HT10',n:'Thermocouple wire Type-K',spec:'30 m per replacement',min:30,u:'Mtr',cost:1260,lead:5,re:/THERMOCOUPLE WIRE|COMPENSAT/},
- {k:'elek',pr:'HIGH',d:'E',m:'CP',n:'Elektronikon controller',spec:'Atlas Copco 1900520002',min:1,u:'Nos',cost:69208,lead:30,re:/ELEKTRONIKON|1900520002/},
- {k:'sepkit',pr:'HIGH',d:'M',m:'CP',n:'Oil separator kit',spec:'Atlas Copco 2901056602',min:1,u:'Set',cost:14180,lead:14,re:/2901056602|SEPARATOR/},
  {k:'silica',pr:'ROUTINE',d:'E',m:'TR',n:'Silica gel',spec:'Breather',min:5,u:'Kg',cost:2500,lead:5,re:/SILICA/}
 ];
 // FY 2025-26 plant maintenance consumption (₹), Apr-25..Mar-26
@@ -1012,7 +1010,7 @@ bind.src=()=>{bindCommon();
   document.querySelectorAll('[data-stg]').forEach(b=>b.onclick=e=>{e.stopPropagation();const s=JSON.parse(JSON.stringify(S.sourcing[b.dataset.stg]));if(s.stage===b.dataset.v)return;
     if(b.dataset.v==='Enquiry sent'&&!s.enq){srcSheet(s.id);toast('Release the indent to send the enquiry');return}
     s.stage=b.dataset.v;s.log=(s.log||[]).concat({t:Date.now(),by:me(),s:s.stage});
-    if(s.stage==='Received'&&s.crit){const c=CRIT.find(x=>x.k===s.crit);toast('Received — update stock of '+c.n+' in Spares')}else toast(s.item+' → '+s.stage);put('sourcing',s.id,s)});
+    const c=s.stage==='Received'&&s.crit?CRIT.find(x=>x.k===s.crit):null;if(c){toast('Received — update stock of '+c.n+' in Spares')}else toast(s.item+' → '+s.stage);put('sourcing',s.id,s)});
 };
 function vendorPicker(item,chosen){
   const mt=vendorMatches(item);if(!mt.vendors.length)return `<div class="empty small">No vendor in the purchase-register list matches “${esc(item)}”. Add a vendor email below.</div>`;
