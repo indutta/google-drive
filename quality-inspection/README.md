@@ -83,3 +83,8 @@ The Dashboard greets the user, offers quick-add buttons, and shows tiles per are
 
 ## Responsible persons (Inspection Flow update)
 The updated `INS_Inspection_Flow.xlsx` adds **Inspector Sign** and **Final Sign of Approval Authority** columns. They are imported into `plan.js` per check, shown on the Inspection plan table, and displayed as "Assigned: …" on the Inspector and Factory Head boxes of each stage's approval strip.
+
+## Daily Production & Inspection
+The app is titled **Daily Production & Inspection** (Datre logo in the header, from `logo.js`).
+**PRODUCTION → Daily plan** shows, for a chosen date, the moulding plan (Stage 2–3), melting heat plan (Stage 4) and a heat treatment plan (Stage 6, editable) with the inspection each plan needs: sand log checks done, furnace log and Stage 4 checks per heat, castings waiting at Stages 5–6.
+**PRODUCTION → Monthly plan & WIP** shows the PPC WIP by customer next to castings tracked in the app by stage, and the October pouring plan against poured quantities. Seed values come from the PPC Daily Performance Report of 26.10.26 and Tamal Mithia's planning set (`ppc.js`).

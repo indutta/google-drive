@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DCL Quality Inspection</title>
+<title>Daily Production & Inspection</title>
 <meta name="theme-color" content="#1f5fbf">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -12,7 +12,7 @@
 </head>
 <body>
 <header class="top">
-  <div class="brandrow"><button id="back" class="back" hidden aria-label="Back">←</button><div class="brand"><b>DATRE</b> <span>Quality Inspection · Casting process</span></div></div>
+  <div class="brandrow"><button id="back" class="back" hidden aria-label="Back">←</button><img id="logo" class="logo" alt="Datre" hidden><div class="brand"><b>Daily Production &amp; Inspection</b> <span>Datre Corporation Limited</span></div></div>
   <span id="sync" class="sync"></span>
   <button id="stale" class="stale" hidden>Updates available – tap to refresh</button>
   <button id="who" class="who" title="Inspector"></button>
@@ -28,6 +28,8 @@
 <script src="mould.js"></script>
 <script src="mplan.js"></script>
 <script src="rm.js"></script>
+<script src="ppc.js"></script>
+<script src="logo.js"></script>
 <script src="app.js"></script>
 <script>if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>

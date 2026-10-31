@@ -100,3 +100,5 @@ dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface)
 .tile.ok{border-left-color:var(--ok)}.tile.warn{border-left-color:var(--warn)}.tile.bad{border-left-color:var(--bad)}
 .bar.lin{grid-template-columns:1fr 3rem;min-width:140px}.bt.warnb i{background:var(--warn)}
 details.card summary{cursor:pointer}
+
+.logo{height:34px;width:auto;border-radius:4px;background:#fff;padding:2px}

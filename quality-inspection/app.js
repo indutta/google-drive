@@ -253,7 +253,7 @@
 
   V.dashboard = () => {
     const s = QI.stats(); const st = S(); const td = today();
-    const intro = st.jobs.length ? '' : `<div class="empty intro"><b>Welcome to the DCL Quality Inspection app.</b><br>No work orders yet. Create a work order, add castings, and follow each one through the 10 inspection stages.${QI.can('create', 'job') ? `<div class="row c"><a class="btn primary" href="#/jobs">Create first work order</a><button class="btn" data-act="demo">Load sample data</button></div>` : '<div class="muted pad">Planning or Quality will create the first work order.</div>'}</div>`;
+    const intro = st.jobs.length ? '' : `<div class="empty intro"><b>Welcome to Daily Production &amp; Inspection.</b><br>No work orders yet. Create a work order, add castings, and follow each one through the 10 inspection stages.${QI.can('create', 'job') ? `<div class="row c"><a class="btn primary" href="#/jobs">Create first work order</a><button class="btn" data-act="demo">Load sample data</button></div>` : '<div class="muted pad">Planning or Quality will create the first work order.</div>'}</div>`;
     const dp = QI.dept();
     const role = QI.mode === 'shared' && dp && dp.approver;
     const toApprove = role ? QI.pending().filter((p) => p.status === role) : null;
@@ -280,7 +280,7 @@
       ${QI.can('create', 'log') ? '<button class="btn" data-act="new-log">+ Sand / calibration log</button>' : ''}
       ${QI.can('rm') ? '<button class="btn" data-act="rm-new">+ Raw material lot</button>' : ''}
       ${QI.can('create', 'job') ? '<button class="btn" data-act="new-job">+ Work order</button>' : ''}
-      <a class="btn" href="#/approvals">Approvals</a>
+      <a class="btn" href="#/ppc">Daily plan</a><a class="btn" href="#/approvals">Approvals</a>
     </div>
     <h3 class="sec">🔥 Melting</h3>
     <div class="tiles">${tile('mplan', planToday, 'Heats planned today')}${tile('melt', heatsToday, 'Heats logged today')}${tile('heats', st.heats.length, 'Heats in total')}${tile('rm', rmWait, 'Raw material lots awaiting decision', rmWait ? 'warn' : '')}</div>
@@ -917,6 +917,65 @@
     if (t.classList.contains('mplsel')) { const o = t.parentNode.querySelector('input[data-other]'); if (t.value === '__other') { o.hidden = false; o.focus(); return; } setPath(ui.mpl.plan, t.dataset.p, t.value); ui.mpl.dirty = true; mplUpdate(); }
   });
 
+  /* ---- Daily production plan (moulding, melting / pouring, heat treatment) synchronised with the inspection plan ---- */
+  const stBadge2 = (s) => s.total ? (s.nok ? badge(`${s.nok} NOT OK`, 'bad') + ' ' : '') + badge(`${s.ok}/${s.total} checks done`, s.ok === s.total && !s.nok ? 'ok' : s.ok ? 'info' : 'warn') : '';
+  function htLoad(date) { const p = QI.htPlan(date); ui.ht = { plan: p ? JSON.parse(JSON.stringify(p)) : QI.htNew(date), dirty: false, saved: !!p }; }
+  V.ppc = () => {
+    if (!ui.ppcDate) ui.ppcDate = today();
+    const date = ui.ppcDate; if (!ui.ht || ui.ht.plan.date !== date) htLoad(date);
+    const x = QI.ppcInspection(date);
+    const mp = x.mould, ml = x.melt;
+    const mould = mp && mp.items.some((i) => i.item) ? table(['Item', 'Heat · moulds'], mp.items.filter((i) => i.item).map((i) => `<tr><td>${esc(i.item)}</td><td>${i.lines.filter((l) => l.heat || l.qty).map((l) => `${esc(l.heat || '–')} × ${esc(l.qty || '–')}`).join(', ') || '–'}</td></tr>`)) : '<div class="muted">No moulding plan for this date. ' + (QI.can('mould') ? '<a href="#/mould">Open moulding log</a>' : '') + '</div>';
+    const sand = x.sand.length ? x.sand.map((s) => `<div class="li">${link('/log/' + s.log.id, 'Sand log · shift ' + s.log.shift)} ${stBadge2(s)}</div>`).join('') : `<div class="warnBox">No sand &amp; calibration log for this date. Stage 2 needs ${x.sandIds} daily / shift checks. <a href="#/logs">Open sand logs</a></div>`;
+    const heats = ml && ml.rows.some((r) => r.heat) ? table(['Heat', 'Items × sub liquid metal', 'Total LM (kg)', 'Nozzle', 'Stage 4 inspection'], ml.rows.filter((r) => r.heat).map((r) => {
+      const h = x.heats.find((y) => y.row === r || y.row.heat === r.heat) || {};
+      return `<tr><td>${link('/heat/' + QI.heatNoFor(r.heat), r.heat)}</td><td class="sm">${r.items.filter((i) => i.item).map((i) => `${esc(i.item)} ${esc(i.n || '')}${i.lmw ? ' × ' + esc(i.lmw) : ''}`).join('<br>')}</td><td>${esc(r.total || QI.mlpRowLM(r) || '–')}</td><td>${esc(r.nozzle || '')}</td><td>${h.log ? link('/meltlog/' + h.heatNo, 'Furnace log') : '<span class="muted">no furnace log</span>'} ${stBadge2(h)}</td></tr>`;
+    })) : '<div class="muted">No melting heat plan for this date. ' + (QI.can('mplan') ? '<a href="#/mplan">Open melting plan</a>' : '') + '</div>';
+    const p = ui.ht.plan;
+    const htRows = p.rows.map((r, i) => `<tr><td><input data-ht="rows.${i}.item" list="ppc-items" value="${esc(r.item)}" placeholder="Item"></td><td><input data-ht="rows.${i}.furnace" value="${esc(r.furnace)}" placeholder="e.g. HT-10"></td><td><input data-ht="rows.${i}.start" type="time" value="${esc(r.start)}"></td><td><input data-ht="rows.${i}.cycle" value="${esc(r.cycle)}" placeholder="e.g. 12 h"></td><td><input data-ht="rows.${i}.weight" type="number" step="any" inputmode="decimal" value="${esc(r.weight)}"></td><td><button class="x" data-act="ht-del" data-i="${i}" aria-label="Remove row">×</button></td></tr>`).join('');
+    const items = QI.mlList ? QI.mlList('mlProduct') : [];
+    const matched = x.htItems.filter((h) => h.castings).length;
+    return `<div class="hd"><div><h2>Daily production plan</h2><div class="muted sm">Plans of each department with the inspection each one needs.</div></div>
+      <label class="f"><span>Date</span><input type="date" data-act="ppc-date" value="${esc(date)}"></label></div>
+    <div class="cols">
+      <section class="card"><h3>Moulding <span class="muted sm">· Stages 2–3</span></h3>${mould}<h5>Sand &amp; calibration (Stage 2)</h5>${sand}<div class="muted sm">Stage 3 mould and core checks are recorded on each casting.</div></section>
+      <section class="card"><h3>Melting &amp; pouring <span class="muted sm">· Stage 4</span></h3>${heats}</section>
+    </div>
+    <section class="card" id="ht"><h3>Heat treatment <span class="muted sm">· Stage 6</span> ${ui.ht.saved ? '' : badge('not saved', 'warn')}</h3>
+      <div class="tw"><table class="cmt"><thead><tr><th>Item</th><th>Furnace</th><th>Start</th><th>Cycle</th><th>Weight (kg)</th><th></th></tr></thead><tbody>${htRows}</tbody></table></div>
+      <datalist id="ppc-items">${items.map((i) => `<option value="${esc(i)}">`).join('')}</datalist>
+      <div class="row"><button class="btn" data-act="ht-add">+ Add row</button><button class="btn primary" data-act="ht-save">Save heat treatment plan</button>${ui.ht.saved ? '<button class="btn danger" data-act="ht-delplan">Delete plan</button>' : ''}</div>
+      <div class="sm muted pad">Inspection: Stage 6 heat cycle check on every casting. ${x.at56} casting(s) are waiting at Stages 5–6 now${matched ? `, ${matched} planned item(s) match castings in the app` : ''}. ${link('/fettle', 'Open fettling & heat treatment')}</div></section>`;
+  };
+  V.wip = () => {
+    const pp = S().settings.ppc || {}; const app = QI.ppcWipApp(); const tot = QI.ppcPlanTotals();
+    const planRows = (pp.plan || []).map((r) => { const pc = r.order ? Math.min(100, r.poured / r.order * 100) : 0; return `<tr><td>${esc(r.customer)}</td><td class="sm">${esc(r.item)}<div class="muted">${esc(r.material)} · ${esc(r.unitWt)} kg</div></td><td>${esc(r.moulds || 0)}</td><td>${esc(r.planKg || 0)}</td><td>${esc(r.order)}</td><td>${esc(r.poured)}</td><td><div class="bar lin"><span class="bt"><i style="width:${pc}%"></i></span><b>${Math.round(pc)}%</b></div></td></tr>`; }).join('');
+    const wipRows = (pp.wip || []).map((r) => {
+      const a = Object.keys(app).filter((k) => QI.ppcCustomerMatch(r.customer, k)).reduce((o, k) => { o.n += app[k].n; o.failing += app[k].failing; Object.keys(app[k].byStage).forEach((s) => (o.st[s] = (o.st[s] || 0) + app[k].byStage[s])); return o; }, { n: 0, failing: 0, st: {} });
+      return `<tr><td>${esc(r.customer)}</td><td>${f2(r.movMT)}</td><td>${f2(r.movLac)}</td><td>${f2(r.nonMT)}</td><td>${f2(num2(r.movMT) + num2(r.nonMT))}</td><td>${a.n ? `${a.n} casting(s) · ` + Object.keys(a.st).sort((m, n) => m - n).map((s) => `S${s}: ${a.st[s]}`).join(' ') + (a.failing ? ' ' + badge(a.failing + ' failing', 'bad') : '') : '<span class="muted">not tracked yet</span>'}</td></tr>`;
+    }).join('');
+    const tm = (pp.wip || []).reduce((o, r) => ({ mov: o.mov + num2(r.movMT), non: o.non + num2(r.nonMT), lac: o.lac + num2(r.movLac) }), { mov: 0, non: 0, lac: 0 });
+    return `<div class="hd"><div><h2>Monthly plan &amp; WIP</h2><div class="muted sm">From the PPC Daily Performance Report as on ${esc(pp.asOn || '–')} and the October pouring plan.</div></div></div>
+    <div class="tiles">${tile('wip', f2(tm.mov, 1) + ' MT', 'Moving WIP in factory (PPC)')}${tile('wip', f2(tm.non, 1) + ' MT', 'Non-moving WIP (PPC)', tm.non > 20 ? 'warn' : '')}${tile('wip', f2(tm.lac, 0) + ' Lac', 'Moving WIP value')}${tile('castings', QI.stats().active, 'Castings tracked in this app')}</div>
+    <section class="card"><h3>Castings on progress by customer</h3>${table(['Customer', 'Moving (MT)', 'Value (Lac)', 'Non-moving (MT)', 'Total (MT)', 'Inspection app (by stage)'], [wipRows])}
+      <div class="muted sm">PPC figures are weights; the app counts individual castings by their current inspection stage (S1–S10). Castings not yet entered as work orders show "not tracked yet".</div></section>
+    <section class="card"><h3>October pouring plan vs poured</h3><div class="muted sm">Planned moulds ${tot.moulds} · planned casting weight ${f2(tot.planKg / 1000, 1)} MT · order qty ${tot.order} · poured ${tot.poured}.</div>
+      ${table(['Customer', 'Item', 'Moulds', 'Plan (kg)', 'Order qty', 'Poured', 'Poured vs order'], [planRows])}
+      <div class="muted sm">Poured quantities are read from the PPC pouring status sheet. Please check them against the original.</div></section>`;
+  };
+  const num2 = (v) => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
+  const PPC_ACTS = {
+    'ppc-date': (el) => { if (!el.value) return; ui.ppcDate = el.value; htLoad(el.value); render(); },
+    'ht-add': () => { ui.ht.plan.rows.push({ item: '', furnace: '', start: '', cycle: '', weight: '' }); ui.ht.dirty = true; render(); },
+    'ht-del': (el) => { ui.ht.plan.rows.splice(+el.dataset.i, 1); if (!ui.ht.plan.rows.length) ui.ht.plan.rows.push({ item: '', furnace: '', start: '', cycle: '', weight: '' }); ui.ht.dirty = true; render(); },
+    'ht-save': () => { if (needInspector()) return; const r = QI.htSave(ui.ht.plan); if (r.error) { toast(r.error, 'bad'); return; } htLoad(ui.ht.plan.date); toast('Heat treatment plan saved', 'ok'); render(); },
+    'ht-delplan': () => ask('Delete the heat treatment plan for this date?', () => { QI.htDelete(ui.ht.plan.date); htLoad(ui.ppcDate); render(); }, 'Delete'),
+  };
+  document.addEventListener('input', (e) => {
+    const t = e.target; if (!t.dataset || !t.dataset.ht || !ui.ht) return;
+    setPath(ui.ht.plan, t.dataset.ht, t.value); ui.ht.dirty = true;
+  });
+
   /* ---- approvals queue ---- */
   V.approvals = () => {
     const list = QI.pending();
@@ -1078,7 +1137,7 @@
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS);
   function download(name, text, type) {
     if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
@@ -1105,7 +1164,7 @@
       if (sl.form.classList.contains('chkform')) liveEval(sl.form);
     }
     const el = e.target; if (!el.dataset || !el.dataset.act) return;
-    if (['applic', 'set-heat', 'set-log', 'import-json', 'maint-limit'].includes(el.dataset.act)) ACT[el.dataset.act](el);
+    if (['applic', 'set-heat', 'set-log', 'import-json', 'maint-limit', 'ppc-date'].includes(el.dataset.act)) ACT[el.dataset.act](el);
   });
   document.addEventListener('input', (e) => {
     const el = e.target;
@@ -1159,6 +1218,7 @@
   /* ================= router ================= */
   const GROUPS = [
     ['home', 'Dashboard', [['dashboard', 'Dashboard']]],
+    ['production', 'PRODUCTION', [['ppc', 'Daily plan'], ['wip', 'Monthly plan & WIP']]],
     ['melting', 'MELTING', [['mplan', 'Melting plan'], ['melt', 'Melting log'], ['heats', 'Heats'], ['rm', 'Raw materials'], ['charge', 'Charge mix']]],
     ['moulding', 'MOULDING', [['mould', 'Moulding log'], ['logs', 'Sand & calibration']]],
     ['fettling', 'FETTLING', [['fettle', 'Fettling & heat treatment']]],
@@ -1167,7 +1227,7 @@
     ['admin', 'Settings', [['settings', 'Settings']]]];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -1201,8 +1261,9 @@
     document.body.classList.toggle('printing', view === 'report');
     if (!open) $('#main').dataset.view = view;
     window.scrollTo(0, y);
-    document.title = 'DCL Quality Inspection';
+    document.title = 'Daily Production & Inspection';
   }
+  if (window.DCL_LOGO) { const lg = $('#logo'); lg.src = window.DCL_LOGO; lg.hidden = false; }
   $('#who').addEventListener('click', () => go('settings'));
   $('#back').addEventListener('click', () => { if (hist.length) { route = hist.pop(); window.scrollTo(0, 0); render(); } });
   $('#stale').addEventListener('click', () => render());
@@ -1211,11 +1272,11 @@
     if ($('#dlg').open || $('form.chkform')) { ui.stale = true; $('#stale').hidden = false; } else render();
   };
   QI.onError = (e) => toast('Not saved: ' + ((e && e.code === 'not_writer') || (e && /permission|writer|denied/i.test(e.message || '')) ? 'you have view-only access.' : (e && e.message) || 'connection problem.'), 'bad');
-  if (!HOSTED) QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed();
+  if (!HOSTED) QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); if (QI.ppcSeed) QI.ppcSeed();
   render();
   if (HOSTED) {
     const use = (n) => Promise.race([Promise.resolve().then(() => window.claude.use(n)).catch(() => null), new Promise((r) => setTimeout(() => r(null), 5000))]);
-    const local = (why) => { booting = false; if (QI.mode === 'shared') { QI.detach(); } else { QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); render(); } if (why) toast(why, 'bad'); };
+    const local = (why) => { booting = false; if (QI.mode === 'shared') { QI.detach(); } else { QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); if (QI.ppcSeed) QI.ppcSeed(); render(); } if (why) toast(why, 'bad'); };
     (async () => {
       const db = await use('db');
       if (!db) return local('Shared data is not available here – working on this device only.');

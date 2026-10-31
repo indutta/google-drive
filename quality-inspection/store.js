@@ -24,7 +24,7 @@
 
   /* ---------- state ---------- */
   const blank = () => ({ v: 1, seq: { ncr: 0, log: 0 }, settings: { inspector: '', overrides: {} },
-    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], mouldPlans: [], meltPlans: [], rmLots: [], results: {}, approvals: {}, ncrs: [] });
+    jobs: [], castings: [], heats: [], logs: [], furnaceLogs: [], mouldPlans: [], meltPlans: [], htPlans: [], rmLots: [], results: {}, approvals: {}, ncrs: [] });
   let S = blank();
   QI.persistent = true;
   try {
@@ -76,6 +76,8 @@
     if (action === 'spec') return d.id === 'melt' || d.id === 'lab';
     if (action === 'charge' || action === 'melt') return d.id === 'melt';
     if (action === 'mould') return d.id === 'sand' || d.id === 'planning';
+    if (action === 'ht') return ['fettle', 'planning', 'qa', 'qcm'].includes(d.id);
+    if (action === 'ppc') return ['planning', 'qa', 'qcm'].includes(d.id);
     if (action === 'mplan') return ['melt', 'planning'].includes(d.id);
     if (action === 'rm') return ['qa', 'qcm', 'lab', 'planning'].includes(d.id);
     if (action === 'rmdecide') return d.id === 'qa' || d.id === 'qcm';
@@ -86,8 +88,8 @@
   let DB = null, ready = true, synced = {}, queue = Promise.resolve();
   QI.ready = true; QI.onChange = () => {}; QI.onError = () => {};
   const enc = (x) => String(x).replace(/[^A-Za-z0-9_\-.~:@+]/g, (c) => '_' + c.charCodeAt(0).toString(16) + '_');
-  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat', mouldPlans: 'date', meltPlans: 'date', rmLots: 'mrn' };
-  const cfgForm = () => ({ rm: S.settings.rm || {}, mould: S.settings.mould || {}, melt: S.settings.melt || {}, charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
+  const COLS = { jobs: 'no', castings: 'id', heats: 'no', logs: 'id', ncrs: 'id', furnaceLogs: 'heat', mouldPlans: 'date', meltPlans: 'date', htPlans: 'date', rmLots: 'mrn' };
+  const cfgForm = () => ({ ppc: S.settings.ppc || {}, rm: S.settings.rm || {}, mould: S.settings.mould || {}, melt: S.settings.melt || {}, charge: S.settings.charge || {}, seeded: S.settings.seeded === true ? 1 : (S.settings.seeded || 0), lists: S.settings.lists || {}, actionCls: S.settings.actionCls || {}, overrides: S.settings.overrides || {} });
   const desired = () => {
     const m = {};
     Object.keys(COLS).forEach((c) => S[c].forEach((x) => (m[c + '/' + enc(x[COLS[c]])] = x)));
@@ -127,7 +129,7 @@
     clearTimeout(watchdog); unsubs.forEach((u) => { try { u(); } catch (e) {} }); unsubs = []; DB = null;
     QI.mode = 'local'; ready = false; QI.ready = false; S = blank();
     try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(blank(), JSON.parse(raw)); } catch (e) {}
-    QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed();
+    QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); if (QI.ppcSeed) QI.ppcSeed();
     QI.onChange(true);
   };
   QI.attach = async (db, user) => {
@@ -142,7 +144,7 @@
       catch (e) { QI.me.uid = 'dev-' + Math.random().toString(36).slice(2, 10); }
     }
     let pending = 0;
-    const done = () => { if (--pending === 0) { clearTimeout(watchdog); if (failed >= total) return QI.detach(); ready = true; QI.ready = true; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); pushDiff(); QI.onChange(true); } };
+    const done = () => { if (--pending === 0) { clearTimeout(watchdog); if (failed >= total) return QI.detach(); ready = true; QI.ready = true; QI.seed(); if (QI.seedCharge) QI.seedCharge(); if (QI.mlSeed) QI.mlSeed(); if (QI.ppcSeed) QI.ppcSeed(); pushDiff(); QI.onChange(true); } };
     let total = 0;
     const reg = (path, handler) => { pending++; total++; listen(path, handler, done); };
     Object.keys(COLS).forEach((col) => reg(col, (ch) => {
@@ -171,7 +173,7 @@
     reg('meta', (ch) => {
       if (ch.doc.id !== 'config' || ch.type === 'removed') return false;
       const b = clone(ch.doc.data() || {}); const before = JSON.stringify(cfgForm());
-      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); if (b.charge && (b.charge.recipes || b.charge.materials)) S.settings.charge = b.charge; if (b.melt && b.melt.specs) S.settings.melt = b.melt; if (b.mould && b.mould.densResin) S.settings.mould = b.mould; if (b.rm && b.rm.specs) S.settings.rm = b.rm; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
+      S.settings.seeded = b.seeded === true ? 1 : (b.seeded || 0); if (b.charge && (b.charge.recipes || b.charge.materials)) S.settings.charge = b.charge; if (b.melt && b.melt.specs) S.settings.melt = b.melt; if (b.mould && b.mould.densResin) S.settings.mould = b.mould; if (b.rm && b.rm.specs) S.settings.rm = b.rm; if (b.ppc && b.ppc.wip) S.settings.ppc = b.ppc; S.settings.lists = b.lists || {}; S.settings.actionCls = b.actionCls || {}; S.settings.overrides = b.overrides || {};
       synced['meta/config'] = JSON.stringify(cfgForm()); return before !== synced['meta/config'];
     });
     reg('people', (ch) => {
