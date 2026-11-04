@@ -1,0 +1,24 @@
+*MAINTENANCE DESK – NEW: Root cause "Other" & Temporary fix* 🛠️
+
+*1. Root cause = "Other"*
+• If you pick *Other*, a box opens.
+• Write the real cause in simple words.
+• The job will not close without it.
+
+*2. Type of repair (when closing a breakdown)*
+• *Permanent* – job fully done. Close as usual.
+• *Temporary* – machine running now, proper repair still to do.
+   ➜ Write the *permanent work still to be done*.
+   ➜ Tap *Close – machine back in service*.
+
+*What the app does for a Temporary fix*
+• The breakdown closes (downtime stops).
+• A new job opens: *PERMANENT REPAIR PENDING* – one priority higher (High ➜ Critical).
+• It stays open until the permanent work is done.
+
+*When you do the permanent repair*
+• Open the *PERMANENT REPAIR PENDING* job.
+• If the machine is stopped for it, set *Machine stopped? = Yes* and correct the Start time.
+• Fill work done ➜ root cause ➜ *Permanent* ➜ Close.
+
+Always send the WhatsApp update when the app asks. 👍
