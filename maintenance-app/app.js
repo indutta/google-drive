@@ -500,6 +500,7 @@ function mSheet(id){
 
 /* ----- BREAKDOWNS ----- */
 const BD_ST=['Reported','Attending','Waiting for spares','Under trial','Closed'];
+const rootOf=b=>b.root==='Other'&&b.rootTxt?'Other: '+b.rootTxt:(b.root||'');
 const ROOT=['Wear & tear','Lubrication failure','Electrical fault','Hydraulic / seal failure','Operator error','Spare quality','Overload','Design / installation','Other'];
 let bdFilter='open';
 function bdDur(b){if(!b.start)return 0;return((b.end||Date.now())-b.start)/36e5}
@@ -524,7 +525,7 @@ function bdUpdateText(b,prev){const m=MBY[b.m]||{n:b.m,a:''};const cl=b.status==
  return [cl?'✅ *BREAKDOWN CLOSED – MACHINE BACK IN SERVICE*':'🔄 *BREAKDOWN UPDATE – '+b.status.toUpperCase()+'*',
   '*Machine:* '+m.n+(m.a?' ('+m.a+')':''),'*Problem:* '+(b.sym||''),'*Status:* '+(prev||'—')+' → '+b.status,
   '*Assigned to:* '+(b.assigned||'Not assigned'),b.spares?'*Spares:* '+b.spares:'',b.work?'*Work done:* '+b.work:'',
-  cl&&b.root?'*Root cause:* '+b.root:'',b.stopped?'*Downtime:* '+hrs(bdDur(b))+' h'+(cl?'':' so far'):'*Machine running with defect*',
+  cl&&b.root?'*Root cause:* '+rootOf(b):'',cl&&b.fix==='T'?'🛠 *TEMPORARY FIX* — permanent repair pending'+(b.pend?': '+b.pend:''):'',b.stopped?'*Downtime:* '+hrs(bdDur(b))+' h'+(cl?'':' so far'):'*Machine running with defect*',
   '*Updated by:* '+me()+' · '+fmtDT(Date.now()),'\u200b','Open the app: '+APP_LINK].filter(x=>x!=='').join('\n').replace('\u200b','')}
 function bdAlertText(b){const m=MBY[b.m]||{n:b.m,a:''};return ['🚨 *'+(b.stopped?'BREAKDOWN – MACHINE STOPPED':'DEFECT – MACHINE RUNNING')+'*',
  '*Machine:* '+m.n+(m.a?' ('+m.a+')':''),'*Type:* '+(b.d==='E'?'Electrical':'Mechanical'),'*Problem:* '+(b.sym||''),
@@ -575,6 +576,11 @@ function bdSheet(id){
    <label class="f">Work done / update<textarea id="bwk">${esc(b.work||'')}</textarea></label>
    <div class="two"><label class="f">Root cause<select id="brc"><option value="">—</option>${ROOT.map(r=>`<option ${r===b.root?'selected':''}>${r}</option>`).join('')}</select></label>
    <label class="f">End time (when back in service)<input type="datetime-local" id="ben" value="${b.end?nowLocalInput(b.end):''}"></label></div>
+   <label class="f" id="brco" ${b.root==='Other'?'':'hidden'}>Root cause — describe (needed for “Other”)<textarea id="brct" placeholder="Explain the actual cause in detail">${esc(b.rootTxt||'')}</textarea></label>
+   <label class="f">Type of repair<select id="bfix"><option value="P" ${b.fix!=='T'?'selected':''}>Permanent — job complete</option><option value="T" ${b.fix==='T'?'selected':''}>Temporary — machine running, permanent repair pending</option></select></label>
+   <label class="f" id="bpendw" ${b.fix==='T'&&!b.followUp?'':'hidden'}>Permanent work still to be done<textarea id="bpend" placeholder="e.g. Replace belt, realign pulleys — needs 4 h shutdown">${esc(b.pend||'')}</textarea><span class="small muted">A new “Permanent repair pending” job is opened at one priority higher.</span></label>
+   ${b.followUp&&S.breakdowns[b.followUp]?`<p class="small" style="margin:0">🛠 Permanent repair job: <b>${esc(S.breakdowns[b.followUp].status)}</b> · ${esc(S.breakdowns[b.followUp].prio||'')}</p>`:''}
+   ${b.parent&&S.breakdowns[b.parent]?`<p class="small" style="margin:0">🛠 Follow-up of temporary fix done ${fmtDT(S.breakdowns[b.parent].end)}: ${esc(S.breakdowns[b.parent].work||S.breakdowns[b.parent].sym)}</p>`:''}
    <label class="f">Start time<input type="datetime-local" id="bstart" value="${nowLocalInput(b.start)}"></label>
    <div id="brunq" hidden style="border:2px solid var(--warn);border-radius:10px;padding:10px 12px"><b>This job is marked “No — running”, so NO downtime will be counted.</b><p class="small" style="margin:4px 0 8px">Was the machine stopped during this breakdown or repair?</p><div class="row"><button type="button" class="btn danger" id="brun1">Yes — it was stopped (count downtime)</button><button type="button" class="btn" id="brun0">No — it kept running</button></div><p class="small muted" style="margin:6px 0 0">If it was stopped only for part of the time, correct the Start time above first.</p></div>
    <div class="row"><button class="btn pri" id="bsave">Save update</button>${b.status!=='Closed'?'<button class="btn" id="bclose">Close — machine back in service</button>':''}${b.spares&&b.status!=='Closed'?'<button class="btn" id="bind">Raise indent for spares</button>':''}<button class="btn ghost" id="bdel">Delete</button></div>
@@ -582,14 +588,22 @@ function bdSheet(id){
   sheet(m.n,html,()=>{
     let status=b.status;
     document.querySelectorAll('#bst button').forEach(x=>x.onclick=()=>{status=x.dataset.v;const ci=BD_ST.indexOf(status);document.querySelectorAll('#bst button').forEach((y,i)=>y.className=i<ci?'past':i===ci?'cur':'');if(status==='Closed'&&!$('#ben').value)$('#ben').value=nowLocalInput()});
+    $('#brc').onchange=()=>{$('#brco').hidden=$('#brc').value!=='Other'};
+    $('#bfix').onchange=()=>{$('#bpendw').hidden=$('#bfix').value!=='T'||!!b.followUp};
     let runOk=false;
     const save=(close)=>{if((close||status==='Closed')&&$('#bstp').value==='0'&&!runOk){const q=$('#brunq');q.hidden=false;q.scrollIntoView({block:'center'});
         $('#brun1').onclick=()=>{$('#bstp').value='1';runOk=true;q.hidden=true;save(close)};$('#brun0').onclick=()=>{runOk=true;q.hidden=true;save(close)};return}
       const nb=JSON.parse(JSON.stringify(b));if(close){status='Closed';if(!$('#ben').value)$('#ben').value=nowLocalInput()}
       if(status==='Closed'&&!$('#brc').value){toast('Pick a root cause before closing');return}
-      Object.assign(nb,{assigned:$('#bas').value,stopped:$('#bstp').value==='1',spares:$('#bsp').value.trim(),work:$('#bwk').value.trim(),root:$('#brc').value,start:fromInput($('#bstart').value)||b.start,end:status==='Closed'?fromInput($('#ben').value):(fromInput($('#ben').value)||null)});
+      if($('#brc').value==='Other'&&!$('#brct').value.trim()){toast('Describe the root cause (Other)');$('#brct').focus();return}
+      const fix=$('#bfix').value,pend=$('#bpend').value.trim();
+      if(status==='Closed'&&fix==='T'&&!b.followUp&&!pend){toast('Write the permanent work still to be done');$('#bpend').focus();return}
+      Object.assign(nb,{assigned:$('#bas').value,stopped:$('#bstp').value==='1',spares:$('#bsp').value.trim(),work:$('#bwk').value.trim(),root:$('#brc').value,rootTxt:$('#brc').value==='Other'?$('#brct').value.trim():'',fix,start:fromInput($('#bstart').value)||b.start,end:status==='Closed'?fromInput($('#ben').value):(fromInput($('#ben').value)||null)});
       if(nb.end&&nb.end<nb.start){toast('End time is before start time');return}
       if(status!==b.status){nb.status=status;nb.log=(nb.log||[]).concat({t:Date.now(),by:me(),s:status})}
+      if(nb.status==='Closed'&&fix==='T'&&!b.followUp){const fid=uid('bd');const up={Low:'Medium',Medium:'High',High:'Critical',Critical:'Critical'}[b.prio]||'High';
+        put('breakdowns',fid,{id:fid,m:b.m,d:b.d,stopped:false,sym:'PERMANENT REPAIR PENDING — '+b.sym,desc:'Temporary fix '+fmtDT(nb.end)+': '+(nb.work||'—')+'\nPermanent work to do: '+pend,start:nb.end||Date.now(),prio:up,by:me(),assigned:nb.assigned,status:'Reported',parent:id,log:[{t:Date.now(),by:me(),s:'Reported — permanent repair after temporary fix'}]});
+        nb.followUp=fid;nb.pend=pend;toast('Permanent repair job opened ('+up+')')}
       const changed=nb.status!==b.status;put('breakdowns',id,nb);closeSheet();toast(status==='Closed'?'Closed · downtime '+hrs(bdDur(nb))+' h':'Updated');
       if(changed)waPrompt(bdUpdateText(nb,b.status),'Send status update');};
     $('#bsave').onclick=()=>save(false);
@@ -949,7 +963,7 @@ function dtReportText(ds){
   if(!rows.length)L.push('✅ No machine downtime on this day.');
   else{L.push('*Machine-wise:*');rows.forEach((m,i)=>{const o=dd[m.id];const md=(mt[m.id]||{})[ym]||0;
     L.push((i+1)+'. *'+m.n+'* — '+hrs(o.h)+' h'+(o.bd.length>1?' ('+o.bd.length+' stops)':'')+' · month '+hrs(md)+' h');
-    o.bd.forEach(b=>L.push('   ↳ '+(b.d==='E'?'Elec':'Mech')+': '+b.sym+' — '+(b.status==='Closed'?'Closed '+fmtDT(b.end).slice(-5)+(b.root?' ('+b.root+')':''):'*STILL DOWN* · '+b.status)+(b.assigned?' · '+b.assigned:'')))})}
+    o.bd.forEach(b=>L.push('   ↳ '+(b.d==='E'?'Elec':'Mech')+': '+b.sym+' — '+(b.status==='Closed'?'Closed '+fmtDT(b.end).slice(-5)+(b.root?' ('+rootOf(b)+')':'')+(b.fix==='T'?' · TEMPORARY FIX':''):'*STILL DOWN* · '+b.status)+(b.assigned?' · '+b.assigned:'')))})}
   const s0=parseD(ds).getTime(),s1=s0+864e5;const run=Object.values(S.breakdowns).filter(x=>!x.stopped&&x.start&&x.start<s1&&(x.end||Date.now())>s0);
   if(run.length){L.push('','⚠️ *Running with defect — NO downtime counted ('+run.length+'):*');run.forEach(x=>L.push('• '+((MBY[x.m]||{}).n||x.m)+' — '+x.sym+' — '+x.status+' · reported '+fmtDT(x.start)));L.push('_If any of these machines was actually stopped, open the job and set “Machine stopped? = Yes”._')}
   const none=MACHINES.filter(m=>!dd[m.id]).length;L.push('','*No downtime:* '+none+' of '+MACHINES.length+' machines');
@@ -1013,7 +1027,7 @@ function reportText(){
   if(!bd.length)L.push('• None');
   bd.forEach(b=>L.push('• '+MBY[b.m].n+' — '+b.sym+' — '+b.status+(b.stopped?' — DOWN '+hrs(bdDur(b))+' h':' — running')+(b.assigned?' — '+b.assigned:'')+(b.spares?' — spares: '+b.spares:'')));
   const closed=Object.values(S.breakdowns).filter(b=>b.status==='Closed'&&b.end&&b.end>Date.now()-864e5);
-  if(closed.length){L.push('');L.push('*Closed in last 24 h:*');closed.forEach(b=>L.push('• '+MBY[b.m].n+' — '+b.sym+' — '+(b.root||'')+(b.stopped?' — '+hrs(bdDur(b))+' h down':'')))}
+  if(closed.length){L.push('');L.push('*Closed in last 24 h:*');closed.forEach(b=>L.push('• '+MBY[b.m].n+' — '+b.sym+' — '+rootOf(b)+(b.fix==='T'?' — TEMPORARY FIX, permanent repair pending':'')+(b.stopped?' — '+hrs(bdDur(b))+' h down':'')))}
   L.push('');L.push('*PM checks:* today '+ps.done+'/'+ps.due+(ps.nok?' ('+ps.nok+' NOT OK)':'')+' · yesterday '+ys.done+'/'+ys.due+(ys.due?' ('+Math.round(ys.done/ys.due*100)+'%)':''));
   L.push('*Downtime:* '+MON[d.getMonth()]+' to date '+hrs(mtd)+' h · FY to date '+hrs(fyt)+' h');
   const low=CRIT.filter(x=>stockOf(x).q<x.min);
