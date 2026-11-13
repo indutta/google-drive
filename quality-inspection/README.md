@@ -91,3 +91,6 @@ The app is titled **Daily Production & Inspection** (Datre logo in the header, f
 
 ## Upload the PPC daily report
 **PRODUCTION → Monthly plan & WIP → Upload PPC report (PDF)** (also under **+ New entry**). The PDF mailed by PPC ("Daily Report as on dd.mm.yy") is read in the phone's browser (`ppcpdf.js` loads pdf.js from cdnjs on first use; `ppcparse.js` reads the text positions). A preview shows the report date, WIP by customer, production figures and the pouring status changes; **Apply** updates the WIP table, the pouring plan (order / poured), the production tiles on the dashboard and an upload history. A report older than the figures in the app shows a warning. Only Planning and Quality can apply. Tested on the reports of 26.10.26 and 12.11.26.
+
+## Version for phones without a Claude account (Google Sheet + Apps Script)
+`gas/` holds `Code.gs` (server: serves the app and stores its data in a Google Sheet), `gasdb.js` (phone side: replaces the shared database with calls to that sheet, polling every 15 s) and `app.html` (the app built for it by `tools/bundle.py`). Steps for the owner are in `gas/SETUP.md`. Tested with a simulated sheet and two simulated phones; not yet against a real Google account.
