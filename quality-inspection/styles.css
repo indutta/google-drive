@@ -112,3 +112,8 @@ details.card summary{cursor:pointer}
 .stickysave{position:sticky;top:calc(env(safe-area-inset-top,0px) + 52px);z-index:4;background:var(--bg);padding:.3rem 0}
 @media(max-width:700px){.quick{display:grid;grid-template-columns:1fr 1fr}.quick .btn{min-height:56px;font-weight:600;text-align:center}main{padding-bottom:6rem}}
 @media print{.fab{display:none!important}}
+
+.homecard{border-left:5px solid var(--accent)}
+.homegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem}
+.home-b{min-height:64px;font-weight:600;text-align:center;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
+.tip{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--infobg);color:var(--info);border-radius:10px;padding:.6rem .8rem;margin-bottom:.8rem}

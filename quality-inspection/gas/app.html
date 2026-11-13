@@ -121,6 +121,11 @@ details.card summary{cursor:pointer}
 @media(max-width:700px){.quick{display:grid;grid-template-columns:1fr 1fr}.quick .btn{min-height:56px;font-weight:600;text-align:center}main{padding-bottom:6rem}}
 @media print{.fab{display:none!important}}
 
+.homecard{border-left:5px solid var(--accent)}
+.homegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem}
+.home-b{min-height:64px;font-weight:600;text-align:center;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
+.tip{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--infobg);color:var(--info);border-radius:10px;padding:.6rem .8rem;margin-bottom:.8rem}
+
 </style>
 </head>
 <body>
@@ -3508,17 +3513,10 @@ window.DCL_LOGO = '';
     const name = (QI.mode === 'shared' ? QI.me.name : st.settings.inspector) || '';
     const todo = (toApprove ? toApprove.length : 0) + (mine ? mine.length : 0);
     return `<div class="hello"><div><h2>${GREET()}${name ? ', ' + esc(name.split(' ')[0]) : ''} 👋</h2><div class="muted">${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${dp ? ' · ' + esc(dp.name) : ''}</div></div>
-      <div class="hello-s">${todo ? `<b class="warnT">${todo}</b> item(s) waiting for you` : due.length || s.openNcr || rmWait ? `<b class="warnT">${due.length + s.openNcr + rmWait}</b> item(s) need attention` : '<b class="okT">All clear ✔</b>'}</div></div>${intro}
+      <div class="hello-s"><button class="btn sm" data-act="share-summary">📤 Share today's summary</button> ${todo ? `<b class="warnT">${todo}</b> item(s) waiting for you` : due.length || s.openNcr || rmWait ? `<b class="warnT">${due.length + s.openNcr + rmWait}</b> item(s) need attention` : '<b class="okT">All clear ✔</b>'}</div></div>${intro}
     ${toApprove ? `<section class="card"><h3>Waiting for your approval <span class="badge warn">${toApprove.length}</span></h3>${toApprove.length ? toApprove.slice(0, 12).map((p) => `<div class="li">${link('/casting/' + p.castings[0], 'Stage ' + p.stageNo + ' · ' + QI.stageOf[p.stageNo].name)} <span class="muted sm">${esc(SCOPE_LABEL[p.scope])} ${esc(p.owner)} · ${p.castings.length} casting(s)</span></div>`).join('') : '<div class="muted">Nothing waiting for you ✔</div>'}</section>` : ''}
     ${mine ? `<section class="card"><h3>Waiting for ${esc(dp.name)} <span class="badge info">${mine.length}</span></h3>${mine.length ? mine.slice(0, 12).map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} <span class="muted sm">${esc(QI.castingState(c).label)}</span></div>`).join('') : '<div class="muted">Nothing waiting for your department ✔</div>'}</section>` : ''}
-    <div class="quick">
-      ${QI.can('melt') ? '<button class="btn primary" data-act="ml-new">+ Melting log</button>' : ''}
-      ${QI.can('mould') ? '<button class="btn primary" data-act="mp-new">+ Moulding plan</button>' : ''}
-      ${QI.can('create', 'log') ? '<button class="btn" data-act="new-log">+ Sand / calibration log</button>' : ''}
-      ${QI.can('rm') ? '<button class="btn" data-act="rm-new">+ Raw material lot</button>' : ''}
-      ${QI.can('create', 'job') ? '<button class="btn" data-act="new-job">+ Work order</button>' : ''}
-      <a class="btn" href="#/ppc">Daily plan</a><a class="btn" href="#/approvals">Approvals</a>
-    </div>
+    ${homeCard(dp, s, due.length)}
     ${(() => { const pk = (st.settings.ppc || {}); const k = pk.kpi; if (!k || !k.gc) return ''; const age = pk.asOn ? Math.floor((Date.now() - new Date(pk.asOn).getTime()) / 864e5) : 0; const mv = (pk.wip || []).reduce((o, r) => o + num2(r.movMT), 0);
       return `<h3 class="sec">🏭 Production <span class="muted sm">· PPC report as on ${esc(pk.asOn)}${age > 2 ? ' ' + badge(age + ' days old', 'warn') : ''}</span></h3><div class="tiles">${tile('wip', f2(k.gc.month, 1) + ' MT', 'Good castings this month (target ' + f2(k.gc.target, 0) + ')')}${k.desp ? tile('wip', f2(k.desp.month, 1) + ' t', 'Despatch this month (target ' + f2(k.desp.target, 0) + ')') : ''}${tile('wip', f2(mv, 1) + ' MT', 'Moving WIP in factory')}${k.yieldPct != null ? tile('wip', f2(k.yieldPct, 1) + ' %', 'Casting yield this month') : ''}</div>`; })()}
     <h3 class="sec">🔥 Melting</h3>
@@ -3541,6 +3539,38 @@ window.DCL_LOGO = '';
       <div><h3>Non-conformances by stage</h3>${QI.stages.map((x) => `<div class="bar"><span class="bl">${x.no}. ${esc(x.name)}</span><span class="bt bad"><i style="width:${s.ncrByStage[x.no] / nmax * 100}%"></i></span><b>${s.ncrByStage[x.no]}</b></div>`).join('')}</div></div></details>`;
   };
 
+  /* ---- "Your work today": the few things each department really does ---- */
+  const HOME = {
+    planning: [['New work order', 'act:new-job'], ['Upload PPC report', 'upload'], ['Monthly plan & WIP', 'go:wip'], ['Melting heat plan', 'act:mpl-new'], ['Moulding plan', 'act:mp-new']],
+    pattern: [['Work orders', 'go:jobs'], ['Castings', 'go:castings']],
+    sand: [['Sand / calibration log', 'act:new-log'], ['Moulding plan', 'act:mp-new'], ['Castings', 'go:castings']],
+    melt: [['Melting log', 'act:ml-new'], ['Melting heat plan', 'act:mpl-new'], ['Raw materials', 'go:rm'], ['Charge mix', 'go:charge']],
+    fettle: [['Heat treatment plan', 'go:ppc'], ['Fettling list', 'go:fettle'], ['Castings', 'go:castings']],
+    lab: [['Castings to test', 'go:castings'], ['Heats', 'go:heats']],
+    mach: [['Castings', 'go:castings']],
+    qa: [['Approvals', 'go:approvals'], ['Open NCRs', 'go:ncr'], ['Castings', 'go:castings'], ['Daily plan', 'go:ppc']],
+    qcm: [['Approvals', 'go:approvals'], ['Open NCRs', 'go:ncr'], ['Castings', 'go:castings'], ['Daily plan', 'go:ppc']],
+    head: [['Approvals', 'go:approvals'], ['Open NCRs', 'go:ncr'], ['Daily plan', 'go:ppc'], ['Monthly plan & WIP', 'go:wip']],
+    mgmt: [['Daily plan', 'go:ppc'], ['Monthly plan & WIP', 'go:wip'], ['Maintenance', 'go:maint']]
+  };
+  const HOME_DEFAULT = [['Melting log', 'act:ml-new'], ['Moulding plan', 'act:mp-new'], ['Sand / calibration log', 'act:new-log'], ['Daily plan', 'go:ppc'], ['Approvals', 'go:approvals'], ['Work order', 'act:new-job']];
+  function homeCard(dp, s, dueN) {
+    const list = (QI.mode === 'shared' && dp && HOME[dp.id]) || HOME_DEFAULT;
+    const badge2 = { 'go:approvals': s.awaiting, 'go:ncr': s.openNcr, 'act:new-log': dueN };
+    const btns = list.filter(([, k]) => { if (k.slice(0, 4) !== 'act:') return true; const p = PERM[k.slice(4)]; return !p || QI.can(p[0], p[1]); })
+      .map(([t, k]) => `<button class="btn big home-b" data-home="${k}">${esc(t)}${badge2[k] ? ` <span class="badge warn">${badge2[k]}</span>` : ''}</button>`).join('');
+    let tip = '';
+    try { if (!localStorage.getItem('dcl_tip_done') && !(window.matchMedia && matchMedia('(display-mode: standalone)').matches)) tip = '<div class="tip"><span>📲 Tip: in Chrome tap ⋮ then <b>Add to Home screen</b> to open this like an app.</span><button class="btn sm" data-act="tip-dismiss">Got it</button></div>'; } catch (e) {}
+    return `${tip}<section class="card homecard"><h3>${dp && QI.mode === 'shared' ? 'Your work today · ' + esc(dp.name) : 'Start here'}</h3><div class="homegrid">${btns}</div></section>`;
+  }
+  function summaryText() {
+    const st = S(), s = QI.stats(), td = today(), pk = st.settings.ppc || {}, k = pk.kpi || {}, f = (v, d) => (v == null || !isFinite(v)) ? '–' : Number(v).toFixed(d == null ? 1 : d);
+    const L = ['DATRE – Daily Production & Inspection', new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), ''];
+    if (k.gc) { L.push(`PPC report as on ${pk.asOn}`, `• Good castings this month: ${f(k.gc.month)} MT (target ${f(k.gc.target, 0)})`); if (k.desp) L.push(`• Despatch this month: ${f(k.desp.month)} t (target ${f(k.desp.target, 0)})`); if (k.yieldPct != null) L.push(`• Yield: ${f(k.yieldPct)} %`); L.push(`• Moving WIP: ${f((pk.wip || []).reduce((o, r) => o + num2(r.movMT), 0))} MT`, ''); }
+    L.push('Today', `• Heats planned: ${st.meltPlans.filter((p) => p.date === td).reduce((n, p) => n + p.rows.filter((r) => r.heat).length, 0)}, logged: ${st.furnaceLogs.filter((l) => l.date === td).length}`, `• Moulding plans: ${st.mouldPlans.filter((p) => p.date === td).length}`, '',
+      'Inspection', `• Castings in process: ${s.active} · released ${s.released} · rejected ${s.rejected}`, `• Waiting for QC / Factory Head: ${s.awaiting}`, `• Open NCRs: ${s.openNcr}`, `• Calibrations / tests due: ${QI.due().length}`);
+    return L.join('\n');
+  }
   /* ---- fettling (stages 5–6) ---- */
   V.fettle = () => {
     const now = stageNowCount([5, 6]);
@@ -4238,6 +4268,11 @@ window.DCL_LOGO = '';
   };
   const num2 = (v) => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
   const PPC_ACTS = {
+    'share-summary': async () => { const text = summaryText();
+      try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+      try { await navigator.clipboard.writeText(text); toast('Summary copied – paste it in WhatsApp', 'ok'); }
+      catch (e) { modal('Today\'s summary', `<textarea rows="14" style="width:100%" readonly onfocus="this.select()">${esc(text)}</textarea><div class="muted sm">Select all and copy.</div>`, () => {}, 'Close'); } },
+    'tip-dismiss': () => { try { localStorage.setItem('dcl_tip_done', '1'); } catch (e) {} render(); },
     'wip-add': (el) => { const k = el.dataset.kind; ui.wip.pp[k].push(k === 'wip' ? { customer: '', movMT: '', movLac: '', nonMT: '', nonLac: '' } : { customer: '', item: '', material: '', unitWt: '', planKg: '', patt: '', moulds: '', order: '', poured: '' }); ui.wip.dirty = true; render(); },
     'wip-del': (el) => { ui.wip.pp[el.dataset.kind].splice(+el.dataset.i, 1); ui.wip.dirty = true; render(); },
     'wip-save': () => { if (!QI.can('ppc')) { toast('Only Planning and Quality can update the PPC figures.', 'bad'); return; }
@@ -4547,6 +4582,11 @@ window.DCL_LOGO = '';
   /* ---- "+ New entry" button: one tap to the entry forms ---- */
   const FAB = [['Melting log (furnace sheet)', 'melt', 'ml-new'], ['Melting heat plan', 'mplan', 'mpl-new'], ['Moulding plan', 'mould', 'mp-new'], ['Sand / calibration log', ['create', 'log'], 'new-log'],
     ['Heat treatment plan', 'ht', '#ppc'], ['Upload PPC report (PDF)', 'ppc', '#wip-upload'], ['PPC WIP / pouring figures', 'ppc', '#wip'], ['Raw material lot', 'rm', 'rm-new'], ['Work order', ['create', 'job'], 'new-job'], ['Inspect a casting', null, '#castings']];
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-home]'); if (!b) return;
+    const k = b.dataset.home;
+    if (k === 'upload') { go('wip'); const fi = $('#ppc-file'); if (fi) fi.click(); } else if (k.slice(0, 3) === 'go:') go(k.slice(3)); else if (k.slice(0, 4) === 'act:' && ACT[k.slice(4)]) ACT[k.slice(4)](b);
+  });
   $('#fab').addEventListener('click', () => {
     $('#fabbtns').innerHTML = FAB.filter((f) => !f[1] || (Array.isArray(f[1]) ? QI.can(f[1][0], f[1][1]) : QI.can(f[1]))).map((f) => `<button class="btn big" data-fab="${f[2]}">${esc(f[0])}</button>`).join('');
     $('#fabsheet').hidden = false;
