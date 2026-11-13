@@ -2888,6 +2888,146 @@ window.PLAN = {
 
 </script>
 <script>
+/* DCL – reads the PPC "Daily Performance Report" (DCL/PPC/05) from the text positions of its PDF pages.
+   Input: pages = [ [ {x, y, w, s}, ... ], ... ] where x = left edge, y = distance from the top, w = width, s = text.
+   Page 1 holds production, despatch and the "Castings on progress in factory" (WIP) table by customer;
+   page 2 holds the pouring status by item.  Works from positions, so wrapped names and empty cells are handled. */
+(function () {
+  'use strict';
+  const NUM = /^-?\(?[\d,]*\.?\d+\)?$/;
+  const isNum = (s) => NUM.test(s) || s === '-';
+  const val = (s) => (s === '-' ? 0 : parseFloat(String(s).replace(/[(),]/g, '')) || 0);
+  const right = (i) => i.x + i.w;
+  const cluster = (items, tol) => {            // group items into lines by y
+    const a = items.slice().sort((p, q) => p.y - q.y || p.x - q.x), out = [];
+    a.forEach((i) => { const l = out[out.length - 1]; if (l && Math.abs(i.y - l.y) <= tol) { l.items.push(i); l.y = (l.y * (l.items.length - 1) + i.y) / l.items.length; } else out.push({ y: i.y, items: [i] }); });
+    out.forEach((l) => l.items.sort((p, q) => p.x - q.x));
+    return out;
+  };
+  const words = (items) => items.slice().sort((p, q) => Math.round(p.y / 3) - Math.round(q.y / 3) || p.x - q.x).map((i) => i.s).join(' ').replace(/\s+/g, ' ').trim();
+
+  function parseDaily(pages) {
+    const warn = [], p1 = pages[0] || [], p2 = pages[1] || [];
+    const has = (p, w) => p.some((i) => i.s === w);
+    if (!has(p1, 'DAILY') || !has(p1, 'PERFORMANCE')) return { error: 'This does not look like the PPC Daily Performance Report.' };
+    const d = p1.filter((i) => /^\d\d\.\d\d\.\d\d$/.test(i.s)).sort((a, b) => a.y - b.y)[0];
+    if (!d) return { error: 'The report date was not found.' };
+    const asOn = '20' + d.s.slice(6, 8) + '-' + d.s.slice(3, 5) + '-' + d.s.slice(0, 2);
+
+    /* ---- WIP by customer (right table of page 1) ---- */
+    const hdr = p1.filter((i) => i.s === 'Customer' && i.y < 80 && i.x > 150).sort((a, b) => a.x - b.x)[0];
+    let wip = [], wipTotal = null;
+    if (!hdr) warn.push('The WIP table was not found on page 1.');
+    else {
+      const xC = hdr.x, yH = hdr.y;
+      const tot = p1.find((i) => i.s === 'TOTAL' && i.x > xC - 15 && i.x < xC + 10 && i.y > yH);
+      const yEnd = tot ? tot.y + 2 : yH + 220;
+      const reg = p1.filter((i) => i.x >= xC - 12 && i.y > yH + 8 && i.y < yEnd + 4);
+      const nums = reg.filter((i) => i.x >= xC + 25 && isNum(i.s));
+      const rows = cluster(nums, 2.2).filter((l) => l.items.length >= 6 && !(tot && Math.abs(l.y - tot.y) < 3));
+      const names = reg.filter((i) => i.x < xC + 25 && !isNum(i.s) && i.y < yEnd - 2);
+      rows.forEach((r) => { r.name = []; });
+      names.forEach((n) => { let best = null; rows.forEach((r) => { const dy = Math.abs(r.y - n.y); if (!best || dy < best.dy) best = { r, dy }; }); if (best && best.dy <= 9) best.r.name.push(n); });
+      rows.forEach((r) => {
+        const v = r.items.slice(-6).map((i) => val(i.s)); const name = words(r.name);
+        if (!name) { warn.push('A WIP row without a customer name was skipped: ' + JSON.stringify(v)); return; }
+        wip.push({ customer: name, movMT: v[0], movLac: v[1], nonMT: v[2], nonLac: v[3], totMT: v[4], totLac: v[5] });
+      });
+      if (tot) { const t = cluster(p1.filter((i) => Math.abs(i.y - tot.y) < 3 && i.x > xC + 25 && isNum(i.s)), 3)[0]; if (t && t.items.length >= 6) wipTotal = t.items.slice(-6).map((i) => val(i.s)); }
+      if (wipTotal) { const s = wip.reduce((a, r) => a + r.totMT, 0); if (Math.abs(s - wipTotal[4]) > 0.06) warn.push(`WIP rows add up to ${s.toFixed(2)} MT but the report total is ${wipTotal[4]} MT. Please check the figures.`); }
+      wip = wip.map((r) => ({ customer: r.customer, movMT: r.movMT, movLac: r.movLac, nonMT: r.nonMT, nonLac: r.nonLac }));
+    }
+
+    /* ---- production and despatch (left table of page 1) ---- */
+    const left = p1.filter((i) => i.x < 200);
+    const rowAt = (y) => left.filter((i) => Math.abs(i.y - y) < 2.5 && isNum(i.s) && i.x > 70).sort((a, b) => a.x - b.x).map((i) => val(i.s));
+    const lab = (a, b) => left.find((i) => i.s === a && i.x < 60 && (!b || left.some((j) => j.s === b && Math.abs(j.y - i.y) < 2.5 && j.x > i.x && j.x < i.x + 40)));
+    const kpi = {};
+    const gc = lab('GC', '(MT)'); if (gc) { const v = rowAt(gc.y); if (v.length >= 6) kpi.gc = { target: v[0], daily: v[1], month: v[2], rate: v[3], year: v[4], value: v[5] }; }
+    const mm = lab('MM', '(Nos)'); if (mm) { const v = rowAt(mm.y); if (v.length >= 4) kpi.mm = { daily: v[v.length - 4], month: v[v.length - 3] }; }
+    const dp = left.find((i) => i.s === '(Ton)' && i.x < 90);
+    if (dp) { const v = rowAt(dp.y); if (v.length >= 5) kpi.desp = { target: v[0], daily: v[1], month: v[2], rate: v[3], year: v[4] }; }
+    const yl = lab('Yield', '(%)'); if (yl) { const v = rowAt(yl.y); if (v.length >= 3) kpi.yieldPct = v[1]; }
+
+    /* ---- pouring status by item (page 2) ---- */
+    const pouring = [];
+    if (!p2.length || !has(p2, 'Pouring')) warn.push('The pouring status page was not found.');
+    else {
+      const hn = p2.filter((i) => (i.s === '(Nos)' || i.s === '(kg/Ton)') && i.y > 75 && i.y < 95).sort((a, b) => a.x - b.x).map(right);
+      const hk = p2.find((i) => i.s === '(kg)' && i.y > 70 && i.y < 95 && i.x > 150 && i.x < 215);
+      if (hn.length < 6 || !hk) warn.push('The pouring status column headings were not recognised.');
+      else {
+        const anchors = [right(hk)].concat(hn.slice(0, 6));            // unit wt, order qty, order wt, plan qty, plan wt, poured qty, poured wt
+        const body = p2.filter((i) => i.y > 100);
+        const num = body.filter((i) => isNum(i.s) && i.x > 150 && i.x < 380);
+        const lines = cluster(num, 2.2).map((l) => {
+          const col = {}; l.items.forEach((i) => { let b = -1, bd = 9; anchors.forEach((a, k) => { const dd = Math.abs(right(i) - a); if (dd < bd) { bd = dd; b = k; } }); if (b >= 0 && col[b] == null) col[b] = val(i.s); });
+          return { y: l.y, col };
+        }).filter((l) => l.col[0] != null && l.col[1] != null && l.col[2] != null);          // an item row has unit wt, order qty and order wt
+        const itemW = body.filter((i) => i.x > 70 && right(i) < 138);
+        const matW = body.filter((i) => !isNum(i.s) && right(i) >= 138 && i.x < 190);
+        const custW = body.filter((i) => !isNum(i.s) && right(i) <= 85 && !/^(Sub|Total|TOTAL|Ltd|Pvt|Engg|India|Ltd\.|Pvt\.|Engg\.)$/.test(i.s));
+        lines.forEach((l) => {
+          const nm = itemW.filter((i) => Math.abs(i.y - l.y) <= 10 && !/^(Sub|Total)$/.test(i.s)).filter((i) => { const own = lines.reduce((b, o) => (Math.abs(o.y - i.y) < Math.abs(b.y - i.y) ? o : b), lines[0]); return own === l; });
+          const item = words(nm); if (!item) return;
+          const mt = words(matW.filter((i) => Math.abs(i.y - l.y) <= 10 && lines.reduce((b, o) => (Math.abs(o.y - i.y) < Math.abs(b.y - i.y) ? o : b), lines[0]) === l));
+          const cw = custW.slice().sort((a, b) => Math.abs(a.y - l.y) - Math.abs(b.y - l.y))[0];
+          pouring.push({ item, material: mt, unitWt: l.col[0], order: l.col[1], plan: l.col[3] || 0, poured: l.col[5] || 0, customer: cw ? cw.s.replace(/\.$/, '') : '' });
+        });
+      }
+    }
+    if (!pouring.length) warn.push('No pouring status rows were read.');
+    return { kind: 'daily', asOn, wip, wipTotal, kpi, pouring, warn };
+  }
+
+  window.PPCPARSE = { parseDaily, cluster, isNum, val };
+})();
+
+</script>
+<script>
+/* DCL – reads a PDF in the browser and returns the position of every word on its first pages (input for ppcparse.js).
+   Uses pdf.js, loaded from cdnjs the first time a PDF is uploaded (internet needed for that one step). */
+(function () {
+  'use strict';
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  let loading = null;
+  function loadLib() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (loading) return loading;
+    loading = new Promise((ok, no) => {
+      const s = document.createElement('script');
+      s.src = PDFJS + 'pdf.min.js';
+      s.onload = () => { if (!window.pdfjsLib) return no(new Error('pdf.js did not start')); window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(window.pdfjsLib); };
+      s.onerror = () => { loading = null; no(new Error('Could not load the PDF reader. Check the internet connection and try again.')); };
+      document.head.appendChild(s);
+    });
+    return loading;
+  }
+  /* one pdf.js text item can hold several words: split it and spread the words over the item's width */
+  function wordsOf(item, height) {
+    const str = item.str; if (!str || !str.trim()) return [];
+    const x0 = item.transform[4], w = item.width || 0, top = height - item.transform[5] - (item.height || Math.abs(item.transform[3]) || 0);
+    const out = []; const re = /\S+/g; let m;
+    while ((m = re.exec(str))) out.push({ x: x0 + w * (m.index / str.length), y: top, w: w * (m[0].length / str.length), s: m[0] });
+    return out;
+  }
+  async function read(buffer, maxPages) {
+    const lib = await loadLib();
+    const pdf = await lib.getDocument({ data: buffer }).promise;
+    const pages = [];
+    for (let n = 1; n <= Math.min(pdf.numPages, maxPages || 4); n++) {
+      const page = await pdf.getPage(n); const vp = page.getViewport({ scale: 1 });
+      const tc = await page.getTextContent(); const items = [];
+      tc.items.forEach((it) => wordsOf(it, vp.height).forEach((w) => items.push(w)));
+      pages.push(items);
+    }
+    return pages;
+  }
+  window.PPCPDF = { read, wordsOf };
+})();
+
+</script>
+<script>
 /* DCL Daily Production & Inspection – PPC data (monthly pouring plan, WIP, heat treatment plan) synchronised with the inspection plan.
    Seed values are copied from the PPC "Daily Performance Report" of 26.10.26 and the "Tentative Pouring Plan October'26" mailed by Tamal Mithia. */
 (function () {
@@ -2970,6 +3110,34 @@ window.PLAN = {
     });
     const at56 = st.castings.filter((c) => { if (c.status !== 'active') return false; const x = QI.castingState(c); return x.stageNo >= 5 && x.stageNo <= 6 && x.label.startsWith('Stage'); }).length;
     return { date, sand, sandIds: sandIds.length, mould: mp, melt: mpl, heats, ht, htItems, at56 };
+  };
+
+
+  /* ---- upload of the PPC Daily Performance Report: compare with the figures in the app, then apply ---- */
+  const nk = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  QI.ppcDiff = (r) => {
+    const pp = S().settings.ppc || { plan: [], wip: [] }, plan = pp.plan || [];
+    const upd = [], add = [];
+    r.pouring.forEach((p) => {
+      const cur = plan.find((x) => nk(x.item) === nk(p.item));
+      if (!cur) add.push(p);
+      else if (num(cur.order) !== num(p.order) || num(cur.poured) !== num(p.poured) || num(cur.unitWt) !== num(p.unitWt)) upd.push({ item: p.item, from: { order: num(cur.order), poured: num(cur.poured) }, to: { order: p.order, poured: p.poured } });
+    });
+    return { upd, add, older: pp.asOn && r.asOn < pp.asOn ? pp.asOn : '' };
+  };
+  QI.ppcApply = (r, fileName) => {
+    if (!QI.can('ppc')) return { error: 'Only Planning and Quality can update the PPC figures.' };
+    const st = S().settings; QI.ppcSeed(); const pp = st.ppc;
+    pp.asOn = r.asOn; pp.wip = r.wip.map((x) => Object.assign({}, x));
+    if (r.kpi && Object.keys(r.kpi).length) pp.kpi = Object.assign({ asOn: r.asOn }, r.kpi);
+    pp.plan = pp.plan || [];
+    r.pouring.forEach((p) => {
+      const cur = pp.plan.find((x) => nk(x.item) === nk(p.item));
+      if (cur) { cur.order = p.order; cur.poured = p.poured; if (p.unitWt) cur.unitWt = p.unitWt; if (!cur.material && p.material) cur.material = p.material; }
+      else pp.plan.push({ customer: p.customer, item: p.item, material: p.material, unitWt: p.unitWt, planKg: 0, patt: '', moulds: 0, order: p.order, poured: p.poured });
+    });
+    pp.history = (pp.history || []).concat([{ ts: Date.now(), by: st.inspector || QI.me.name || '', file: fileName || '', asOn: r.asOn, wip: r.wip.length, pour: r.pouring.length }]).slice(-30);
+    QI.save(); return { ok: true };
   };
 
   /* ---- monthly plan progress ---- */
@@ -3271,6 +3439,8 @@ window.DCL_LOGO = '';
       ${QI.can('create', 'job') ? '<button class="btn" data-act="new-job">+ Work order</button>' : ''}
       <a class="btn" href="#/ppc">Daily plan</a><a class="btn" href="#/approvals">Approvals</a>
     </div>
+    ${(() => { const pk = (st.settings.ppc || {}); const k = pk.kpi; if (!k || !k.gc) return ''; const age = pk.asOn ? Math.floor((Date.now() - new Date(pk.asOn).getTime()) / 864e5) : 0; const mv = (pk.wip || []).reduce((o, r) => o + num2(r.movMT), 0);
+      return `<h3 class="sec">🏭 Production <span class="muted sm">· PPC report as on ${esc(pk.asOn)}${age > 2 ? ' ' + badge(age + ' days old', 'warn') : ''}</span></h3><div class="tiles">${tile('wip', f2(k.gc.month, 1) + ' MT', 'Good castings this month (target ' + f2(k.gc.target, 0) + ')')}${k.desp ? tile('wip', f2(k.desp.month, 1) + ' t', 'Despatch this month (target ' + f2(k.desp.target, 0) + ')') : ''}${tile('wip', f2(mv, 1) + ' MT', 'Moving WIP in factory')}${k.yieldPct != null ? tile('wip', f2(k.yieldPct, 1) + ' %', 'Casting yield this month') : ''}</div>`; })()}
     <h3 class="sec">🔥 Melting</h3>
     <div class="tiles">${tile('mplan', planToday, 'Heats planned today')}${tile('melt', heatsToday, 'Heats logged today')}${tile('heats', st.heats.length, 'Heats in total')}${tile('rm', rmWait, 'Raw material lots awaiting decision', rmWait ? 'warn' : '')}</div>
     <h3 class="sec">🧱 Moulding</h3>
@@ -3936,6 +4106,28 @@ window.DCL_LOGO = '';
       <div class="row"><button class="btn" data-act="ht-add">+ Add row</button><button class="btn primary" data-act="ht-save">Save heat treatment plan</button>${ui.ht.saved ? '<button class="btn danger" data-act="ht-delplan">Delete plan</button>' : ''}</div>
       <div class="sm muted pad">Inspection: Stage 6 heat cycle check on every casting. ${x.at56} casting(s) are waiting at Stages 5–6 now${matched ? `, ${matched} planned item(s) match castings in the app` : ''}. ${link('/fettle', 'Open fettling & heat treatment')}</div></section>`;
   };
+  async function ppcUpload(file) {
+    if (!file) return;
+    if (!QI.can('ppc')) { toast('Only Planning and Quality can update the PPC figures.', 'bad'); return; }
+    toast('Reading ' + file.name + ' …');
+    let r;
+    try { r = PPCPARSE.parseDaily(await PPCPDF.read(await file.arrayBuffer(), 4)); } catch (e) { toast('Could not read this PDF. ' + (e.message || ''), 'bad'); return; }
+    if (r.error) { toast(r.error, 'bad'); return; }
+    const d = QI.ppcDiff(r), k = r.kpi || {};
+    const tot = r.wip.reduce((o, x) => ({ m: o.m + x.movMT, n: o.n + x.nonMT }), { m: 0, n: 0 });
+    const body = `<p><b>Report as on ${esc(fd(new Date(r.asOn).getTime()))}</b> · ${esc(file.name)}</p>
+      ${d.older ? `<div class="warnBox">This report is older than the figures already in the app (${esc(d.older)}).</div>` : ''}
+      ${r.warn.length ? `<div class="warnBox">${r.warn.map(esc).join('<br>')}</div>` : ''}
+      <h5>Castings on progress (WIP)</h5>
+      <div class="tw"><table><thead><tr><th>Customer</th><th>Moving MT</th><th>Non-moving MT</th></tr></thead><tbody>${r.wip.map((x) => `<tr><td>${esc(x.customer)}</td><td>${f2(x.movMT)}</td><td>${f2(x.nonMT)}</td></tr>`).join('')}<tr><td><b>Total</b></td><td><b>${f2(tot.m)}</b></td><td><b>${f2(tot.n)}</b></td></tr></tbody></table></div>
+      ${k.gc ? `<h5>Production</h5><div class="sm">Good castings this month <b>${f2(k.gc.month)} MT</b> (till date), yield ${k.yieldPct != null ? f2(k.yieldPct, 1) + ' %' : '–'}${k.desp ? ` · despatch this month <b>${f2(k.desp.month)} t</b> of ${f2(k.desp.target)} t` : ''}</div>` : ''}
+      <h5>Pouring status</h5><div class="sm">${r.pouring.length} items read · <b>${d.upd.length}</b> changed · <b>${d.add.length}</b> new</div>
+      ${d.upd.length ? `<div class="sm">${d.upd.slice(0, 10).map((u) => `${esc(u.item)}: poured ${u.from.poured} → <b>${u.to.poured}</b>${u.from.order !== u.to.order ? `, order ${u.from.order} → <b>${u.to.order}</b>` : ''}`).join('<br>')}${d.upd.length > 10 ? `<br>+ ${d.upd.length - 10} more` : ''}</div>` : ''}
+      ${d.add.length ? `<div class="sm">New: ${d.add.slice(0, 8).map((p) => esc(p.item)).join(', ')}${d.add.length > 8 ? ' …' : ''}</div>` : ''}`;
+    modal('Update from PPC report', body, () => { const x = QI.ppcApply(r, file.name); if (x.error) return x.error; ui.wip = null; render(); toast('PPC figures updated to ' + r.asOn, 'ok'); }, d.older ? 'Apply anyway' : 'Apply to the app');
+  }
+  document.addEventListener('change', (e) => { const t = e.target; if (t && t.id === 'ppc-file') { const f = t.files && t.files[0]; t.value = ''; ppcUpload(f); } });
+
   function wipLoad() { ui.wip = { pp: JSON.parse(JSON.stringify(S().settings.ppc || { plan: [], wip: [] })), dirty: false }; }
   V.wip = () => {
     if (!ui.wip || (!ui.wip.dirty && JSON.stringify(ui.wip.pp) !== JSON.stringify(S().settings.ppc || { plan: [], wip: [] }))) wipLoad();
@@ -3952,7 +4144,10 @@ window.DCL_LOGO = '';
     const xh = ed ? '<th></th>' : '';
     return `<div class="hd"><div><h2>Monthly plan &amp; WIP</h2><div class="muted sm">${ed ? 'Type the new PPC figures into the boxes, then tap Save.' : 'Figures from the PPC Daily Performance Report.'}</div></div>
       <label class="f"><span>As on date</span>${ed ? `<input type="date" data-wip="asOn" value="${esc(pp.asOn || '')}">` : esc(pp.asOn || '–')}</label></div>
-    ${ed ? `<div class="row stickysave"><button class="btn primary" data-act="wip-save">Save figures</button><span id="wip-dirty" class="badge warn" ${ui.wip.dirty ? '' : 'hidden'}>unsaved changes</span></div>` : ''}
+    ${ed ? `<section class="card upl"><h3>Upload the PPC report</h3><div class="muted sm">Choose the PDF mailed by PPC (Daily Report as on …). The app reads it, shows what will change, and updates the WIP and pouring figures after you confirm.</div>
+      <div class="row"><label class="btn primary">Upload PPC report (PDF)<input id="ppc-file" type="file" accept="application/pdf,.pdf" hidden></label></div>
+      ${(pp.history || []).length ? `<details><summary class="sm">Earlier uploads (${pp.history.length})</summary>${pp.history.slice().reverse().slice(0, 8).map((h) => `<div class="li sm">${esc(h.asOn)} · ${esc(h.file || 'report')} <span class="muted">· ${esc(h.by || '')} ${fdt(h.ts)} · ${h.wip} customers, ${h.pour} items</span></div>`).join('')}</details>` : ''}</section>
+      <div class="row stickysave"><button class="btn primary" data-act="wip-save">Save figures</button><span id="wip-dirty" class="badge warn" ${ui.wip.dirty ? '' : 'hidden'}>unsaved changes</span></div>` : ''}
     <div class="tiles">${tile('wip', f2(tm.mov, 1) + ' MT', 'Moving WIP in factory')}${tile('wip', f2(tm.non, 1) + ' MT', 'Non-moving WIP', tm.non > 20 ? 'warn' : '')}${tile('wip', f2(tm.lac, 0) + ' Lac', 'Moving WIP value')}${tile('castings', QI.stats().active, 'Castings tracked in this app')}</div>
     <section class="card"><h3>Castings on progress by customer</h3><div class="tw"><table class="cmt"><thead><tr><th>Customer</th><th>Moving MT</th><th>Value Lac</th><th>Non-moving MT</th><th>Value Lac</th><th>In inspection app</th>${xh}</tr></thead><tbody>${wipRows}</tbody></table></div>
       ${ed ? '<button class="btn" data-act="wip-add" data-kind="wip">+ Add customer</button>' : ''}
@@ -4271,7 +4466,7 @@ window.DCL_LOGO = '';
   if (window.DCL_LOGO) { const lg = $('#logo'); lg.src = window.DCL_LOGO; lg.hidden = false; }
   /* ---- "+ New entry" button: one tap to the entry forms ---- */
   const FAB = [['Melting log (furnace sheet)', 'melt', 'ml-new'], ['Melting heat plan', 'mplan', 'mpl-new'], ['Moulding plan', 'mould', 'mp-new'], ['Sand / calibration log', ['create', 'log'], 'new-log'],
-    ['Heat treatment plan', 'ht', '#ppc'], ['PPC WIP / pouring figures', 'ppc', '#wip'], ['Raw material lot', 'rm', 'rm-new'], ['Work order', ['create', 'job'], 'new-job'], ['Inspect a casting', null, '#castings']];
+    ['Heat treatment plan', 'ht', '#ppc'], ['Upload PPC report (PDF)', 'ppc', '#wip-upload'], ['PPC WIP / pouring figures', 'ppc', '#wip'], ['Raw material lot', 'rm', 'rm-new'], ['Work order', ['create', 'job'], 'new-job'], ['Inspect a casting', null, '#castings']];
   $('#fab').addEventListener('click', () => {
     $('#fabbtns').innerHTML = FAB.filter((f) => !f[1] || (Array.isArray(f[1]) ? QI.can(f[1][0], f[1][1]) : QI.can(f[1]))).map((f) => `<button class="btn big" data-fab="${f[2]}">${esc(f[0])}</button>`).join('');
     $('#fabsheet').hidden = false;
@@ -4281,7 +4476,7 @@ window.DCL_LOGO = '';
   $('#fabsheet').addEventListener('click', (e) => {
     if (e.target.id === 'fabsheet') return fabHide();
     const b = e.target.closest('[data-fab]'); if (!b) return; fabHide();
-    const k = b.dataset.fab; if (k[0] === '#') go(k.slice(1)); else if (ACT[k]) ACT[k](b);
+    const k = b.dataset.fab; if (k === '#wip-upload') { go('wip'); const fi = $('#ppc-file'); if (fi) fi.click(); } else if (k[0] === '#') go(k.slice(1)); else if (ACT[k]) ACT[k](b);
   });
   $('#who').addEventListener('click', () => go('settings'));
   $('#back').addEventListener('click', () => { if (hist.length) { route = hist.pop(); window.scrollTo(0, 0); render(); } });

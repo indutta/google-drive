@@ -282,6 +282,8 @@
       ${QI.can('create', 'job') ? '<button class="btn" data-act="new-job">+ Work order</button>' : ''}
       <a class="btn" href="#/ppc">Daily plan</a><a class="btn" href="#/approvals">Approvals</a>
     </div>
+    ${(() => { const pk = (st.settings.ppc || {}); const k = pk.kpi; if (!k || !k.gc) return ''; const age = pk.asOn ? Math.floor((Date.now() - new Date(pk.asOn).getTime()) / 864e5) : 0; const mv = (pk.wip || []).reduce((o, r) => o + num2(r.movMT), 0);
+      return `<h3 class="sec">🏭 Production <span class="muted sm">· PPC report as on ${esc(pk.asOn)}${age > 2 ? ' ' + badge(age + ' days old', 'warn') : ''}</span></h3><div class="tiles">${tile('wip', f2(k.gc.month, 1) + ' MT', 'Good castings this month (target ' + f2(k.gc.target, 0) + ')')}${k.desp ? tile('wip', f2(k.desp.month, 1) + ' t', 'Despatch this month (target ' + f2(k.desp.target, 0) + ')') : ''}${tile('wip', f2(mv, 1) + ' MT', 'Moving WIP in factory')}${k.yieldPct != null ? tile('wip', f2(k.yieldPct, 1) + ' %', 'Casting yield this month') : ''}</div>`; })()}
     <h3 class="sec">🔥 Melting</h3>
     <div class="tiles">${tile('mplan', planToday, 'Heats planned today')}${tile('melt', heatsToday, 'Heats logged today')}${tile('heats', st.heats.length, 'Heats in total')}${tile('rm', rmWait, 'Raw material lots awaiting decision', rmWait ? 'warn' : '')}</div>
     <h3 class="sec">🧱 Moulding</h3>
@@ -947,6 +949,28 @@
       <div class="row"><button class="btn" data-act="ht-add">+ Add row</button><button class="btn primary" data-act="ht-save">Save heat treatment plan</button>${ui.ht.saved ? '<button class="btn danger" data-act="ht-delplan">Delete plan</button>' : ''}</div>
       <div class="sm muted pad">Inspection: Stage 6 heat cycle check on every casting. ${x.at56} casting(s) are waiting at Stages 5–6 now${matched ? `, ${matched} planned item(s) match castings in the app` : ''}. ${link('/fettle', 'Open fettling & heat treatment')}</div></section>`;
   };
+  async function ppcUpload(file) {
+    if (!file) return;
+    if (!QI.can('ppc')) { toast('Only Planning and Quality can update the PPC figures.', 'bad'); return; }
+    toast('Reading ' + file.name + ' …');
+    let r;
+    try { r = PPCPARSE.parseDaily(await PPCPDF.read(await file.arrayBuffer(), 4)); } catch (e) { toast('Could not read this PDF. ' + (e.message || ''), 'bad'); return; }
+    if (r.error) { toast(r.error, 'bad'); return; }
+    const d = QI.ppcDiff(r), k = r.kpi || {};
+    const tot = r.wip.reduce((o, x) => ({ m: o.m + x.movMT, n: o.n + x.nonMT }), { m: 0, n: 0 });
+    const body = `<p><b>Report as on ${esc(fd(new Date(r.asOn).getTime()))}</b> · ${esc(file.name)}</p>
+      ${d.older ? `<div class="warnBox">This report is older than the figures already in the app (${esc(d.older)}).</div>` : ''}
+      ${r.warn.length ? `<div class="warnBox">${r.warn.map(esc).join('<br>')}</div>` : ''}
+      <h5>Castings on progress (WIP)</h5>
+      <div class="tw"><table><thead><tr><th>Customer</th><th>Moving MT</th><th>Non-moving MT</th></tr></thead><tbody>${r.wip.map((x) => `<tr><td>${esc(x.customer)}</td><td>${f2(x.movMT)}</td><td>${f2(x.nonMT)}</td></tr>`).join('')}<tr><td><b>Total</b></td><td><b>${f2(tot.m)}</b></td><td><b>${f2(tot.n)}</b></td></tr></tbody></table></div>
+      ${k.gc ? `<h5>Production</h5><div class="sm">Good castings this month <b>${f2(k.gc.month)} MT</b> (till date), yield ${k.yieldPct != null ? f2(k.yieldPct, 1) + ' %' : '–'}${k.desp ? ` · despatch this month <b>${f2(k.desp.month)} t</b> of ${f2(k.desp.target)} t` : ''}</div>` : ''}
+      <h5>Pouring status</h5><div class="sm">${r.pouring.length} items read · <b>${d.upd.length}</b> changed · <b>${d.add.length}</b> new</div>
+      ${d.upd.length ? `<div class="sm">${d.upd.slice(0, 10).map((u) => `${esc(u.item)}: poured ${u.from.poured} → <b>${u.to.poured}</b>${u.from.order !== u.to.order ? `, order ${u.from.order} → <b>${u.to.order}</b>` : ''}`).join('<br>')}${d.upd.length > 10 ? `<br>+ ${d.upd.length - 10} more` : ''}</div>` : ''}
+      ${d.add.length ? `<div class="sm">New: ${d.add.slice(0, 8).map((p) => esc(p.item)).join(', ')}${d.add.length > 8 ? ' …' : ''}</div>` : ''}`;
+    modal('Update from PPC report', body, () => { const x = QI.ppcApply(r, file.name); if (x.error) return x.error; ui.wip = null; render(); toast('PPC figures updated to ' + r.asOn, 'ok'); }, d.older ? 'Apply anyway' : 'Apply to the app');
+  }
+  document.addEventListener('change', (e) => { const t = e.target; if (t && t.id === 'ppc-file') { const f = t.files && t.files[0]; t.value = ''; ppcUpload(f); } });
+
   function wipLoad() { ui.wip = { pp: JSON.parse(JSON.stringify(S().settings.ppc || { plan: [], wip: [] })), dirty: false }; }
   V.wip = () => {
     if (!ui.wip || (!ui.wip.dirty && JSON.stringify(ui.wip.pp) !== JSON.stringify(S().settings.ppc || { plan: [], wip: [] }))) wipLoad();
@@ -963,7 +987,10 @@
     const xh = ed ? '<th></th>' : '';
     return `<div class="hd"><div><h2>Monthly plan &amp; WIP</h2><div class="muted sm">${ed ? 'Type the new PPC figures into the boxes, then tap Save.' : 'Figures from the PPC Daily Performance Report.'}</div></div>
       <label class="f"><span>As on date</span>${ed ? `<input type="date" data-wip="asOn" value="${esc(pp.asOn || '')}">` : esc(pp.asOn || '–')}</label></div>
-    ${ed ? `<div class="row stickysave"><button class="btn primary" data-act="wip-save">Save figures</button><span id="wip-dirty" class="badge warn" ${ui.wip.dirty ? '' : 'hidden'}>unsaved changes</span></div>` : ''}
+    ${ed ? `<section class="card upl"><h3>Upload the PPC report</h3><div class="muted sm">Choose the PDF mailed by PPC (Daily Report as on …). The app reads it, shows what will change, and updates the WIP and pouring figures after you confirm.</div>
+      <div class="row"><label class="btn primary">Upload PPC report (PDF)<input id="ppc-file" type="file" accept="application/pdf,.pdf" hidden></label></div>
+      ${(pp.history || []).length ? `<details><summary class="sm">Earlier uploads (${pp.history.length})</summary>${pp.history.slice().reverse().slice(0, 8).map((h) => `<div class="li sm">${esc(h.asOn)} · ${esc(h.file || 'report')} <span class="muted">· ${esc(h.by || '')} ${fdt(h.ts)} · ${h.wip} customers, ${h.pour} items</span></div>`).join('')}</details>` : ''}</section>
+      <div class="row stickysave"><button class="btn primary" data-act="wip-save">Save figures</button><span id="wip-dirty" class="badge warn" ${ui.wip.dirty ? '' : 'hidden'}>unsaved changes</span></div>` : ''}
     <div class="tiles">${tile('wip', f2(tm.mov, 1) + ' MT', 'Moving WIP in factory')}${tile('wip', f2(tm.non, 1) + ' MT', 'Non-moving WIP', tm.non > 20 ? 'warn' : '')}${tile('wip', f2(tm.lac, 0) + ' Lac', 'Moving WIP value')}${tile('castings', QI.stats().active, 'Castings tracked in this app')}</div>
     <section class="card"><h3>Castings on progress by customer</h3><div class="tw"><table class="cmt"><thead><tr><th>Customer</th><th>Moving MT</th><th>Value Lac</th><th>Non-moving MT</th><th>Value Lac</th><th>In inspection app</th>${xh}</tr></thead><tbody>${wipRows}</tbody></table></div>
       ${ed ? '<button class="btn" data-act="wip-add" data-kind="wip">+ Add customer</button>' : ''}
@@ -1282,7 +1309,7 @@
   if (window.DCL_LOGO) { const lg = $('#logo'); lg.src = window.DCL_LOGO; lg.hidden = false; }
   /* ---- "+ New entry" button: one tap to the entry forms ---- */
   const FAB = [['Melting log (furnace sheet)', 'melt', 'ml-new'], ['Melting heat plan', 'mplan', 'mpl-new'], ['Moulding plan', 'mould', 'mp-new'], ['Sand / calibration log', ['create', 'log'], 'new-log'],
-    ['Heat treatment plan', 'ht', '#ppc'], ['PPC WIP / pouring figures', 'ppc', '#wip'], ['Raw material lot', 'rm', 'rm-new'], ['Work order', ['create', 'job'], 'new-job'], ['Inspect a casting', null, '#castings']];
+    ['Heat treatment plan', 'ht', '#ppc'], ['Upload PPC report (PDF)', 'ppc', '#wip-upload'], ['PPC WIP / pouring figures', 'ppc', '#wip'], ['Raw material lot', 'rm', 'rm-new'], ['Work order', ['create', 'job'], 'new-job'], ['Inspect a casting', null, '#castings']];
   $('#fab').addEventListener('click', () => {
     $('#fabbtns').innerHTML = FAB.filter((f) => !f[1] || (Array.isArray(f[1]) ? QI.can(f[1][0], f[1][1]) : QI.can(f[1]))).map((f) => `<button class="btn big" data-fab="${f[2]}">${esc(f[0])}</button>`).join('');
     $('#fabsheet').hidden = false;
@@ -1292,7 +1319,7 @@
   $('#fabsheet').addEventListener('click', (e) => {
     if (e.target.id === 'fabsheet') return fabHide();
     const b = e.target.closest('[data-fab]'); if (!b) return; fabHide();
-    const k = b.dataset.fab; if (k[0] === '#') go(k.slice(1)); else if (ACT[k]) ACT[k](b);
+    const k = b.dataset.fab; if (k === '#wip-upload') { go('wip'); const fi = $('#ppc-file'); if (fi) fi.click(); } else if (k[0] === '#') go(k.slice(1)); else if (ACT[k]) ACT[k](b);
   });
   $('#who').addEventListener('click', () => go('settings'));
   $('#back').addEventListener('click', () => { if (hist.length) { route = hist.pop(); window.scrollTo(0, 0); render(); } });

@@ -82,6 +82,34 @@
     return { date, sand, sandIds: sandIds.length, mould: mp, melt: mpl, heats, ht, htItems, at56 };
   };
 
+
+  /* ---- upload of the PPC Daily Performance Report: compare with the figures in the app, then apply ---- */
+  const nk = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  QI.ppcDiff = (r) => {
+    const pp = S().settings.ppc || { plan: [], wip: [] }, plan = pp.plan || [];
+    const upd = [], add = [];
+    r.pouring.forEach((p) => {
+      const cur = plan.find((x) => nk(x.item) === nk(p.item));
+      if (!cur) add.push(p);
+      else if (num(cur.order) !== num(p.order) || num(cur.poured) !== num(p.poured) || num(cur.unitWt) !== num(p.unitWt)) upd.push({ item: p.item, from: { order: num(cur.order), poured: num(cur.poured) }, to: { order: p.order, poured: p.poured } });
+    });
+    return { upd, add, older: pp.asOn && r.asOn < pp.asOn ? pp.asOn : '' };
+  };
+  QI.ppcApply = (r, fileName) => {
+    if (!QI.can('ppc')) return { error: 'Only Planning and Quality can update the PPC figures.' };
+    const st = S().settings; QI.ppcSeed(); const pp = st.ppc;
+    pp.asOn = r.asOn; pp.wip = r.wip.map((x) => Object.assign({}, x));
+    if (r.kpi && Object.keys(r.kpi).length) pp.kpi = Object.assign({ asOn: r.asOn }, r.kpi);
+    pp.plan = pp.plan || [];
+    r.pouring.forEach((p) => {
+      const cur = pp.plan.find((x) => nk(x.item) === nk(p.item));
+      if (cur) { cur.order = p.order; cur.poured = p.poured; if (p.unitWt) cur.unitWt = p.unitWt; if (!cur.material && p.material) cur.material = p.material; }
+      else pp.plan.push({ customer: p.customer, item: p.item, material: p.material, unitWt: p.unitWt, planKg: 0, patt: '', moulds: 0, order: p.order, poured: p.poured });
+    });
+    pp.history = (pp.history || []).concat([{ ts: Date.now(), by: st.inspector || QI.me.name || '', file: fileName || '', asOn: r.asOn, wip: r.wip.length, pour: r.pouring.length }]).slice(-30);
+    QI.save(); return { ok: true };
+  };
+
   /* ---- monthly plan progress ---- */
   QI.ppcPlanTotals = () => {
     const p = (S().settings.ppc || {}).plan || [];
