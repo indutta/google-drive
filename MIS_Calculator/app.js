@@ -36,7 +36,7 @@
       { k: 'gst', l: 'GST rate on domestic sales (%)', n: 'Leave blank for 18%', pctf: 1 } ] },
     { id: 'adj', title: 'HO adjustments', hint: 'Rs. lakh. Plus increases the cost or income shown. Note the reason for each.', fields: [
       { k: 'amat', l: 'Material consumed adjustment', neg: 1 }, { k: 'astk', l: '(Increase)/decrease in stock adjustment', neg: 1 },
-      { k: 'apow', l: 'Variable power adjustment', neg: 1 }, { k: 'ajob', l: 'Job-work adjustment', neg: 1, n: 'For example QC job work not in the factory feed' },
+      { k: 'apow', l: 'Variable power adjustment', neg: 1 }, { k: 'aoth', l: 'Other factory expenses adjustment', neg: 1, n: 'Restatement of other overhead, for example reversing a prior month charge' }, { k: 'ajob', l: 'Job-work adjustment', neg: 1, n: 'For example QC job work not in the factory feed' },
       { k: 'carve', l: 'Selling expenses carved out of other factory expenses', n: 'Moves cost from other overhead to selling expenses. No PBT effect' },
       { k: 'patre', l: 'Pattern income shown under storage income', n: 'Moves income between the two lines. No PBT effect' } ] },
     { id: 'stat', title: 'Statistics', hint: 'MT for tonnage, Rs. lakh for collections.', fields: [
@@ -89,12 +89,13 @@
     L.adm = g('admin');
     L.rep = g('repair');
     L.othtot = g('o1') + g('o2') + g('o3') + g('o4') + g('o5') + g('o6') + g('o7') + g('o8') + g('o9');
-    L.omo = L.othtot - g('carve');
+    L.omo = L.othtot - g('carve') + g('aoth');
     L.sal = g('sal');
     L.powf = g('dem');
     L.sell = g('carve');
     L.tfc = L.adm + L.rep + L.omo + L.sal + L.powf + L.sell;
     L.npo = L.contr - L.tfc;
+    L.defr = g('defr');
     L.pad = L.npo - g('defr') - g('nonop');
     L.stor = g('stor') + g('patre');
     L.ebitda = L.pad + L.stor;
@@ -109,7 +110,7 @@
     ['sec', 'Variable costs'], ['mat', 'Material consumed'], ['stk', '(Increase)/decrease in stock'], ['powv', 'Power and fuel (variable)'], ['job', 'Job-work charges'], ['nvc', 'Total net variable costs', 1],
     ['contr', 'Contribution', 1],
     ['sec', 'Fixed costs'], ['adm', 'Administrative expenses'], ['rep', 'Repair and maintenance'], ['omo', 'Other manufacturing overhead'], ['sal', 'Salary and wages'], ['powf', 'Power and fuel (fixed)'], ['sell', 'Selling expenses'], ['tfc', 'Total fixed costs', 1],
-    ['npo', 'Net profit from operations', 1], ['stor', 'Storage facility income'], ['ebitda', 'EBITDA', 1], ['pbt', 'PBT', 1]
+    ['npo', 'Net profit from operations', 1], ['defr', 'Less: deferred revenue expenses'], ['pad', 'Profit after deferred revenue expenses', 1], ['stor', 'Storage facility income'], ['ebitda', 'EBITDA', 1], ['pbt', 'PBT', 1]
   ];
   var SUMKEYS = LINES.filter(function (l) { return l[0] !== 'sec'; }).map(function (l) { return l[0]; }).concat(['prod', 'desp', 'rej', 'coll', 'wipchg']);
   function lastMonth() { return state.month; }
