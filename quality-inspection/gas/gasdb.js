@@ -64,7 +64,7 @@
   try { uid = localStorage.getItem('dcl_gas_uid') || ''; if (!uid) { uid = 'g' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('dcl_gas_uid', uid); } } catch (e) { uid = 'g' + Math.random().toString(36).slice(2, 12); }
   const user = { id: async () => uid, me: async () => ({}), can: () => true };
   const downloads = { save: ({ filename, data }) => new Promise((ok, no) => {
-    try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'text/plain' })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); ok({ status: 'saved' }); } catch (e) { no(e); }
+    try { const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type: 'text/plain' })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); ok({ status: 'saved' }); } catch (e) { no(e); }
   }) };
   window.claude = { gas: true, poll, use: async (n) => (n === 'db' ? db : n === 'user' ? user : n === 'downloads' ? downloads : null) };
 })();

@@ -94,3 +94,6 @@ The app is titled **Daily Production & Inspection** (Datre logo in the header, f
 
 ## Version for phones without a Claude account (Google Sheet + Apps Script)
 `gas/` holds `Code.gs` (server: serves the app and stores its data in a Google Sheet), `gasdb.js` (phone side: replaces the shared database with calls to that sheet, polling every 15 s) and `app.html` (the app built for it by `tools/bundle.py`). Steps for the owner are in `gas/SETUP.md`. Tested with a simulated sheet and two simulated phones; not yet against a real Google account.
+
+## Customer PDF reports
+**Download PDF** on a casting's inspection report (or the PDF button on the casting page) makes the casting inspection report; **Customer report (PDF)** on a work order makes a one-to-two page inspection summary (castings, status, heat chemistry / temperature / mechanical results). Built in the browser with jsPDF (`pdfreport.js`, loaded from cdnjs on first use) and offered as a file download; the Datre logo is added when `logo.js` holds it.

@@ -384,7 +384,7 @@
     const st1 = QI.stageOf[1];
     const s1 = QI.stageOf[1].groups[0].steps.flatMap((s) => s.checks).map((c) => QI.status('job', no, c.id));
     return `<div class="hd"><div><h2>${esc(j.no)} <small>${esc(j.part)}</small></h2><div class="muted">${esc(j.customer)} · PO ${esc(j.po)} · Drawing ${esc(j.drawing)} · Pattern ${esc(j.pattern)} · Grade ${esc(j.grade)}${j.qty ? ' · Order qty ' + esc(j.qty) : ''}</div></div>
-      <div class="row"><button class="btn" data-act="edit-job" data-no="${esc(no)}">Edit</button><button class="btn primary" data-act="add-castings" data-no="${esc(no)}">+ Add castings</button></div></div>
+      <div class="row"><button class="btn" data-act="edit-job" data-no="${esc(no)}">Edit</button><button class="btn" data-act="pdf-job" data-no="${esc(no)}">Customer report (PDF)</button><button class="btn primary" data-act="add-castings" data-no="${esc(no)}">+ Add castings</button></div></div>
     <section class="card"><h3>Inspection requirements for this order <small class="muted">(per PO / customer QAP)</small></h3>
       <div class="chips">${Object.keys(j.applic).map((id) => `<label class="chip"><input type="checkbox" data-act="applic" data-no="${esc(no)}" data-step="${id}" ${j.applic[id] ? 'checked' : ''}> ${id} ${esc(QI.steps[id].name)}</label>`).join('')}</div>
       <div class="muted sm">Unticked steps are skipped for every casting of this order. 3.2 and 8.3 are sampled (10 %) and never block a casting.</div></section>
@@ -411,7 +411,7 @@
     const openN = S().ncrs.filter((n) => n.status === 'open' && n.castings.includes(c.id));
     const heats = S().heats, logs = S().logs;
     return `<div class="hd"><div><h2>${esc(c.id)} ${stateBadge(c)}</h2><div class="muted">${link('/job/' + c.jobNo, c.jobNo)} · ${esc(j.part)} · Dwg ${esc(j.drawing)} · Grade ${esc(j.grade)}</div></div>
-      <div class="row"><a class="btn" href="#/report/${esc(c.id)}">Inspection report</a>
+      <div class="row"><a class="btn" href="#/report/${esc(c.id)}">Inspection report</a><button class="btn" data-act="pdf-casting" data-id="${esc(c.id)}">PDF</button>
       ${c.status === 'active' ? `<button class="btn" data-act="reject-casting" data-id="${esc(c.id)}">Reject casting</button><button class="btn primary" data-act="release" data-id="${esc(c.id)}" ${t.allDone && !openN.length ? '' : 'disabled title="Complete all stages and close NCRs first"'}>Release casting</button>` : ''}</div></div>
     ${c.status === 'rejected' ? `<div class="banner bad"><b>Rejected</b> at stage ${c.reject.stageNo || '–'} – ${esc(c.reject.reason)} · ${esc(c.reject.action)} · ${esc(c.reject.by)}, ${fdt(c.reject.ts)}</div>` : ''}
     ${c.status === 'released' ? `<div class="banner ok"><b>Released</b> by ${esc(c.release.by)} on ${fdt(c.release.ts)} ${c.release.remarks ? '· ' + esc(c.release.remarks) : ''}</div>` : ''}
@@ -1026,6 +1026,8 @@
   };
   const num2 = (v) => (v === '' || v == null || !isFinite(+v)) ? 0 : +v;
   const PPC_ACTS = {
+    'pdf-casting': (el) => savePdf(`Inspection-report-${el.dataset.id}.pdf`, () => PDFREPORT.casting(el.dataset.id)),
+    'pdf-job': (el) => savePdf(`Inspection-summary-${el.dataset.no}.pdf`, () => PDFREPORT.job(el.dataset.no)),
     'share-summary': async () => { const text = summaryText();
       try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
       try { await navigator.clipboard.writeText(text); toast('Summary copied – paste it in WhatsApp', 'ok'); }
@@ -1125,7 +1127,7 @@
       });
     });
     const ncrs = S().ncrs.filter((n) => n.castings.includes(c.id));
-    return `<div class="noprint hd"><a class="btn" href="#/casting/${esc(c.id)}">← Back</a>${HOSTED ? '<button class="btn primary" data-act="report-dl" data-id="' + esc(c.id) + '">Download report</button>' : '<button class="btn primary" onclick="window.print()">Print / Save as PDF</button>'}</div>
+    return `<div class="noprint hd"><a class="btn" href="#/casting/${esc(c.id)}">← Back</a><button class="btn primary" data-act="pdf-casting" data-id="' + esc(c.id) + '">Download PDF</button></div>
     <article class="report"><header><div><h1>${esc(QI.plan.company)}</h1><div>Casting Inspection Report</div></div><div class="rs-r"><b>${esc(c.id)}</b><div>${esc(s.label)}</div></div></header>
       <table class="kv"><tr><th>Work order</th><td>${esc(j.no)}</td><th>Customer / PO</th><td>${esc(j.customer)} / ${esc(j.po)}</td></tr>
       <tr><th>Part</th><td>${esc(j.part)}</td><th>Drawing / Pattern</th><td>${esc(j.drawing)} / ${esc(j.pattern)}</td></tr>
@@ -1211,6 +1213,11 @@
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
   Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS);
+  async function savePdf(name, make) {
+    toast('Making the PDF …');
+    try { const blob = await make(); download(name, blob, 'application/pdf'); }
+    catch (e) { toast((e && e.message) || 'Could not make the PDF', 'bad'); }
+  }
   function download(name, text, type) {
     if (DL) { DL.save({ filename: name, data: text }).then((r) => toast(r.status === 'saved' ? 'File saved' : 'File sent', 'ok')).catch((e) => { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('Could not save the file', 'bad'); }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
