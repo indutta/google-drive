@@ -233,7 +233,7 @@ const MACHINES=[
   E:{risk:'HIGH',h:40,drv:'Coil / element ageing',act:'Inspect element supports, coil bushings and panel cooling'}},
  {id:'WQ',n:'Water Quenching Set Up',a:'Heat Treatment',dt:null,spend:31176,
   M:{risk:'HIGH',h:46,drv:'Pump / piping / agitation',act:'Inspect pump, pipe leakage and agitation system after spike'},E:null},
- {id:'CP',n:'Compressor 55 kW (Atlas Copco)',a:'Utilities',dt:null,spend:0,note:'Atlas Copco 55 kW, almost new; replaced the defunct 75 kW compressor (Oct-26)',
+ {id:'CP',n:'Compressor GA-55 55 kW (Atlas Copco)',a:'Utilities',dt:null,spend:0,note:'Atlas Copco 55 kW, almost new; replaced the defunct 75 kW compressor (Oct-26)',
   M:{risk:'LOW',h:85,drv:'Air/oil filters, oil level, belt / coupling',act:'Daily oil level & condensate drain; service filters, separator and oil at Atlas Copco service hours'},
   E:{risk:'LOW',h:85,drv:'Controller alarms / motor current',act:'Log Atlas Copco controller alarms and running hours weekly; monthly motor current check'}},
  {id:'TR',n:'Transformer',a:'Utilities',dt:null,spend:21420,M:null,
@@ -374,7 +374,7 @@ const VENDORS={"V":[["AANARCHEY TECHNOLOGIES","52, Arunachal East, Sodepur, Kolk
 let STOCK_SRC='Tally stock 23-Oct-26', STOCK_VER=0;const STOCK_AT=1792827876810;
 
 /* ======================= STORE (shared db when opened in Claude, else this device) ======================= */
-const COLLS=['breakdowns','sourcing','machines','stock','jobcards','dtmanual','acks','config','moves'];
+const COLLS=['breakdowns','sourcing','machines','stock','jobcards','dtmanual','acks','config','moves','svc'];
 const LSKEY='datre-maint-desk-v1';
 const S={};COLLS.forEach(c=>S[c]={});
 let DB=null, MODE='local', READONLY=false;
@@ -512,6 +512,55 @@ function logMove(name,m,q){const id=uid('mv');put('moves',id,{id,n:name,delta:m.
 function saveLocalStock(i,name,v,m){put('stock',i!=null?stockKey(SPARES[i][0]):name,{q:v,n:i!=null?SPARES[i][0]:name});logMove(i!=null?SPARES[i][0]:name,m,v)}
 
 /* ----- Alerts ----- */
+/* ----- Major service schedule (from "Major Machine Yearly Service", 16-Nov-26) ----- */
+const SVC=[
+ {k:'swy',n:'Switchyard (Sub-Station) cleaning',f:3,q:1,last:'2026-08',d:'E'},
+ {k:'vcb',n:'HT VCB overall service & internal part checking',f:12,q:4,last:null,d:'E'},
+ {k:'tr25',n:'Transformer 2.5 MVA — BDV test & oil top-up',f:12,q:1,last:'2026-01',d:'E',m:'TR'},
+ {k:'tr16',n:'Transformer 1.6 MVA — BDV test & oil top-up',f:12,q:1,last:'2026-01',d:'E',m:'TR'},
+ {k:'tr160',n:'Transformer 160 kVA — BDV test & oil top-up',f:12,q:1,last:'2026-01',d:'E',m:'TR'},
+ {k:'acb32',n:'ACB CN-CS 3200D internal kit service (LT side)',f:12,q:3,last:'2026-11',d:'E'},
+ {k:'acb25',n:'ACB CN-CS 2500D internal kit service (Melting)',f:12,q:1,last:'2025-06',d:'E'},
+ {k:'hp3t',n:'3T hydraulic power pack — oil filtration & circuit line service',f:12,q:1,last:null,d:'M'},
+ {k:'hp500',n:'500 kg hydraulic power pack — oil filtration & circuit line service',f:12,q:1,last:null,d:'M'},
+ {k:'hpro',n:'Roll Over hydraulic power pack — oil filtration & circuit line service',f:6,q:1,last:null,d:'M',m:'RO'},
+ {k:'hpcs',n:'Closing hydraulic power pack — oil filtration & circuit line service',f:6,q:1,last:null,d:'M',m:'CS'},
+ {k:'hpso',n:'Shake-Out pusher hydraulic power pack — oil filtration & circuit line service',f:6,q:1,last:null,d:'M',m:'SO'},
+ {k:'hppc',n:'Pouring line car 1 & 2 — hydraulic filtration',f:6,q:2,last:null,d:'M',m:'PB'},
+ {k:'rop',n:'RO plant — membrane & two-vessel service',f:12,q:1,last:'2026-10',d:'M'},
+ {k:'ga55',n:'GA-55 kW air compressor (Atlas Copco) service',f:3,q:1,last:'2026-09',d:'M',m:'CP'},
+ {k:'ltir',n:'LT panel IR testing (insulation resistance)',f:3,q:1,last:null,d:'E'},
+ {k:'poll',n:'Pollution testing',f:6,q:11,last:'2026-09',d:'S'},
+ {k:'stat',n:'Statutory testing of lifting tackles & pressure vessels (Factory Rules)',f:6,q:26,last:'2026-06',d:'S'}];
+const SVC_F={3:'Quarterly',6:'Half yearly',12:'Yearly'},SVC_D={E:'Elec',M:'Mech',S:'Statutory'};
+function svcLast(x){const o=S.svc[x.k];return o&&o.last?o.last:(x.last?x.last+'-01':null)}
+function svcDue(x){const l=svcLast(x);if(!l)return null;const d=parseD(l);return dstr(new Date(d.getFullYear(),d.getMonth()+x.f,d.getDate()))}
+function svcDays(x){const du=svcDue(x);return du?Math.round((parseD(du)-parseD(today()))/864e5):-99999}
+function svcState(x){const n=svcDays(x);return n<0?'over':n<=7?'soon':'ok'}
+function svcDueList(){return SVC.filter(x=>svcState(x)!=='ok').sort((a,b)=>svcDays(a)-svcDays(b))}
+function svcLastTxt(x){const l=svcLast(x);if(!l)return 'no record';const o=S.svc[x.k];return o&&o.last?fmtD(l):MON[+l.slice(5,7)-1]+'-'+l.slice(2,4)}
+function svcWhen(x){const n=svcDays(x),du=svcDue(x);return !du?'PENDING — no service record':n<0?'OVERDUE '+(-n)+' days (due '+fmtD(du)+')':n===0?'due TODAY':'due '+fmtD(du)+' (in '+n+' day'+(n===1?'':'s')+')'}
+function svcText(list){list=list||svcDueList();const soon=list.filter(x=>svcState(x)==='soon'),over=list.filter(x=>svcState(x)==='over');
+  const L=['🗓️ *MAJOR SERVICE REMINDER — DATRE FALTA*',DOW[new Date().getDay()]+', '+fmtD(today())+' · by '+me(),''];
+  const row=x=>'• '+x.n+(x.q>1?' (×'+x.q+')':'')+' — '+SVC_F[x.f]+' — '+svcWhen(x)+(svcLast(x)?' · last '+svcLastTxt(x):'');
+  if(soon.length){L.push('*Due within 7 days ('+soon.length+'):*');soon.forEach(x=>L.push(row(x)));L.push('')}
+  if(over.length){L.push('*OVERDUE / PENDING ('+over.length+'):*');over.forEach(x=>L.push(row(x)));L.push('')}
+  if(!list.length)L.push('✅ No major service due in the next 7 days.','');
+  L.push('Plan shutdown, vendor and spares now. After the job: app → PM Plan → Major service → *Mark done*.','',APP_LINK);return L.join('\n')}
+function svcPending(){return svcDueList().filter(x=>((S.svc[x.k]||{}).rem)!==(svcDue(x)||'pending'))}
+function svcMarkReminded(){svcDueList().forEach(x=>{const o=Object.assign({},S.svc[x.k]||{});o.rem=svcDue(x)||'pending';put('svc',x.k,o)})}
+function svcPanel(){const dl=svcDueList();
+  return `<section class="panel" id="svcp"><div class="spread"><h3>Major service schedule — quarterly / half-yearly / yearly</h3><div class="row"><a class="btn sm pri" id="svcwa2" style="background:#1f9d55;border-color:#1f9d55" href="https://wa.me/?text=${encodeURIComponent(svcText(dl))}" target="_blank" rel="noopener">Send reminder on WhatsApp</a></div></div>
+   <p class="small muted" style="margin:0 0 8px">Source: “Major Machine Yearly Service” (16-Nov-26). Next due = last service + frequency. A reminder appears on the Today page and in the daily update <b>7 days before</b> each due date; overdue jobs stay red until marked done.</p>
+   <div class="tblwrap"><table><thead><tr><th>Job</th><th>Next due</th><th></th></tr></thead><tbody>
+   ${SVC.slice().sort((a,b)=>svcDays(a)-svcDays(b)).map(x=>{const st=svcState(x);const n=svcDays(x);return `<tr><td><b>${esc(x.n)}</b><div class="small muted">${SVC_D[x.d]} · ${SVC_F[x.f]} · qty ${x.q} · last ${esc(svcLastTxt(x))}${x.m&&MBY[x.m]?' · '+esc(MBY[x.m].n):''}</div></td>
+    <td><span class="pill ${st==='over'?'p-crit':st==='soon'?'p-warn':'p-ok'}">${svcDue(x)?(st==='over'?'Overdue '+(-n)+' d':fmtD(svcDue(x))+(st==='soon'?' · in '+n+' d':'')):'Pending'}</span></td><td><button class="btn sm" data-svc="${x.k}">Mark done</button></td></tr>`}).join('')}</tbody></table></div></section>`}
+function svcDoneSheet(k){const x=SVC.find(y=>y.k===k);const o=S.svc[k]||{};
+  sheet('Service done — '+x.n,`<form class="form" id="svcf"><p class="small muted" style="margin:0">${SVC_F[x.f]} · qty ${x.q} · last ${esc(svcLastTxt(x))} · ${esc(svcWhen(x))}</p>
+   <label class="f">Date done<input type="date" id="svcd" value="${today()}" max="${today()}"></label>
+   <label class="f">Done by / vendor &amp; remarks<textarea id="svcn" placeholder="e.g. BDV 62 kV, oil topped up 40 L — by XYZ Electricals"></textarea></label>
+   <button class="btn pri" type="submit">Save — next due ${fmtD(dstr(new Date(new Date().getFullYear(),new Date().getMonth()+x.f,new Date().getDate())))}</button></form>`,()=>{
+   $('#svcf').onsubmit=e=>{e.preventDefault();const d=$('#svcd').value||today();const no=Object.assign({},o,{last:d,by:me(),note:$('#svcn').value.trim(),rem:null,hist:(o.hist||[]).concat({d,by:me(),note:$('#svcn').value.trim()})});put('svc',k,no);closeSheet();toast('Saved · next due '+fmtD(svcDue(x)))}})}
 function alerts(){
   const A=[];const now=Date.now();
   openBD().forEach(b=>{const m=MBY[b.m];const age=(now-b.start)/36e5;const crit=b.stopped||b.prio==='Critical';
@@ -527,6 +576,7 @@ function alerts(){
    if(old.length)A.push({k:'aged_'+old.length+'_'+today(),sev:'warn',t:old.length+' indent line'+(old.length>1?'s':'')+' pending over 60 days',d:'Oldest: '+old[0].item+' ('+old[0].ref+', '+ageDays(old[0])+' days, '+(old[0].st||old[0].stage)+')',go:()=>{srcFilter='open';go('src')}});}
   Object.values(S.sourcing).forEach(s=>{if(s.stage==='Received'||!s.eta)return;if(s.eta<td)A.push({k:'eta_'+s.id+'_'+s.eta,sev:'warn',t:'Sourcing overdue: '+s.item,d:'ETA was '+fmtD(s.eta)+' · '+s.stage+(s.vendor?' · '+s.vendor:''),go:()=>srcSheet(s.id)})});
   if(canRelease())Object.values(S.sourcing).filter(s=>s.stage==='Indent raised').forEach(s=>A.push({k:'rel_'+s.id,sev:s.prio==='Critical'?'crit':'warn',t:'Indent waiting for release: '+s.item,d:[s.ref,s.qty,s.raisedBy?'raised by '+s.raisedBy:'','release to mail the vendor enquiry'].filter(Boolean).join(' · '),go:()=>srcSheet(s.id)}));
+  svcDueList().forEach(x=>{const ov=svcState(x)==='over';A.push({k:'svc_'+x.k+'_'+(svcDue(x)||'p'),sev:ov?'crit':'warn',t:(ov?'Service OVERDUE: ':'Service due in '+svcDays(x)+' days: ')+x.n,d:SVC_F[x.f]+' · qty '+x.q+' · last '+svcLastTxt(x)+' · '+svcWhen(x),go:()=>go('pm')})});
   MACHINES.forEach(m=>['M','E'].forEach(d=>{const p=m[d];if(p&&p.h!=null&&p.h<25)A.push({k:'hl_'+m.id+d,sev:'warn',t:'Health '+p.h+'/100: '+m.n+' ('+(d==='M'?'Mech':'Elec')+')',d:'Predicted driver: '+p.drv+' → '+p.act,go:()=>mSheet(m.id)})}));
   const ord={crit:0,warn:1,info:2};A.sort((a,b)=>ord[a.sev]-ord[b.sev]);
   A.forEach(a=>a.ack=S.acks[a.k]);
@@ -577,6 +627,7 @@ function vHome(){
    <button class="kpi" data-go="job"><span class="lbl">PM checks today</span><span class="v">${ps.done}<span class="small muted">/${ps.due}</span></span><span class="small muted">${ps.nok} NOT OK</span></button>
    <button class="kpi" data-go="dt"><span class="lbl">Downtime ${MON[d.getMonth()]}</span><span class="v">${hrs(mtd)}<span class="small muted"> h</span></span><span class="small muted">month to date</span></button>
   </div>
+  ${svcPending().length?`<section class="panel noprint" style="border:2px solid var(--warn)"><div class="spread"><div><b>🗓️ ${svcPending().length} major service job${svcPending().length>1?'s':''} due within 7 days or overdue</b><div class="small muted">${esc(svcPending().slice(0,3).map(x=>x.n).join(' · '))}${svcPending().length>3?' …':''}</div></div><a class="btn pri" id="svcwa" style="background:#1f9d55;border-color:#1f9d55" href="https://wa.me/?text=${encodeURIComponent(svcText())}" target="_blank" rel="noopener">Send reminder to WhatsApp group</a></div></section>`:''}
   <div class="big-actions noprint">
    <button class="btn danger" data-act="bd">Report breakdown</button>
    <button class="btn pri" data-go="job">Open my job card</button>
@@ -603,7 +654,7 @@ function bindCommon(){
   document.querySelectorAll('[data-act=bd]').forEach(b=>b.onclick=()=>newBD({}));
   document.querySelectorAll('[data-act=indent]').forEach(b=>b.onclick=()=>srcSheet(null,{}));
 }
-bind.home=bindCommon;
+bind.home=()=>{bindCommon();if($('#svcwa'))$('#svcwa').addEventListener('click',()=>setTimeout(()=>{svcMarkReminded();toast('Reminder marked as sent')},300))};
 
 /* ----- MACHINES ----- */
 let mFilter=pref('mf')||'All', mView=pref('mv')||'cards', mDisc='M';
@@ -851,11 +902,12 @@ function vPM(){
    <div class="kpi"><span class="lbl">Checklist size</span><span class="v">${cnt('D')+cnt('W')+cnt('M')}</span><span class="small muted">${cnt('D')} daily · ${cnt('W')} weekly · ${cnt('M')} monthly</span></div></div>
   <div class="row small muted"><span><span class="pc D" style="display:inline-block;width:22px;text-align:center">·</span> daily only</span><span><span class="pc W" style="display:inline-block;width:22px;text-align:center">W</span> weekly due</span><span><span class="pc M" style="display:inline-block;width:22px;text-align:center">M</span> monthly due</span><span><span class="pc done" style="display:inline-block;width:22px;text-align:center">✓</span> all ticked</span><span><span class="pc nok" style="display:inline-block;width:22px;text-align:center">!</span> NOT OK</span><span><span class="pc miss" style="display:inline-block;width:22px;text-align:center">&nbsp;</span> missed</span></div>
   <div class="tblwrap"><table class="pmgrid"><thead><tr><th class="mn">Machine</th>${days.map(d=>{const dd=parseD(d);return `<th class="${d===td?'today':''} ${dd.getDay()===0?'sun':''}">${dd.getDate()}<br>${DOW[dd.getDay()][0]}</th>`}).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+  ${svcPanel()}
   <section class="panel"><h3>Checklist by machine</h3><p class="small muted" style="margin-top:0">Weekly checks fall on a fixed weekday per machine; monthly checks on a fixed date (moved to Monday if it is a Sunday). Source: PM Checklist Critical Equipment (DCL/MAINT/ID/25-26).</p>
    ${MACHINES.map(m=>{const ts=TASKS.filter(t=>t.m===m.id&&(pmDisc==='ALL'||t.d===pmDisc));if(!ts.length)return'';const i=MACHINES.indexOf(m);
     return `<details><summary><b>${esc(m.n)}</b> <span class="small muted">· ${ts.length} checks · weekly on ${DOW[weeklyDay(i)]} · monthly on ${monthlyDate(i,y,mo-1)}-${MON[mo-1]}</span></summary><ul class="small" style="margin:6px 0 10px;padding-left:18px">${ts.map(t=>`<li><b>${{D:'Daily',W:'Weekly',M:'Monthly'}[t.f]}</b> · ${t.d==='M'?'Mech':'Elec'} · ${esc(t.text)}</li>`).join('')}</ul></details>`}).join('')}</section>`;
 }
-bind.pm=()=>{bindCommon();$('#pmm').onchange=e=>{pmMonth=e.target.value||today().slice(0,7);render()};document.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>{pmDisc=b.dataset.pd;render()})};
+bind.pm=()=>{bindCommon();document.querySelectorAll('[data-svc]').forEach(b=>b.onclick=()=>svcDoneSheet(b.dataset.svc));if($('#svcwa2'))$('#svcwa2').addEventListener('click',()=>setTimeout(svcMarkReminded,300));$('#pmm').onchange=e=>{pmMonth=e.target.value||today().slice(0,7);render()};document.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>{pmDisc=b.dataset.pd;render()})};
 
 /* ----- SPARES ----- */
 let spView='crit', spQ='', spCat='All';
@@ -1205,13 +1257,14 @@ function reportText(){
   if(closed.length){L.push('');L.push('*Closed in last 24 h:*');closed.forEach(b=>L.push('• '+MBY[b.m].n+' — '+b.sym+' — '+rootOf(b)+(b.fix==='T'?' — TEMPORARY FIX, permanent repair pending':'')+(b.stopped?' — '+hrs(bdDur(b))+' h down':'')))}
   L.push('');L.push('*PM checks:* today '+ps.done+'/'+ps.due+(ps.nok?' ('+ps.nok+' NOT OK)':'')+' · yesterday '+ys.done+'/'+ys.due+(ys.due?' ('+Math.round(ys.done/ys.due*100)+'%)':''));
   L.push('*Downtime:* '+MON[d.getMonth()]+' to date '+hrs(mtd)+' h · FY to date '+hrs(fyt)+' h');
+  const sv=svcDueList();if(sv.length){L.push('');L.push('*Major service due ≤7 days / overdue ('+sv.length+'):*');sv.slice(0,10).forEach(x=>L.push('• '+x.n+' — '+svcWhen(x)));if(sv.length>10)L.push('  … and '+(sv.length-10)+' more in the app')}
   const low=CRIT.filter(x=>stockOf(x).q<x.min);
   L.push('');L.push('*Critical spares below minimum ('+low.length+'):*');
   low.forEach(x=>{const on=Object.values(S.sourcing).find(s=>s.crit===x.k&&s.stage!=='Received');L.push('• '+x.n+' — '+stockOf(x).q+'/'+x.min+' '+x.u+' — '+(on?on.stage:'NO INDENT'))});
   const src=Object.values(S.sourcing).filter(s=>s.stage!=='Received');
   if(src.length){L.push('');L.push('*Sourcing pending ('+src.length+'):*');const pk=src.filter(s=>/pick up/i.test(s.st||''));if(pk.length)L.push('Ready for pick up: '+[...new Set(pk.map(s=>s.vendor))].join(', ')+' ('+pk.length+' items)');
     src.sort((a,b)=>(a.idate||'9').localeCompare(b.idate||'9')).slice(0,12).forEach(s=>L.push('• '+s.item+(s.qty?' ('+s.qty+')':'')+' — '+(s.st||s.stage)+(s.po?' — PO '+s.po.replace('DCL/MNT/26-27/','')+'':'')+(s.vendor?' — '+s.vendor:'')+(s.idate?' — '+ageDays(s)+' d':'')+(s.eta&&s.eta<td?' (ETA OVERDUE)':'')));if(src.length>12)L.push('  … and '+(src.length-12)+' more in the app')}
-  const crit=alerts().filter(a=>!a.ack&&a.sev==='crit'&&!a.k.startsWith('bd_')&&!a.k.startsWith('low_'));
+  const crit=alerts().filter(a=>!a.ack&&a.sev==='crit'&&!a.k.startsWith('bd_')&&!a.k.startsWith('low_')&&!a.k.startsWith('svc_'));
   if(crit.length){L.push('');L.push('*Other critical alerts:*');crit.slice(0,8).forEach(a=>L.push('• '+a.t+' — '+a.d))}
   return L.join('\n');
 }
