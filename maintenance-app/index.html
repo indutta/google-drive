@@ -542,16 +542,18 @@ function svcLastTxt(x){const l=svcLast(x);if(!l)return 'no record';const o=S.svc
 function svcWhen(x){const n=svcDays(x),du=svcDue(x);return !du?'PENDING — no service record':n<0?'OVERDUE '+(-n)+' days (due '+fmtD(du)+')':n===0?'due TODAY':'due '+fmtD(du)+' (in '+n+' day'+(n===1?'':'s')+')'}
 function svcText(list){list=list||svcDueList();const soon=list.filter(x=>svcState(x)==='soon'),over=list.filter(x=>svcState(x)==='over');
   const L=['🗓️ *MAJOR SERVICE REMINDER — DATRE FALTA*',DOW[new Date().getDay()]+', '+fmtD(today())+' · by '+me(),''];
-  const row=x=>'• '+x.n+(x.q>1?' (×'+x.q+')':'')+' — '+SVC_F[x.f]+' — '+svcWhen(x)+(svcLast(x)?' · last '+svcLastTxt(x):'');
+  const row=x=>'• '+x.n+(x.q>1?' (×'+x.q+')':'')+' — '+SVC_F[x.f]+' — '+svcWhen(x)+((S.svc[x.k]||{}).remN?' · reminder #'+((S.svc[x.k]||{}).remN+1):'')+(svcLast(x)?' · last '+svcLastTxt(x):'');
   if(soon.length){L.push('*Due within 7 days ('+soon.length+'):*');soon.forEach(x=>L.push(row(x)));L.push('')}
   if(over.length){L.push('*OVERDUE / PENDING ('+over.length+'):*');over.forEach(x=>L.push(row(x)));L.push('')}
   if(!list.length)L.push('✅ No major service due in the next 7 days.','');
   L.push('Plan shutdown, vendor and spares now. After the job: app → PM Plan → Major service → *Mark done*.','',APP_LINK);return L.join('\n')}
-function svcPending(){return svcDueList().filter(x=>((S.svc[x.k]||{}).rem)!==(svcDue(x)||'pending'))}
-function svcMarkReminded(){svcDueList().forEach(x=>{const o=Object.assign({},S.svc[x.k]||{});o.rem=svcDue(x)||'pending';put('svc',x.k,o)})}
+// Reminder repeats every 7 days until the job is marked done (rem = date the last reminder was sent).
+function svcRemAge(x){const r=(S.svc[x.k]||{}).rem;if(!r||!/^\d{4}-\d{2}-\d{2}$/.test(r))return 999;return Math.round((parseD(today())-parseD(r))/864e5)}
+function svcPending(){return svcDueList().filter(x=>svcRemAge(x)>=7)}
+function svcMarkReminded(){svcDueList().forEach(x=>{if(svcRemAge(x)<7)return;const o=Object.assign({},S.svc[x.k]||{});o.rem=today();o.remN=(o.remN||0)+1;put('svc',x.k,o)})}
 function svcPanel(){const dl=svcDueList();
   return `<section class="panel" id="svcp"><div class="spread"><h3>Major service schedule — quarterly / half-yearly / yearly</h3><div class="row"><a class="btn sm pri" id="svcwa2" style="background:#1f9d55;border-color:#1f9d55" href="https://wa.me/?text=${encodeURIComponent(svcText(dl))}" target="_blank" rel="noopener">Send reminder on WhatsApp</a></div></div>
-   <p class="small muted" style="margin:0 0 8px">Source: “Major Machine Yearly Service” (16-Nov-26). Next due = last service + frequency. A reminder appears on the Today page and in the daily update <b>7 days before</b> each due date; overdue jobs stay red until marked done.</p>
+   <p class="small muted" style="margin:0 0 8px">Source: “Major Machine Yearly Service” (16-Nov-26). Next due = last service + frequency. A reminder appears on the Today page and in the daily update <b>7 days before</b> each due date, and <b>repeats every week</b> until the job is marked done here.</p>
    <div class="tblwrap"><table><thead><tr><th>Job</th><th>Next due</th><th></th></tr></thead><tbody>
    ${SVC.slice().sort((a,b)=>svcDays(a)-svcDays(b)).map(x=>{const st=svcState(x);const n=svcDays(x);return `<tr><td><b>${esc(x.n)}</b><div class="small muted">${SVC_D[x.d]} · ${SVC_F[x.f]} · qty ${x.q} · last ${esc(svcLastTxt(x))}${x.m&&MBY[x.m]?' · '+esc(MBY[x.m].n):''}</div></td>
     <td><span class="pill ${st==='over'?'p-crit':st==='soon'?'p-warn':'p-ok'}">${svcDue(x)?(st==='over'?'Overdue '+(-n)+' d':fmtD(svcDue(x))+(st==='soon'?' · in '+n+' d':'')):'Pending'}</span></td><td><button class="btn sm" data-svc="${x.k}">Mark done</button></td></tr>`}).join('')}</tbody></table></div></section>`}
@@ -576,7 +578,7 @@ function alerts(){
    if(old.length)A.push({k:'aged_'+old.length+'_'+today(),sev:'warn',t:old.length+' indent line'+(old.length>1?'s':'')+' pending over 60 days',d:'Oldest: '+old[0].item+' ('+old[0].ref+', '+ageDays(old[0])+' days, '+(old[0].st||old[0].stage)+')',go:()=>{srcFilter='open';go('src')}});}
   Object.values(S.sourcing).forEach(s=>{if(s.stage==='Received'||!s.eta)return;if(s.eta<td)A.push({k:'eta_'+s.id+'_'+s.eta,sev:'warn',t:'Sourcing overdue: '+s.item,d:'ETA was '+fmtD(s.eta)+' · '+s.stage+(s.vendor?' · '+s.vendor:''),go:()=>srcSheet(s.id)})});
   if(canRelease())Object.values(S.sourcing).filter(s=>s.stage==='Indent raised').forEach(s=>A.push({k:'rel_'+s.id,sev:s.prio==='Critical'?'crit':'warn',t:'Indent waiting for release: '+s.item,d:[s.ref,s.qty,s.raisedBy?'raised by '+s.raisedBy:'','release to mail the vendor enquiry'].filter(Boolean).join(' · '),go:()=>srcSheet(s.id)}));
-  svcDueList().forEach(x=>{const ov=svcState(x)==='over';A.push({k:'svc_'+x.k+'_'+(svcDue(x)||'p'),sev:ov?'crit':'warn',t:(ov?'Service OVERDUE: ':'Service due in '+svcDays(x)+' days: ')+x.n,d:SVC_F[x.f]+' · qty '+x.q+' · last '+svcLastTxt(x)+' · '+svcWhen(x),go:()=>go('pm')})});
+  svcDueList().forEach(x=>{const ov=svcState(x)==='over';A.push({k:'svc_'+x.k+'_'+(svcDue(x)||'p')+'_w'+Math.floor(parseD(today()).getTime()/6048e5),sev:ov?'crit':'warn',t:(ov?'Service OVERDUE: ':'Service due in '+svcDays(x)+' days: ')+x.n,d:SVC_F[x.f]+' · qty '+x.q+' · last '+svcLastTxt(x)+' · '+svcWhen(x),go:()=>go('pm')})});
   MACHINES.forEach(m=>['M','E'].forEach(d=>{const p=m[d];if(p&&p.h!=null&&p.h<25)A.push({k:'hl_'+m.id+d,sev:'warn',t:'Health '+p.h+'/100: '+m.n+' ('+(d==='M'?'Mech':'Elec')+')',d:'Predicted driver: '+p.drv+' → '+p.act,go:()=>mSheet(m.id)})}));
   const ord={crit:0,warn:1,info:2};A.sort((a,b)=>ord[a.sev]-ord[b.sev]);
   A.forEach(a=>a.ack=S.acks[a.k]);
