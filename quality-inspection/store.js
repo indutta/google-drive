@@ -70,6 +70,7 @@
     if (action === 'reopen') return !!d.approver;
     if (d.extra && d.extra.includes(action)) return true;
     if (d.all) return true;
+    if (action === 'test') return ({ sand: ['sand', 'planning', 'lab', 'qa', 'qcm'], chem: ['melt', 'lab', 'qa', 'qcm'], dim: ['lab', 'mach', 'qa', 'qcm'], phys: ['lab', 'fettle', 'qa', 'qcm'] }[arg] || []).includes(d.id);
     if (action === 'record') return d.stages.includes(arg);
     if (action === 'create') return (d.create || []).includes(arg);
     if (action === 'link') return (d.link || []).includes(arg);

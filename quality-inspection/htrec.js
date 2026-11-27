@@ -6,8 +6,7 @@
   QI.HT_FIELDS = {
     norm: [['temp', 'Temp. (°C)'], ['ram', 'Ram / Hrs'], ['soak', 'Soaking time'], ['hard', 'Hardness after normalising (HB)']],
     quench: [['furnace', 'Furnace no.'], ['waterBefore', 'Water temp. before dipping (°C)'], ['furnaceTemp', 'Furnace temp. (°C)'], ['matTemp', 'Material temp. (°C)'], ['immersion', 'Immersion time'], ['agitators', 'No. of agitators running'], ['rpm', 'RPM of agitator'], ['agitWhen', 'Agitator running before / after immersion'], ['agitTime', 'Agitator running time'], ['waterAfter', 'Water temp. after dipping (°C)'], ['hard', 'Hardness after quenching (HB)']],
-    temper: [['temp', 'Temp. (°C)'], ['ram', 'Ram / Hrs'], ['soak', 'Soaking time'], ['hard', 'Hardness after tempering (HB)']],
-    phys: [['uts', 'UTS (MPa)'], ['ys', 'YS (MPa)'], ['el', 'Elongation %E'], ['ra', 'Reduction of area %RA'], ['impact', 'Impact (J)']]
+    temper: [['temp', 'Temp. (°C)'], ['ram', 'Ram / Hrs'], ['soak', 'Soaking time'], ['hard', 'Hardness after tempering (HB)']]
   };
   QI.htRec = (c) => c.htRec || null;
   QI.htRecSave = (c, rec, copyToHeat) => {
@@ -56,9 +55,6 @@
       { t: 'Dye penetrant testing (DPT)', std: 'ASTM E165', how: 'Clean, apply penetrant, wait the dwell time, remove excess, apply developer and inspect.', freq: 'Non-magnetic grades / as per plan', rec: 'Final inspection' },
       { t: 'Ultrasonic testing (UT)', std: 'ASTM A609', how: 'Calibrate on the reference block, scan the casting with couplant and record indications against the quality level.', freq: 'As per plan / customer', rec: 'Final UT inspection' },
       { t: 'Radiographic testing (RT)', std: 'ASTM E446 / E186 / E280', how: 'Place the film or detector and penetrameter, expose, and read the image against the reference radiographs.', freq: 'As per plan / customer', rec: 'Final RT inspection' }] },
-    { dept: 'maint', name: 'Maintenance', items: [
-      { t: 'Instrument calibration', std: 'Calibration schedule', how: 'Check each gauge, thermocouple, balance and tester against a certified standard before the due date; tag with the next due date.', freq: 'Per schedule (see "due" on the dashboard)', rec: 'Calibration log' },
-      { t: 'Furnace & equipment checks', std: 'Maintenance checklist', how: 'Run the shift checklist and record faults and breakdown time on the maintenance dashboard.', freq: 'Daily', rec: 'Maintenance dashboard' }] }
   ];
   /* department id -> test group shown first */
   QI.TEST_HOME = { planning: 'qa', pattern: 'qa', sand: 'sand', melt: 'melt', fettle: 'fettle', lab: 'lab', mach: 'qa', qa: 'qa', qcm: 'qa', head: 'qa', mgmt: 'qa' };

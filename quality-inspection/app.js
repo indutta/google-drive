@@ -283,14 +283,15 @@
     <div class="tiles">${tile('mould', mouldToday, 'Moulding plans today')}${tile('logs', st.logs.length, 'Sand & calibration logs')}${tile('logs', due.length, 'Calibrations / tests due', due.length ? 'warn' : 'ok')}</div>
     <h3 class="sec">🔧 Fettling &amp; heat treatment</h3>
     <div class="tiles">${tile('fettle', fet, 'Castings in fettling / heat treatment')}</div>
+    <h3 class="sec">🧪 Testing</h3>
+    <div class="tiles">${(() => { const t = QI.testTotals(); return tile('sandtests', t.sandPending, 'Castings without sand test', t.sandPending ? 'warn' : 'ok') + tile('chemtests', t.chemPending, 'Heats without composition', t.chemPending ? 'warn' : 'ok') + tile('dimtests', t.dimPending, 'Castings not measured', t.dimPending ? 'warn' : 'ok') + tile('phystests', t.physPending, 'Castings without physical test', t.physPending ? 'warn' : 'ok'); })()}</div>
     <h3 class="sec">✅ Inspection</h3>
     <div class="tiles">${tile('castings', s.active, 'Castings in process')}${tile('approvals', s.awaiting, 'Awaiting QC / Factory Head', s.awaiting ? 'warn' : '')}${tile('ncr', s.openNcr, 'Open NCRs', s.openNcr ? 'warn' : 'ok')}${tile('castings', s.released, 'Released', 'ok')}${tile('castings', s.rejected, 'Rejected', s.rejected ? 'bad' : '')}${tile('plan', pct(s.fpy), 'First-time-OK rate')}${tile('castings', pct(s.yield), 'Casting yield')}</div>
     <div class="cols">
       <section class="card"><h3>Needs attention</h3>${attention.length ? attention.map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} ${stateBadge(c)}</div>`).join('') : '<div class="muted">No failed checks waiting ✔</div>'}
         ${st.ncrs.filter((n) => n.status === 'open').slice(-5).reverse().map((n) => `<div class="li sm"><b>${n.id}</b> ${esc(n.param)} – ${esc(n.found)}<div class="muted">${esc(n.action)}</div></div>`).join('')}
         <a class="btn sm" href="#/ncr">NCR register</a></section>
-      <section class="card"><h3>Calibration & testing due</h3>${due.length ? due.slice(0, 6).map((d) => `<div class="li"><span>${dot('nok')} ${esc(d.check.id)} ${esc(QI.steps[d.check.step].name)}<div class="muted sm">${esc(QI.PERIOD_LABEL[d.check.freq])} · last ${d.last ? fd(d.last) : 'never'}</div></span></div>`).join('') + (due.length > 6 ? `<div class="muted sm">+ ${due.length - 6} more</div>` : '') : '<div class="muted">All up to date ✔</div>'}
-        <a class="btn sm" href="#/maint">Open maintenance dashboard</a></section>
+      <section class="card"><h3>Calibration & testing due</h3>${due.length ? due.slice(0, 6).map((d) => `<div class="li"><span>${dot('nok')} ${esc(d.check.id)} ${esc(QI.steps[d.check.step].name)}<div class="muted sm">${esc(QI.PERIOD_LABEL[d.check.freq])} · last ${d.last ? fd(d.last) : 'never'}</div></span></div>`).join('') + (due.length > 6 ? `<div class="muted sm">+ ${due.length - 6} more</div>` : '') : '<div class="muted">All up to date ✔</div>'}</section>
     </div>
     <details class="card"><summary><b>Stage-wise charts</b> <span class="muted sm">(castings in each stage · non-conformances)</span></summary><div class="cols">
       <div><h3>Castings by current stage</h3>${QI.stages.map((x) => `<div class="bar"><span class="bl">${x.no}. ${esc(x.name)}</span><span class="bt"><i style="width:${s.wip[x.no] / max * 100}%"></i></span><b>${s.wip[x.no]}</b></div>`).join('')}</div>
@@ -309,7 +310,7 @@
     qa: [['Approvals', 'go:approvals'], ['Open NCRs', 'go:ncr'], ['Castings', 'go:castings'], ['Daily plan', 'go:ppc']],
     qcm: [['Approvals', 'go:approvals'], ['Open NCRs', 'go:ncr'], ['Castings', 'go:castings'], ['Daily plan', 'go:ppc']],
     head: [['Approvals', 'go:approvals'], ['Open NCRs', 'go:ncr'], ['Daily plan', 'go:ppc'], ['Monthly plan & WIP', 'go:wip']],
-    mgmt: [['Daily plan', 'go:ppc'], ['Monthly plan & WIP', 'go:wip'], ['Maintenance', 'go:maint']]
+    mgmt: [['Daily plan', 'go:ppc'], ['Monthly plan & WIP', 'go:wip']]
   };
   const HOME_DEFAULT = [['Melting log', 'act:ml-new'], ['Moulding plan', 'act:mp-new'], ['Sand / calibration log', 'act:new-log'], ['Daily plan', 'go:ppc'], ['Approvals', 'go:approvals'], ['Work order', 'act:new-job']];
   function homeCard(dp, s, dueN) {
@@ -338,12 +339,10 @@
     const sum = (k) => HTR()[k].map(([f, l]) => `${esc(l)}: <b>${esc((r[k] || {})[f] || '–')}</b>`).join(' · ');
     const empty = !r.ts;
     return `<section class="card"><h3>Heat treatment record ${rtip('From the internal inspection report: shake-out time, normalising, water quenching, tempering with hardness after each, then physical and impact test.')} ${empty ? badge('not recorded', 'warn') : badge('recorded', 'ok')}</h3>
-      ${empty ? '<div class="muted sm">Shake-out time, normalising, quenching, tempering, hardness after each treatment and the physical / impact test result.</div>' : `<div class="sm">Shake-out from pouring: <b>${esc(r.shakeout || '–')}</b></div>
+      ${empty ? '<div class="muted sm">Shake-out time, normalising, quenching, tempering and hardness after each treatment.</div>' : `<div class="sm">Shake-out from pouring: <b>${esc(r.shakeout || '–')}</b></div>
       <details class="ht-d" open><summary><b>Normalising</b> <span class="muted sm">hardness ${esc((r.norm || {}).hard || '–')} HB</span></summary><div class="sm">${sum('norm')}</div></details>
       <details class="ht-d"><summary><b>Water quenching</b> <span class="muted sm">hardness ${esc((r.quench || {}).hard || '–')} HB</span></summary><div class="sm">${sum('quench')}</div></details>
       <details class="ht-d"><summary><b>Tempering</b> <span class="muted sm">hardness ${esc((r.temper || {}).hard || '–')} HB</span></summary><div class="sm">${sum('temper')}</div></details>
-      <details class="ht-d"><summary><b>Physical & impact test</b> <span class="muted sm">${esc((r.phys || {}).result || '–')}</span></summary><div class="sm">${sum('phys')}</div></details>
-      ${r.extra ? `<details class="ht-d"><summary><b>Sand, mould & ladle values</b> <span class="muted sm">from the internal report</span></summary><div class="sm">${Object.entries(r.extra.sand || {}).map(([k, v]) => `${esc(k)}: <b>${esc(v)}</b>`).join(' · ') || '–'}<br>Mould hardness: <b>${esc(r.extra.mouldHardness == null ? '–' : r.extra.mouldHardness)}</b> · Paint °Bé: <b>${esc(r.extra.paint == null ? '–' : r.extra.paint)}</b><br>Ladle %: ${Object.entries(r.extra.chem || {}).map(([k, v]) => `${esc(k)} <b>${esc(v)}</b>`).join(' · ') || '–'}<br><span class="muted">${esc(r.extra.source || '')}</span></div></details>` : ''}
       ${r.remarks ? `<div class="sm muted">${esc(r.remarks)}</div>` : ''}<div class="muted sm">Recorded by ${esc(r.by || '–')} · ${r.ts ? fdt(r.ts) : ''}</div>`}
       ${can ? `<div class="row"><button class="btn primary" data-act="ht-rec" data-id="${esc(c.id)}">${empty ? '+ Record heat treatment' : 'Edit record'}</button></div>` : ''}</section>`;
   }
@@ -354,11 +353,10 @@
       ${grp('Normalising', 'norm', 'Heat to the normalising temperature, soak, then air cool. Record temperature, ramp hours, soaking time and hardness.')}
       ${grp('Water quenching', 'quench', 'Record water temperature before and after, furnace and material temperature, immersion time and the agitator details.')}
       ${grp('Tempering', 'temper', 'Reheat after quenching, soak, then cool. Record temperature, ramp hours, soaking time and hardness.')}
-      <fieldset class="fs"><legend>Physical & impact test ${rtip('Tensile (UTS, YS, %E, %RA) and Charpy impact from the test coupon of this heat.')}</legend><div class="grid2">${HTR().phys.map(([f, l]) => fld(l, 'phys.' + f, (r.phys || {})[f], '')).join('')}${sel('Physical test result', 'phys.result', ['', 'OK', 'Not OK'], (r.phys || {}).result || '')}</div></fieldset>
       ${fld('Remarks', 'remarks', r.remarks, '')}
       ${c.heatNo ? `<label class="chk"><input type="checkbox" name="copy"> Copy these cycle settings (not hardness or test results) to the other castings of heat ${esc(c.heatNo)}</label>` : ''}`;
   }
-  const htRecRead = (f) => { const o = { phys: {}, norm: {}, quench: {}, temper: {} }; [...f.elements].forEach((e) => { if (!e.name || e.name === 'copy') return; const [a, b] = e.name.split('.'); if (b) o[a][b] = e.value.trim(); else o[a] = e.value.trim(); }); return o; };
+  const htRecRead = (f) => { const o = { norm: {}, quench: {}, temper: {} }; [...f.elements].forEach((e) => { if (!e.name || e.name === 'copy') return; const [a, b] = e.name.split('.'); if (b) o[a][b] = e.value.trim(); else o[a] = e.value.trim(); }); return o; };
   V.tests = () => {
     const me = QI.dept(); const cur = ui.testDept || QI.TEST_HOME[me && me.id] || 'qa';
     const g = QI.TESTS.find((x) => x.dept === cur) || QI.TESTS[0];
@@ -373,10 +371,68 @@
   };
   V.hts = () => {
     const cs = S().castings.filter((c) => c.htRec && c.htRec.ts).slice().reverse();
-    const h = (c, k, f) => esc(((c.htRec || {})[k] || {})[f] || '–');
+    const h = (c, k, f) => k === 'phys' ? esc((QI.physOf(c).slice(-1)[0] || {})[f === 'result' ? 'result' : f] || '–') : esc(((c.htRec || {})[k] || {})[f] || '–');
     return `<div class="hd"><h2>Heat treatment records</h2></div>${cs.length ? table(['Casting', 'Heat', 'Shake-out', 'Normalising (°C / HB)', 'Quench HB', 'Tempering (°C / HB)', 'UTS', 'YS', '%E', '%RA', 'Impact', 'Result'], cs.map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(c.htRec.shakeout || '–')}</td><td>${h(c, 'norm', 'temp')} / ${h(c, 'norm', 'hard')}</td><td>${h(c, 'quench', 'hard')}</td><td>${h(c, 'temper', 'temp')} / ${h(c, 'temper', 'hard')}</td><td>${h(c, 'phys', 'uts')}</td><td>${h(c, 'phys', 'ys')}</td><td>${h(c, 'phys', 'el')}</td><td>${h(c, 'phys', 'ra')}</td><td>${h(c, 'phys', 'impact')}</td><td>${h(c, 'phys', 'result')}</td></tr>`)) : '<section class="card"><div class="muted">No heat treatment records yet. Open a casting and choose “Record heat treatment”.</div></section>'}`;
   };
 
+  /* ---- test results: sand (moulding), chemistry (melting), dimensions & physical tests (testing) ---- */
+  const castOpts = (sel0) => S().castings.filter((c) => c.status === 'active' || c.id === sel0).map((c) => [c.id, `${c.id}${c.heatNo ? ' · heat ' + c.heatNo : ''}`]);
+  const nz = (o) => Object.keys(o).forEach((k) => { if (o[k] === '') delete o[k]; });
+  const tby = () => S().settings.inspector || QI.me.name || '';
+  const fl = (f) => f === 'low' ? ' class="bad"' : f === 'high' ? ' class="bad"' : '';
+  const sandForm = (c) => { const t = (c && QI.sandOf(c)) || {}; return `${sel('Casting', 'cid', castOpts(c && c.id), c && c.id)}${fld('Test date', 'date', t.date || today(), 'type="date"')}<div class="grid2">${QI.SAND_F.map(([k, l]) => fld(l, k, t[k], 'inputmode="decimal"')).join('')}</div>`; };
+  const physForm = (c, stage) => { const t = (c ? QI.physOf(c) : []).find((p) => p.stage === stage) || {}; return `${sel('Casting', 'cid', castOpts(c && c.id), c && c.id)}${sel('Stage of heat treatment', 'stage', QI.PHYS_STAGES, stage || QI.PHYS_STAGES[0])}${fld('Test date', 'date', t.date || today(), 'type="date"')}<div class="grid2">${QI.PHYS_F.map(([k, l]) => fld(l, k, t[k], 'inputmode="decimal"')).join('')}</div>${sel('Result', 'result', ['', 'OK', 'Not OK'], t.result || '')}${fld('Remarks', 'remarks', t.remarks, '')}`; };
+  const dimForm = (c) => { const t = (c && QI.dimOf(c)) || { rows: [] }; const rows = (t.rows || []).concat(Array(Math.max(0, 6 - (t.rows || []).length)).fill({})); return `${sel('Casting', 'cid', castOpts(c && c.id), c && c.id)}${fld('Test date', 'date', t.date || today(), 'type="date"')}<div class="muted sm">Dimension, nominal, tolerance ± and the measured value. Result is worked out automatically.</div>${rows.map((r, i) => `<div class="grid4">${fld('Dimension', 'n' + i, r.name, '')}${fld('Nominal', 'v' + i, r.nominal, 'inputmode="decimal"')}${fld('Tol. ±', 't' + i, r.tol, 'inputmode="decimal"')}${fld('Actual', 'a' + i, r.actual, 'inputmode="decimal"')}</div>`).join('')}`; };
+  const readNums = (f, keys) => { const o = {}; keys.forEach(([k]) => { o[k] = val(f, k); }); nz(o); return o; };
+  const tbtn = (kind, label, id) => QI.can('test', kind) ? `<button class="btn primary" data-act="test-${kind}" ${id ? `data-id="${esc(id)}"` : ''}>${label}</button>` : '';
+  V.sandtests = () => {
+    const cs = S().castings; const done = cs.filter((c) => QI.sandOf(c));
+    return `<div class="hd"><div><h2>Sand testing</h2><div class="muted sm">Sand, mould and paint test results for each casting’s mould. ${link('/logs', 'Sand & calibration logs')}</div></div>${tbtn('sand', '+ Record sand test')}</div>
+    <div class="tiles">${tile('sandtests', done.length, 'Castings with sand test', 'ok')}${tile('sandtests', cs.filter((c) => c.status === 'active' && !QI.sandOf(c)).length, 'Active castings without sand test', 'warn')}</div>
+    ${done.length ? table(['Casting', 'Heat', 'Date', 'Resin % / Catalyst %', 'Fines', 'Moisture', 'Tensile / Compressive', 'Gas', 'L.O.I', 'Mould hardness', 'Paint °Bé', ''], done.map((c) => { const t = QI.sandOf(c); const v = (k) => esc(t[k] == null ? '–' : t[k]); return `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(t.date || '–')}</td><td>${v('resinMixed')} / ${v('catalystMixed')}</td><td>${v('fines')}</td><td>${v('moisture')}</td><td>${v('tensile')} / ${v('compressive')}</td><td>${v('gas')}</td><td>${v('loi')}</td><td>${v('mouldHardness')}</td><td>${v('paint')}</td><td>${tbtn('sand', 'Edit', c.id)}</td></tr>`; })) : '<section class="card"><div class="muted">No sand tests recorded yet.</div></section>'}`;
+  };
+  V.chemtests = () => {
+    const hs = S().heats;
+    return `<div class="hd"><div><h2>Chemical composition</h2><div class="muted sm">Ladle sample results (%) for each heat. Values outside the limits set in the heat’s Specification are shown in red.</div></div>${tbtn('chem', '+ Record composition')}</div>
+    <div class="tiles">${tile('chemtests', hs.filter((h) => h.chem).length, 'Heats with composition', 'ok')}${tile('chemtests', hs.filter((h) => !h.chem).length, 'Heats waiting for composition', 'warn')}</div>
+    ${hs.length ? table(['Heat', 'Grade', 'Date'].concat(QI.CHEM_EL.map((e) => '%' + e)).concat(['Castings', '']), hs.slice().reverse().map((h) => { const c = h.chem || {}; return `<tr><td>${link('/heat/' + h.no, h.no)}</td><td>${esc(h.grade || '–')}</td><td>${esc(c.date || '–')}</td>${QI.CHEM_EL.map((e) => `<td${fl(QI.chemFlag(h, e, c[e]))}>${esc(c[e] == null ? '–' : c[e])}</td>`).join('')}<td>${QI.heatCastings(h.no).length}</td><td>${tbtn('chem', h.chem ? 'Edit' : 'Record', h.no)}</td></tr>`; })) : '<section class="card"><div class="muted">No heats yet.</div></section>'}`;
+  };
+  V.dimtests = () => {
+    const done = S().castings.filter((c) => QI.dimOf(c));
+    return `<div class="hd"><div><h2>Dimensions</h2><div class="muted sm">Dimensional inspection of each casting against the drawing.</div></div>${tbtn('dim', '+ Record dimensions')}</div>
+    <div class="tiles">${tile('dimtests', done.length, 'Castings measured', 'ok')}${tile('dimtests', S().castings.filter((c) => c.status === 'active' && !QI.dimOf(c)).length, 'Active castings not measured', 'warn')}</div>
+    ${done.length ? done.map((c) => { const t = QI.dimOf(c); return `<section class="card"><h3>${link('/casting/' + c.id, c.id)} <span class="muted sm">${esc(t.date || '')} · ${esc(t.by || '')}</span> ${tbtn('dim', 'Edit', c.id)}</h3>${table(['Dimension', 'Nominal', 'Tol. ±', 'Actual', 'Result'], (t.rows || []).map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.nominal)}</td><td>${esc(r.tol)}</td><td>${esc(r.actual)}</td><td>${r.ok === true ? badge('OK', 'ok') : r.ok === false ? badge('Not OK', 'bad') : '–'}</td></tr>`))}</section>`; }).join('') : '<section class="card"><div class="muted">No dimensions recorded yet.</div></section>'}`;
+  };
+  V.phystests = () => {
+    const rows = []; S().castings.forEach((c) => QI.physOf(c).forEach((p) => rows.push([c, p])));
+    const byStage = QI.PHYS_STAGES.map((s) => `${esc(s)}: <b>${rows.filter((r) => r[1].stage === s).length}</b>`).join(' · ');
+    return `<div class="hd"><div><h2>Physical testing</h2><div class="muted sm">Tensile, impact and hardness results at each stage of heat treatment. ${byStage}</div></div>${tbtn('phys', '+ Record physical test')}</div>
+    ${rows.length ? table(['Casting', 'Heat', 'Stage', 'Date', 'UTS', 'YS', '%E', '%RA', 'Impact', 'HB', 'Result', ''], rows.map(([c, p]) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(p.stage)}</td><td>${esc(p.date || '–')}</td><td>${esc(p.uts || '–')}</td><td>${esc(p.ys || '–')}</td><td>${esc(p.el || '–')}</td><td>${esc(p.ra || '–')}</td><td>${esc(p.impact || '–')}</td><td>${esc(p.hardness || '–')}</td><td>${p.result === 'OK' ? badge('OK', 'ok') : p.result ? badge(p.result, 'bad') : '–'}</td><td>${tbtn('phys', 'Edit', c.id + '|' + p.stage)}</td></tr>`)) : '<section class="card"><div class="muted">No physical tests recorded yet.</div></section>'}`;
+  };
+  function testsCard(c) {
+    const sd = QI.sandOf(c), dm = QI.dimOf(c), ph = QI.physOf(c), h = c.heatNo && QI.heat(c.heatNo);
+    return `<section class="card"><h3>Test results</h3>
+      <div class="li"><span>Sand test ${sd ? badge('recorded', 'ok') : badge('pending', 'warn')}</span>${tbtn('sand', sd ? 'Edit' : 'Record', c.id)}</div>
+      <div class="li"><span>Chemical composition ${h ? (h.chem ? badge('heat ' + h.no, 'ok') : badge('pending', 'warn')) : badge('assign a heat', 'mute')}</span>${h ? tbtn('chem', h.chem ? 'Edit' : 'Record', h.no) : ''}</div>
+      <div class="li"><span>Dimensions ${dm ? badge((dm.rows || []).length + ' measured', 'ok') : badge('pending', 'warn')}</span>${tbtn('dim', dm ? 'Edit' : 'Record', c.id)}</div>
+      ${QI.PHYS_STAGES.map((s) => { const p = ph.find((x) => x.stage === s); return `<div class="li"><span>Physical test – ${esc(s)} ${p ? badge(p.result || 'recorded', p.result === 'Not OK' ? 'bad' : 'ok') + `<span class="muted sm"> UTS ${esc(p.uts || '–')} · YS ${esc(p.ys || '–')} · ${esc(p.hardness || '–')} HB</span>` : ''}</span>${tbtn('phys', p ? 'Edit' : 'Record', c.id + '|' + s)}</div>`; }).join('')}</section>`;
+  }
+  function testSyncCard(date) {
+    const x = QI.testSync(date); const f = (p) => p[1] ? `${p[0]} / ${p[1]}` : '<span class="muted">no castings yet</span>';
+    const none = !x.mould.length && !x.melt.length && !x.ht.length;
+    return `<section class="card" id="tsync"><h3>Testing status of today’s plan <span class="muted sm">· results recorded / castings of the item</span></h3>${none ? '<div class="muted">Add items to the moulding, melting or heat treatment plan above to see their test results here.</div>' : ''}
+    ${x.mould.length ? `<h5>Moulding → sand tests</h5>${table(['Item', 'Sand tested'], x.mould.map((m) => `<tr><td>${esc(m.item)}</td><td>${f(m.sand)}</td></tr>`))}<a class="btn sm" href="#/sandtests">Sand testing</a>` : ''}
+    ${x.melt.length ? `<h5>Melting → chemical composition</h5>${table(['Heat', 'Composition', 'Castings'], x.melt.map((m) => `<tr><td>${m.exists ? link('/heat/' + m.no, m.heat) : esc(m.heat)}</td><td>${m.chem ? badge('recorded', 'ok') : m.exists ? badge('pending', 'warn') : badge('heat not created', 'mute')}</td><td>${m.castings}</td></tr>`))}<a class="btn sm" href="#/chemtests">Chemical composition</a>` : ''}
+    ${x.ht.length ? `<h5>Heat treatment → physical tests &amp; dimensions</h5>${table(['Item', 'HT record', 'Dimensions'].concat(QI.PHYS_STAGES.slice(1, 4)), x.ht.map((m) => `<tr><td>${esc(m.item)}</td><td>${f(m.rec)}</td><td>${f(m.dim)}</td>${m.stages.map((s) => `<td>${f(s[1])}</td>`).join('')}</tr>`))}<a class="btn sm" href="#/phystests">Physical testing</a> <a class="btn sm" href="#/dimtests">Dimensions</a>` : ''}</section>`;
+  }
+  const readCast = (f) => QI.casting(val(f, 'cid'));
+  const TEST_ACTS = {
+    'test-sand': (el) => { const c = QI.casting(el.dataset.id) || null; if (needInspector()) return; modal('Sand test', sandForm(c), (f) => { const k = readCast(f); if (!k) return 'Choose a casting.'; const d = readNums(f, QI.SAND_F); d.date = val(f, 'date'); d.by = tby(); const r = QI.testSave('sand', k, d); if (r.error) return r.error; toast('Sand test saved', 'ok'); }); },
+    'test-chem': (el) => { const h = QI.heat(el.dataset.id) || null; if (needInspector()) return; const cur = (h && h.chem) || {};
+      modal('Chemical composition (%)', `${sel('Heat', 'hno', S().heats.map((x) => x.no), h && h.no)}${fld('Test date', 'date', cur.date || today(), 'type="date"')}<div class="grid2">${QI.CHEM_EL.map((e) => fld('%' + e, e, cur[e], 'inputmode="decimal"')).join('')}</div>`, (f) => { const hh = QI.heat(val(f, 'hno')); if (!hh) return 'Choose a heat.'; const d = readNums(f, QI.CHEM_EL.map((e) => [e])); d.date = val(f, 'date'); d.by = tby(); const r = QI.chemSave(hh, d); if (r.error) return r.error; toast('Composition saved', 'ok'); }); },
+    'test-dim': (el) => { const c = QI.casting(el.dataset.id) || null; if (needInspector()) return; modal('Dimensions', dimForm(c), (f) => { const k = readCast(f); if (!k) return 'Choose a casting.'; const rows = []; for (let i = 0; i < 6; i++) { const name = val(f, 'n' + i); if (!name) continue; const r = { name, nominal: val(f, 'v' + i), tol: val(f, 't' + i), actual: val(f, 'a' + i) }; if (r.nominal !== '' && r.tol !== '' && r.actual !== '') r.ok = Math.abs(+r.actual - +r.nominal) <= +r.tol + 1e-9; rows.push(r); } if (!rows.length) return 'Enter at least one dimension.'; const r = QI.testSave('dim', k, { rows, date: val(f, 'date'), by: tby() }); if (r.error) return r.error; toast('Dimensions saved', 'ok'); }); },
+    'test-phys': (el) => { const [id, stage] = (el.dataset.id || '').split('|'); const c = QI.casting(id) || null; if (needInspector()) return; modal('Physical test', physForm(c, stage), (f) => { const k = readCast(f); if (!k) return 'Choose a casting.'; const d = readNums(f, QI.PHYS_F); Object.assign(d, { stage: val(f, 'stage'), date: val(f, 'date'), result: val(f, 'result'), remarks: val(f, 'remarks'), by: tby() }); const r = QI.testSave('phys', k, d); if (r.error) return r.error; toast('Physical test saved', 'ok'); }); }
+  };
   /* ---- fettling (stages 5–6) ---- */
   V.fettle = () => {
     const now = stageNowCount([5, 6]);
@@ -387,37 +443,6 @@
     <div class="muted sm">Open a casting to record Stage 5 (Shot blasting &amp; fettling), Stage 6 (Heat treatment) checks and its heat treatment record. ${link('/hts', 'All heat treatment records')} · ${link('/tests', 'Testing procedures')}</div>`;
   };
 
-  /* ---- maintenance dashboard ---- */
-  V.maint = () => {
-    const st = S(); const mt = st.settings.maint || (st.settings.maint = { limit: 100 });
-    const day = 864e5;
-    const sched = QI.allChecks().filter((c) => c.scope === 'log' && c.freq && c.freq !== 'shift').map((c) => {
-      const last = QI.lastDone(c.id); const p = QI.PERIOD_DAYS[c.freq];
-      const next = last ? last + p * day : null; const left = last ? Math.ceil((next - Date.now()) / day) : null;
-      return { c, last, next, left, state: last == null ? 'never' : left < 0 ? 'over' : left <= Math.max(1, Math.round(p * 0.2)) ? 'soon' : 'ok' };
-    }).sort((a, b) => ['never', 'over', 'soon', 'ok'].indexOf(a.state) - ['never', 'over', 'soon', 'ok'].indexOf(b.state));
-    const cnt = (k) => sched.filter((x) => x.state === k).length;
-    const lbl = { never: ['Never done', 'bad'], over: ['Overdue', 'bad'], soon: ['Due soon', 'warn'], ok: ['On time', 'ok'] };
-    const num = (v) => parseFloat(v) || 0;
-    const furn = {};
-    st.furnaceLogs.forEach((l) => { const f = l.furnace || '–'; (furn[f] = furn[f] || []).push(l); });
-    const cut = Date.now() - 30 * day;
-    const furnRows = Object.keys(furn).sort().map((f) => {
-      const ls = furn[f].slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-      const last = ls[ls.length - 1]; const lin = num(last.lining); const lim = num(mt.limit) || 100;
-      const recent = ls.filter((l) => new Date(l.date).getTime() >= cut);
-      const refr = {}; QI.ML_REFR.forEach(([k]) => (refr[k] = recent.reduce((a, l) => a + num((l.refr || {})[k]), 0)));
-      const pc = Math.min(100, lin / lim * 100);
-      return `<tr><td><b>${esc(f)}</b></td><td>${ls.length}</td><td>${esc(last.date || '–')}<div class="muted sm">${link('/meltlog/' + last.heat, last.heat)}</div></td><td><div class="bar lin"><span class="bt ${lin >= lim ? 'bad' : lin >= lim * 0.85 ? 'warnb' : ''}"><i style="width:${pc}%"></i></span><b>${lin || '–'}</b></div><div class="muted sm">limit ${lim} · ${lin >= lim ? '<span class="badT">relining due</span>' : lin >= lim * 0.85 ? '<span class="warnT">relining soon</span>' : 'OK'}</div></td><td>${esc(last.patching || '–')}</td><td class="sm">${QI.ML_REFR.filter(([k]) => refr[k]).map(([k, t]) => esc(t.replace(/ \(.*\)/, '')) + ' ' + refr[k]).join(' · ') || '–'}</td></tr>`;
-    });
-    return `<div class="hd"><h2>Maintenance dashboard</h2></div>
-    <div class="tiles">${tile('maint', cnt('over') + cnt('never'), 'Calibrations / tests overdue', cnt('over') + cnt('never') ? 'bad' : 'ok')}${tile('maint', cnt('soon'), 'Due soon', cnt('soon') ? 'warn' : 'ok')}${tile('maint', cnt('ok'), 'On time', 'ok')}${tile('maint', Object.keys(furn).length, 'Furnaces in use')}</div>
-    <section class="card"><h3>Furnaces &amp; refractory <small class="muted">(from the Melting log sheets)</small></h3>
-      <label class="sm">Relining limit – heats on lining <input type="number" min="1" style="width:6rem" value="${esc(mt.limit)}" data-act="maint-limit"></label> <span class="muted sm">(starter value – set to your practice)</span>
-      ${furnRows.length ? table(['Furnace', 'Heats logged', 'Last heat', 'Heat on lining', 'On patching', 'Refractory used (last 30 days)'], furnRows) : empty('No melting logs yet – furnace condition appears here after the first Melting log.')}</section>
-    <section class="card"><h3>Calibration &amp; periodic tests schedule</h3>${table(['Check', 'Frequency', 'Last done', 'Next due'], sched.map((x) => `<tr><td><b>${esc(x.c.id)}</b> ${esc(QI.steps[x.c.step].name)}<div class="muted sm">${esc(x.c.param)}</div>${badge(lbl[x.state][0], lbl[x.state][1])}</td><td>${esc(QI.PERIOD_LABEL[x.c.freq])}</td><td>${x.last ? fd(x.last) : '–'}</td><td>${x.next ? fd(x.next) : 'now'}</td></tr>`))}
-      <div class="row"><a class="btn" href="#/logs">Open sand &amp; calibration logs</a></div></section>`;
-  };
 
   /* ---- jobs ---- */
   V.jobs = () => `<div class="hd"><h2>Work orders</h2><button class="btn primary" data-act="new-job">+ New work order</button></div>
@@ -468,6 +493,7 @@
       <div><span class="lbl">Heat (melt)</span><div class="row">${c.status === 'active' || !c.heatNo ? `<select data-act="set-heat" data-id="${esc(c.id)}"><option value="">– select heat –</option>${heats.map((h) => `<option ${h.no === c.heatNo ? 'selected' : ''}>${esc(h.no)}</option>`).join('')}</select>` : esc(c.heatNo)}<button class="btn sm" data-act="new-heat" data-for="${esc(c.id)}">+ New heat</button></div></div>
       <div><span class="lbl">Sand & calibration log (mould-making shift)</span><div class="row"><select data-act="set-log" data-id="${esc(c.id)}"><option value="">– select log –</option>${logs.map((l) => `<option value="${esc(l.id)}" ${l.id === c.logId ? 'selected' : ''}>${esc(l.date)} · shift ${esc(l.shift)}</option>`).join('')}</select><button class="btn sm" data-act="new-log" data-for="${esc(c.id)}">+ New log</button></div></div></div></section>
     ${htRecCard(c)}
+    ${testsCard(c)}
     ${t.stages.map((x) => {
       const no = x.stage.no;
       const open = ui.stageOpen[c.id + no] != null ? ui.stageOpen[c.id + no] : (no === t.current || x.status === 'fail');
@@ -1021,7 +1047,8 @@
       <div class="tw"><table class="cmt"><thead><tr><th>Item</th><th>Furnace</th><th>Start</th><th>Cycle</th><th>Weight (kg)</th><th></th></tr></thead><tbody>${htRows}</tbody></table></div>
       <datalist id="ppc-items">${items.map((i) => `<option value="${esc(i)}">`).join('')}</datalist>
       <div class="row"><button class="btn" data-act="ht-add">+ Add row</button><button class="btn primary" data-act="ht-save">Save heat treatment plan</button>${ui.ht.saved ? '<button class="btn danger" data-act="ht-delplan">Delete plan</button>' : ''}</div>
-      <div class="sm muted pad">Inspection: Stage 6 heat cycle check on every casting. ${x.at56} casting(s) are waiting at Stages 5–6 now${matched ? `, ${matched} planned item(s) match castings in the app` : ''}. ${link('/fettle', 'Open fettling & heat treatment')}</div></section>`;
+      <div class="sm muted pad">Inspection: Stage 6 heat cycle check on every casting. ${x.at56} casting(s) are waiting at Stages 5–6 now${matched ? `, ${matched} planned item(s) match castings in the app` : ''}. ${link('/fettle', 'Open fettling & heat treatment')}</div></section>
+    ${testSyncCard(date)}`;
   };
   async function ppcUpload(file) {
     if (!file) return;
@@ -1224,7 +1251,6 @@
     'edit-items': (el) => { const c = el.dataset.c; modal(`Casting items – ${c}`, ta('Items (one per line)', 'items', QI.opts('part:' + c).join('\n'), 'e.g. Knuckle, Main Body, …', 10), (f) => { const L = S().settings.lists || (S().settings.lists = {}); L['part:' + c] = [...new Set(val(f, 'items').split('\n').map((x) => x.trim()).filter(Boolean))]; QI.save(); }); },
     'add-customer': () => modal('Add customer', `${fld('Customer name', 'name', '', 'required')}${ta('Casting items (one per line)', 'items', '', '', 8)}`, (f) => { const n = val(f, 'name'); if (!n) return 'Enter the customer name.'; QI.learn('customer', n); const L = S().settings.lists; L['part:' + n] = [...new Set(val(f, 'items').split('\n').map((x) => x.trim()).filter(Boolean))]; QI.save(); }),
     'modal-cancel': () => $('#dlg').close(),
-    'maint-limit': (el) => { const st = S(); (st.settings.maint || (st.settings.maint = {})).limit = parseFloat(el.value) || 100; QI.save(); render(); },
     'filter-castings': (el) => { ui.filter.castings = el.value; render(); const i = $('.search'); i.focus(); i.setSelectionRange(99, 99); },
     'filter-plan': (el) => { ui.filter.plan = el.value; render(); const i = $('.search'); i.focus(); i.setSelectionRange(99, 99); },
     'ncr-filter': (el) => { ui.filter.ncr = el.dataset.f; render(); },
@@ -1261,7 +1287,7 @@
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS, HT_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS, HT_ACTS, TEST_ACTS);
   async function savePdf(name, make) {
     toast('Making the PDF …');
     try { const blob = await make(); download(name, blob, 'application/pdf'); }
@@ -1293,7 +1319,7 @@
       if (sl.form.classList.contains('chkform')) liveEval(sl.form);
     }
     const el = e.target; if (!el.dataset || !el.dataset.act) return;
-    if (['applic', 'set-heat', 'set-log', 'import-json', 'maint-limit', 'ppc-date'].includes(el.dataset.act)) ACT[el.dataset.act](el);
+    if (['applic', 'set-heat', 'set-log', 'import-json', 'ppc-date'].includes(el.dataset.act)) ACT[el.dataset.act](el);
   });
   document.addEventListener('input', (e) => {
     const el = e.target;
@@ -1348,15 +1374,15 @@
   const GROUPS = [
     ['home', 'Dashboard', [['dashboard', 'Dashboard']]],
     ['production', 'PRODUCTION', [['ppc', 'Daily plan'], ['wip', 'Monthly plan & WIP']]],
-    ['melting', 'MELTING', [['mplan', 'Melting plan'], ['melt', 'Melting log'], ['heats', 'Heats'], ['rm', 'Raw materials'], ['charge', 'Charge mix'], ['tests', 'Testing procedures']]],
-    ['moulding', 'MOULDING', [['mould', 'Moulding log'], ['logs', 'Sand & calibration'], ['tests', 'Testing procedures']]],
-    ['fettling', 'FETTLING', [['fettle', 'Fettling & heat treatment'], ['hts', 'Heat treatment records'], ['tests', 'Testing procedures']]],
-    ['inspection', 'INSPECTION', [['jobs', 'Work orders'], ['castings', 'Castings'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['tests', 'Testing procedures']]],
-    ['maintenance', 'MAINTENANCE', [['maint', 'Maintenance dashboard']]],
+    ['melting', 'MELTING', [['mplan', 'Melting plan'], ['melt', 'Melting log'], ['heats', 'Heats'], ['rm', 'Raw materials'], ['charge', 'Charge mix'], ['chemtests', 'Chemical composition']]],
+    ['moulding', 'MOULDING', [['mould', 'Moulding log'], ['logs', 'Sand & calibration'], ['sandtests', 'Sand testing']]],
+    ['fettling', 'FETTLING', [['fettle', 'Fettling & heat treatment'], ['hts', 'Heat treatment records']]],
+    ['inspection', 'INSPECTION', [['jobs', 'Work orders'], ['castings', 'Castings'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan']]],
+    ['testing', 'TESTING', [['dimtests', 'Dimensions'], ['phystests', 'Physical testing'], ['tests', 'Testing procedures']]],
     ['admin', 'Settings', [['settings', 'Settings']]]];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'wip-add': ['ppc'], 'wip-del': ['ppc'], 'wip-save': ['ppc'], 'ht-rec': ['ht'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'wip-add': ['ppc'], 'wip-del': ['ppc'], 'wip-save': ['ppc'], 'ht-rec': ['ht'], 'test-sand': ['test', 'sand'], 'test-chem': ['test', 'chem'], 'test-dim': ['test', 'dim'], 'test-phys': ['test', 'phys'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;

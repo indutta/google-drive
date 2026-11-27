@@ -77,9 +77,8 @@ The **Melting plan** page mirrors the paper *Melting heat plan*: date; per heat 
 * **Heat page:** shows the melting plan of the heat next to its furnace log, raw-material traceability and charge.
 Together the chain *melting plan → moulding plan → charge mix → raw material lots → furnace log → inspection results* is now linked by heat number, item and MRN, which is the base for output analysis.
 
-## Navigation, dashboard and maintenance
-The top bar has main headings — **Dashboard, MELTING** (Melting plan, Melting log, Heats, Raw materials, Charge mix), **MOULDING** (Moulding log, Sand & calibration), **FETTLING** (stages 5–6), **INSPECTION** (Work orders, Castings, Approvals, NCRs, Inspection plan), **MAINTENANCE**, Settings — and the sub-headings of the selected heading appear in a second row.
-The Dashboard greets the user, offers quick-add buttons, and shows tiles per area (each tile opens its window). The Maintenance dashboard shows calibration / periodic-test schedule status (overdue, due soon, on time) and furnace condition (heats on lining against a relining limit, patching, refractory used in the last 30 days) from the Melting logs.
+## Navigation and dashboard
+Top bar: **Dashboard, PRODUCTION, MELTING** (… Chemical composition), **MOULDING** (… Sand testing), **FETTLING** (… Heat treatment records), **INSPECTION**, **TESTING** (Dimensions, Physical testing at each heat-treatment stage, Testing procedures). The Maintenance dashboard was removed. The Daily plan shows the testing status of each planned item, heat and heat-treatment item.
 
 ## Responsible persons (Inspection Flow update)
 The updated `INS_Inspection_Flow.xlsx` adds **Inspector Sign** and **Final Sign of Approval Authority** columns. They are imported into `plan.js` per check, shown on the Inspection plan table, and displayed as "Assigned: …" on the Inspector and Factory Head boxes of each stage's approval strip.
