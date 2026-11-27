@@ -329,6 +329,53 @@
       'Inspection', `• Castings in process: ${s.active} · released ${s.released} · rejected ${s.rejected}`, `• Waiting for QC / Factory Head: ${s.awaiting}`, `• Open NCRs: ${s.openNcr}`, `• Calibrations / tests due: ${QI.due().length}`);
     return L.join('\n');
   }
+  /* ---- heat treatment record (internal inspection report) + testing procedures ---- */
+  const HTR = () => QI.HT_FIELDS;
+  const rtip = (txt) => `<span class="rtip" tabindex="0" data-tip="${esc(txt)}">ⓘ</span>`;
+  function htRecCard(c) {
+    const r = QI.htRec(c) || {}; const can = QI.can('ht');
+    const row = (lab, k, o) => { const v = r[k] || {}; return `<tr><th>${lab}</th>${HTR()[k].map(([f]) => `<td>${esc(v[f] == null || v[f] === '' ? '–' : v[f])}</td>`).join('')}</tr>`; };
+    const sum = (k) => HTR()[k].map(([f, l]) => `${esc(l)}: <b>${esc((r[k] || {})[f] || '–')}</b>`).join(' · ');
+    const empty = !r.ts;
+    return `<section class="card"><h3>Heat treatment record ${rtip('From the internal inspection report: shake-out time, normalising, water quenching, tempering with hardness after each, then physical and impact test.')} ${empty ? badge('not recorded', 'warn') : badge('recorded', 'ok')}</h3>
+      ${empty ? '<div class="muted sm">Shake-out time, normalising, quenching, tempering, hardness after each treatment and the physical / impact test result.</div>' : `<div class="sm">Shake-out from pouring: <b>${esc(r.shakeout || '–')}</b></div>
+      <details class="ht-d" open><summary><b>Normalising</b> <span class="muted sm">hardness ${esc((r.norm || {}).hard || '–')} HB</span></summary><div class="sm">${sum('norm')}</div></details>
+      <details class="ht-d"><summary><b>Water quenching</b> <span class="muted sm">hardness ${esc((r.quench || {}).hard || '–')} HB</span></summary><div class="sm">${sum('quench')}</div></details>
+      <details class="ht-d"><summary><b>Tempering</b> <span class="muted sm">hardness ${esc((r.temper || {}).hard || '–')} HB</span></summary><div class="sm">${sum('temper')}</div></details>
+      <details class="ht-d"><summary><b>Physical & impact test</b> <span class="muted sm">${esc((r.phys || {}).result || '–')}</span></summary><div class="sm">${sum('phys')}</div></details>
+      ${r.remarks ? `<div class="sm muted">${esc(r.remarks)}</div>` : ''}<div class="muted sm">Recorded by ${esc(r.by || '–')} · ${r.ts ? fdt(r.ts) : ''}</div>`}
+      ${can ? `<div class="row"><button class="btn primary" data-act="ht-rec" data-id="${esc(c.id)}">${empty ? '+ Record heat treatment' : 'Edit record'}</button></div>` : ''}</section>`;
+  }
+  function htRecForm(c) {
+    const r = QI.htRec(c) || {};
+    const grp = (title, k, tip) => `<fieldset class="fs"><legend>${title} ${rtip(tip)}</legend><div class="grid2">${HTR()[k].map(([f, l]) => fld(l, k + '.' + f, (r[k] || {})[f], '')).join('')}</div></fieldset>`;
+    return `${fld('Shake-out time from pouring', 'shakeout', r.shakeout, 'placeholder="e.g. 28 Hrs"')}
+      ${grp('Normalising', 'norm', 'Heat to the normalising temperature, soak, then air cool. Record temperature, ramp hours, soaking time and hardness.')}
+      ${grp('Water quenching', 'quench', 'Record water temperature before and after, furnace and material temperature, immersion time and the agitator details.')}
+      ${grp('Tempering', 'temper', 'Reheat after quenching, soak, then cool. Record temperature, ramp hours, soaking time and hardness.')}
+      <fieldset class="fs"><legend>Physical & impact test ${rtip('Tensile (UTS, YS, %E, %RA) and Charpy impact from the test coupon of this heat.')}</legend><div class="grid2">${HTR().phys.map(([f, l]) => fld(l, 'phys.' + f, (r.phys || {})[f], '')).join('')}${sel('Physical test result', 'phys.result', ['', 'OK', 'Not OK'], (r.phys || {}).result || '')}</div></fieldset>
+      ${fld('Remarks', 'remarks', r.remarks, '')}
+      ${c.heatNo ? `<label class="chk"><input type="checkbox" name="copy"> Copy these cycle settings (not hardness or test results) to the other castings of heat ${esc(c.heatNo)}</label>` : ''}`;
+  }
+  const htRecRead = (f) => { const o = { phys: {}, norm: {}, quench: {}, temper: {} }; [...f.elements].forEach((e) => { if (!e.name || e.name === 'copy') return; const [a, b] = e.name.split('.'); if (b) o[a][b] = e.value.trim(); else o[a] = e.value.trim(); }); return o; };
+  V.tests = () => {
+    const me = QI.dept(); const cur = ui.testDept || QI.TEST_HOME[me && me.id] || 'qa';
+    const g = QI.TESTS.find((x) => x.dept === cur) || QI.TESTS[0];
+    return `<div class="hd"><div><h2>Testing procedures</h2><div class="muted sm">Tap a test to open how it is done. Limits come from the inspection plan and the customer specification.</div></div></div>
+    <div class="chips">${QI.TESTS.map((x) => `<button class="chip ${x.dept === g.dept ? 'on' : ''}" data-act="test-dept" data-d="${x.dept}">${esc(x.name)}</button>`).join('')}</div>
+    <section class="card"><h3>${esc(g.name)}</h3>${g.items.map((i) => `<details class="ht-d"><summary><b>${esc(i.t)}</b> <span class="muted sm">${esc(i.std)}</span></summary>
+      <div class="sm"><p>${esc(i.how)}</p><div><span class="lbl">How often</span> ${esc(i.freq)}</div><div><span class="lbl">Recorded in</span> ${esc(i.rec)}</div></div></details>`).join('')}</section>`;
+  };
+  const HT_ACTS = {
+      'ht-rec': (el) => { const c = QI.casting(el.dataset.id); if (!c) return; if (needInspector()) return; modal('Heat treatment record – ' + c.id, htRecForm(c), (f) => { const rec = htRecRead(f); rec.by = S().settings.inspector || QI.me.name || ''; const r = QI.htRecSave(c, rec, f.elements.copy && f.elements.copy.checked); if (r.error) return r.error; toast('Heat treatment record saved', 'ok'); }); },
+      'test-dept': (el) => { ui.testDept = el.dataset.d; render(); }
+  };
+  V.hts = () => {
+    const cs = S().castings.filter((c) => c.htRec && c.htRec.ts).slice().reverse();
+    const h = (c, k, f) => esc(((c.htRec || {})[k] || {})[f] || '–');
+    return `<div class="hd"><h2>Heat treatment records</h2></div>${cs.length ? table(['Casting', 'Heat', 'Shake-out', 'Normalising (°C / HB)', 'Quench HB', 'Tempering (°C / HB)', 'UTS', 'YS', '%E', '%RA', 'Impact', 'Result'], cs.map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(c.htRec.shakeout || '–')}</td><td>${h(c, 'norm', 'temp')} / ${h(c, 'norm', 'hard')}</td><td>${h(c, 'quench', 'hard')}</td><td>${h(c, 'temper', 'temp')} / ${h(c, 'temper', 'hard')}</td><td>${h(c, 'phys', 'uts')}</td><td>${h(c, 'phys', 'ys')}</td><td>${h(c, 'phys', 'el')}</td><td>${h(c, 'phys', 'ra')}</td><td>${h(c, 'phys', 'impact')}</td><td>${h(c, 'phys', 'result')}</td></tr>`)) : '<section class="card"><div class="muted">No heat treatment records yet. Open a casting and choose “Record heat treatment”.</div></section>'}`;
+  };
+
   /* ---- fettling (stages 5–6) ---- */
   V.fettle = () => {
     const now = stageNowCount([5, 6]);
@@ -336,7 +383,7 @@
     return `<div class="hd"><h2>Fettling &amp; heat treatment</h2></div>
     <div class="tiles">${tile('fettle', now.length, 'In shot blasting / fettling / heat treatment')}${tile('fettle', done.length, 'Passed on to NDT and later stages', 'ok')}</div>
     <section class="card"><h3>Castings waiting at stages 5–6</h3>${now.length ? castingTable(now) : '<div class="muted">Nothing waiting ✔</div>'}</section>
-    <div class="muted sm">Open a casting to record Stage 5 (Shot blasting &amp; fettling) and Stage 6 (Heat treatment) checks.</div>`;
+    <div class="muted sm">Open a casting to record Stage 5 (Shot blasting &amp; fettling), Stage 6 (Heat treatment) checks and its heat treatment record. ${link('/hts', 'All heat treatment records')} · ${link('/tests', 'Testing procedures')}</div>`;
   };
 
   /* ---- maintenance dashboard ---- */
@@ -419,6 +466,7 @@
     <section class="card links"><div class="grid2">
       <div><span class="lbl">Heat (melt)</span><div class="row">${c.status === 'active' || !c.heatNo ? `<select data-act="set-heat" data-id="${esc(c.id)}"><option value="">– select heat –</option>${heats.map((h) => `<option ${h.no === c.heatNo ? 'selected' : ''}>${esc(h.no)}</option>`).join('')}</select>` : esc(c.heatNo)}<button class="btn sm" data-act="new-heat" data-for="${esc(c.id)}">+ New heat</button></div></div>
       <div><span class="lbl">Sand & calibration log (mould-making shift)</span><div class="row"><select data-act="set-log" data-id="${esc(c.id)}"><option value="">– select log –</option>${logs.map((l) => `<option value="${esc(l.id)}" ${l.id === c.logId ? 'selected' : ''}>${esc(l.date)} · shift ${esc(l.shift)}</option>`).join('')}</select><button class="btn sm" data-act="new-log" data-for="${esc(c.id)}">+ New log</button></div></div></div></section>
+    ${htRecCard(c)}
     ${t.stages.map((x) => {
       const no = x.stage.no;
       const open = ui.stageOpen[c.id + no] != null ? ui.stageOpen[c.id + no] : (no === t.current || x.status === 'fail');
@@ -1212,7 +1260,7 @@
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS, HT_ACTS);
   async function savePdf(name, make) {
     toast('Making the PDF …');
     try { const blob = await make(); download(name, blob, 'application/pdf'); }
@@ -1299,15 +1347,15 @@
   const GROUPS = [
     ['home', 'Dashboard', [['dashboard', 'Dashboard']]],
     ['production', 'PRODUCTION', [['ppc', 'Daily plan'], ['wip', 'Monthly plan & WIP']]],
-    ['melting', 'MELTING', [['mplan', 'Melting plan'], ['melt', 'Melting log'], ['heats', 'Heats'], ['rm', 'Raw materials'], ['charge', 'Charge mix']]],
-    ['moulding', 'MOULDING', [['mould', 'Moulding log'], ['logs', 'Sand & calibration']]],
-    ['fettling', 'FETTLING', [['fettle', 'Fettling & heat treatment']]],
-    ['inspection', 'INSPECTION', [['jobs', 'Work orders'], ['castings', 'Castings'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan']]],
+    ['melting', 'MELTING', [['mplan', 'Melting plan'], ['melt', 'Melting log'], ['heats', 'Heats'], ['rm', 'Raw materials'], ['charge', 'Charge mix'], ['tests', 'Testing procedures']]],
+    ['moulding', 'MOULDING', [['mould', 'Moulding log'], ['logs', 'Sand & calibration'], ['tests', 'Testing procedures']]],
+    ['fettling', 'FETTLING', [['fettle', 'Fettling & heat treatment'], ['hts', 'Heat treatment records'], ['tests', 'Testing procedures']]],
+    ['inspection', 'INSPECTION', [['jobs', 'Work orders'], ['castings', 'Castings'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['tests', 'Testing procedures']]],
     ['maintenance', 'MAINTENANCE', [['maint', 'Maintenance dashboard']]],
     ['admin', 'Settings', [['settings', 'Settings']]]];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'wip-add': ['ppc'], 'wip-del': ['ppc'], 'wip-save': ['ppc'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'wip-add': ['ppc'], 'wip-del': ['ppc'], 'wip-save': ['ppc'], 'ht-rec': ['ht'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;

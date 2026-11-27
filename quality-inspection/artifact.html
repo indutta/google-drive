@@ -120,6 +120,12 @@ details.card summary{cursor:pointer}
 .home-b{min-height:64px;font-weight:600;text-align:center;font-size:1rem;display:flex;align-items:center;justify-content:center;gap:.4rem}
 .tip{display:flex;gap:.6rem;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--infobg);color:var(--info);border-radius:10px;padding:.6rem .8rem;margin-bottom:.8rem}
 
+.rtip{display:inline-flex;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;border-radius:50%;background:var(--infobg);color:var(--info);font-size:.8rem;cursor:help;position:relative;vertical-align:middle;font-weight:400}
+.rtip:hover::after,.rtip:focus::after{content:attr(data-tip);position:absolute;left:0;top:1.6rem;z-index:30;width:min(18rem,70vw);background:#222;color:#fff;padding:.5rem .65rem;border-radius:8px;font-size:.8rem;line-height:1.3;box-shadow:0 4px 14px rgba(0,0,0,.3);white-space:normal;text-align:left}
+details.ht-d{border-top:1px solid var(--line,#ddd);padding:.4rem 0}details.ht-d summary{cursor:pointer;display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap}details.ht-d[open]>summary{margin-bottom:.35rem}
+fieldset.fs{border:1px solid var(--line,#ddd);border-radius:10px;margin:.6rem 0;padding:.4rem .7rem}fieldset.fs legend{font-weight:600;padding:0 .3rem}
+.chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.2rem 0 .8rem}.chip{border:1px solid var(--line,#ccc);background:transparent;color:inherit;border-radius:999px;padding:.35rem .8rem;cursor:pointer}.chip.on{background:var(--brand,#1b5e8c);color:#fff;border-color:transparent}
+
 </style>
 <header class="top">
   <div class="brandrow"><button id="back" class="back" hidden aria-label="Back">←</button><img id="logo" class="logo" alt="Datre" hidden><div class="brand"><b>Daily Production &amp; Inspection</b> <span>Datre Corporation Limited</span></div></div>
@@ -3154,6 +3160,74 @@ window.PLAN = {
 
 </script>
 <script>
+/* Heat-treatment record per casting (from the internal inspection report) + testing-procedure reference by department. */
+(function () {
+  'use strict';
+  const QI = window.QI;
+  /* Fields in the order of the internal inspection sheet */
+  QI.HT_FIELDS = {
+    norm: [['temp', 'Temp. (°C)'], ['ram', 'Ram / Hrs'], ['soak', 'Soaking time'], ['hard', 'Hardness after normalising (HB)']],
+    quench: [['furnace', 'Furnace no.'], ['waterBefore', 'Water temp. before dipping (°C)'], ['furnaceTemp', 'Furnace temp. (°C)'], ['matTemp', 'Material temp. (°C)'], ['immersion', 'Immersion time'], ['agitators', 'No. of agitators running'], ['rpm', 'RPM of agitator'], ['agitWhen', 'Agitator running before / after immersion'], ['agitTime', 'Agitator running time'], ['waterAfter', 'Water temp. after dipping (°C)'], ['hard', 'Hardness after quenching (HB)']],
+    temper: [['temp', 'Temp. (°C)'], ['ram', 'Ram / Hrs'], ['soak', 'Soaking time'], ['hard', 'Hardness after tempering (HB)']],
+    phys: [['uts', 'UTS (MPa)'], ['ys', 'YS (MPa)'], ['el', 'Elongation %E'], ['ra', 'Reduction of area %RA'], ['impact', 'Impact (J)']]
+  };
+  QI.htRec = (c) => c.htRec || null;
+  QI.htRecSave = (c, rec, copyToHeat) => {
+    if (!QI.can('ht')) return { error: 'Your department cannot record heat treatment.' };
+    rec.by = rec.by || ''; rec.ts = Date.now();
+    c.htRec = rec;
+    if (copyToHeat && c.heatNo) {
+      QI.S().castings.forEach((o) => {
+        if (o === c || o.heatNo !== c.heatNo || o.status !== 'active') return;
+        const r = JSON.parse(JSON.stringify(o.htRec || {}));
+        ['norm', 'quench', 'temper'].forEach((k) => { r[k] = Object.assign({}, rec[k], { hard: (r[k] || {}).hard || '' }); });
+        r.shakeout = rec.shakeout; r.ts = rec.ts; r.by = rec.by; o.htRec = r;
+      });
+    }
+    QI.save(); return { ok: true };
+  };
+
+  /* ---- testing procedures by department (reference summary – limits come from the inspection plan / customer spec) ---- */
+  QI.TESTS = [
+    { dept: 'sand', name: 'Sand lab & moulding', items: [
+      { t: 'Sand grain fineness & fines', std: 'AFS sieve analysis', how: 'Dry a 50 g sample, shake through the sieve set for the fixed time, weigh each sieve and calculate GFN and % fines.', freq: 'Per shift (new & mixed sand)', rec: 'Sand test report – fines' },
+      { t: 'Moisture', std: 'Moisture analyser / oven drying', how: 'Weigh 50 g sand, dry to constant weight, moisture % = weight loss ÷ original weight.', freq: 'Per shift', rec: 'Sand test report – moisture' },
+      { t: 'Compressive / tensile strength', std: 'Universal sand strength machine', how: 'Ram three standard 50 × 50 mm specimens, test to failure, report the average. Resin sand: cure for the stated time first.', freq: 'Per shift', rec: 'Sand test report – C./T. strength' },
+      { t: 'Resin & catalyst %', std: 'Dosing check', how: 'Collect the dosed quantity for the timed run and weigh it against the sand delivered; compare with the set % of the sand weight.', freq: 'Start of shift & after setting change', rec: 'Sand calibration report' },
+      { t: 'Loss on ignition (L.O.I) & gas content', std: 'Muffle furnace / gas evolution test', how: 'L.O.I: heat a dried sample at the set temperature and weigh the loss. Gas: heat in the gas tester and read the volume.', freq: 'Weekly or per batch', rec: 'Sand test report – L.O.I / gas' },
+      { t: 'Mould hardness', std: 'Scratch hardness tester', how: 'Press the tester on the mould face at several points (cope, drag, pattern depth) and take the readings.', freq: 'Every mould', rec: 'Mould hardness' },
+      { t: 'Paint (coating) Baumé', std: 'Hydrometer', how: 'Float the hydrometer in a measuring cylinder of the stirred paint and read °Bé at the meniscus.', freq: 'Each paint batch', rec: 'Paint test' }] },
+    { dept: 'melt', name: 'Melting & pouring', items: [
+      { t: 'Ladle / furnace sample chemistry', std: 'Optical emission spectrometer (OES)', how: 'Cast the sample, grind the face, burn at the set points and compare C, Si, Mn, P, S, Cr, Mo, Ni, Al, Cu, Ti with the grade. Correct the bath before tapping.', freq: 'Every heat, before tap', rec: 'Ladle sample report' },
+      { t: 'Tapping & pouring temperature', std: 'Immersion thermocouple', how: 'Dip the calibrated thermocouple in the ladle; record at tap and at pouring against the heat window.', freq: 'Every heat', rec: 'Melting log' },
+      { t: 'Charge verification', std: 'Weighing & lot check', how: 'Weigh each charge item against the approved charge mix and note the raw-material lot.', freq: 'Every heat', rec: 'Charge mix / melting log' },
+      { t: 'Test coupon / keel block', std: 'Cast with the heat', how: 'Pour the coupon from the same ladle, mark with the heat code and send it with the castings through the same heat treatment.', freq: 'Every heat (as per customer)', rec: 'Heat record' }] },
+    { dept: 'fettle', name: 'Fettling & heat treatment', items: [
+      { t: 'Shake-out time from pouring', std: 'Clock record', how: 'Note the hours from pouring to shake-out; do not shake out before the set minimum.', freq: 'Every mould', rec: 'Heat treatment record' },
+      { t: 'Normalising / tempering cycle', std: 'Furnace chart & thermocouple', how: 'Record furnace no., temperature, ramp (hours) and soaking time against the approved cycle; keep the furnace chart.', freq: 'Every charge', rec: 'Heat treatment record' },
+      { t: 'Water quenching', std: 'Quench tank record', how: 'Record water temp. before and after dipping, furnace and material temperature, immersion time, agitators running, RPM and when agitation ran.', freq: 'Every charge', rec: 'Heat treatment record' },
+      { t: 'Hardness after each treatment', std: 'Brinell hardness (HB)', how: 'Grind a flat spot, test at the marked location and record HB after normalising, after quenching and after tempering.', freq: 'Every casting / sample', rec: 'Heat treatment record' }] },
+    { dept: 'lab', name: 'Metallurgical & physical lab', items: [
+      { t: 'Tensile test (UTS, YS, %E, %RA)', std: 'ISO 6892-1 / ASTM A370', how: 'Machine the specimen from the coupon, measure the gauge dimensions, pull to fracture and record UTS, YS, elongation and reduction of area.', freq: 'Per heat / treatment lot', rec: 'Physical test report' },
+      { t: 'Impact test (Charpy)', std: 'ISO 148-1 / ASTM A370', how: 'Notched specimen at the specified temperature, strike on the pendulum and record absorbed energy (J); usually the average of three.', freq: 'Per heat / treatment lot', rec: 'Impact' },
+      { t: 'Hardness (Brinell)', std: 'ISO 6506 / ASTM E10', how: 'Prepare the surface, apply the set load and ball, measure the indentation and read HB.', freq: 'As per plan', rec: 'Hardness record' },
+      { t: 'Microstructure', std: 'Metallography', how: 'Cut, mount, polish, etch and examine against the customer standard.', freq: 'When specified', rec: 'Lab report' }] },
+    { dept: 'qa', name: 'NDT & final inspection', items: [
+      { t: 'Visual & dimensional', std: 'Drawing / template / CMM', how: 'Check surface condition and each drawing dimension with the approved gauges or template; record the readings.', freq: 'Every casting', rec: 'Inspection report' },
+      { t: 'Magnetic particle testing (MPT)', std: 'ASTM E709', how: 'Clean, magnetise, apply the particles, inspect under light and compare indications with the acceptance class.', freq: 'As per plan / customer', rec: 'Final MPT inspection' },
+      { t: 'Dye penetrant testing (DPT)', std: 'ASTM E165', how: 'Clean, apply penetrant, wait the dwell time, remove excess, apply developer and inspect.', freq: 'Non-magnetic grades / as per plan', rec: 'Final inspection' },
+      { t: 'Ultrasonic testing (UT)', std: 'ASTM A609', how: 'Calibrate on the reference block, scan the casting with couplant and record indications against the quality level.', freq: 'As per plan / customer', rec: 'Final UT inspection' },
+      { t: 'Radiographic testing (RT)', std: 'ASTM E446 / E186 / E280', how: 'Place the film or detector and penetrameter, expose, and read the image against the reference radiographs.', freq: 'As per plan / customer', rec: 'Final RT inspection' }] },
+    { dept: 'maint', name: 'Maintenance', items: [
+      { t: 'Instrument calibration', std: 'Calibration schedule', how: 'Check each gauge, thermocouple, balance and tester against a certified standard before the due date; tag with the next due date.', freq: 'Per schedule (see "due" on the dashboard)', rec: 'Calibration log' },
+      { t: 'Furnace & equipment checks', std: 'Maintenance checklist', how: 'Run the shift checklist and record faults and breakdown time on the maintenance dashboard.', freq: 'Daily', rec: 'Maintenance dashboard' }] }
+  ];
+  /* department id -> test group shown first */
+  QI.TEST_HOME = { planning: 'qa', pattern: 'qa', sand: 'sand', melt: 'melt', fettle: 'fettle', lab: 'lab', mach: 'qa', qa: 'qa', qcm: 'qa', head: 'qa', mgmt: 'qa' };
+})();
+
+</script>
+<script>
 /* DCL – customer PDF reports: casting inspection report and work-order summary.
    Built in the phone's browser with jsPDF (loaded from cdnjs the first time a report is made). */
 (function () {
@@ -3621,6 +3695,53 @@ window.DCL_LOGO = '';
       'Inspection', `• Castings in process: ${s.active} · released ${s.released} · rejected ${s.rejected}`, `• Waiting for QC / Factory Head: ${s.awaiting}`, `• Open NCRs: ${s.openNcr}`, `• Calibrations / tests due: ${QI.due().length}`);
     return L.join('\n');
   }
+  /* ---- heat treatment record (internal inspection report) + testing procedures ---- */
+  const HTR = () => QI.HT_FIELDS;
+  const rtip = (txt) => `<span class="rtip" tabindex="0" data-tip="${esc(txt)}">ⓘ</span>`;
+  function htRecCard(c) {
+    const r = QI.htRec(c) || {}; const can = QI.can('ht');
+    const row = (lab, k, o) => { const v = r[k] || {}; return `<tr><th>${lab}</th>${HTR()[k].map(([f]) => `<td>${esc(v[f] == null || v[f] === '' ? '–' : v[f])}</td>`).join('')}</tr>`; };
+    const sum = (k) => HTR()[k].map(([f, l]) => `${esc(l)}: <b>${esc((r[k] || {})[f] || '–')}</b>`).join(' · ');
+    const empty = !r.ts;
+    return `<section class="card"><h3>Heat treatment record ${rtip('From the internal inspection report: shake-out time, normalising, water quenching, tempering with hardness after each, then physical and impact test.')} ${empty ? badge('not recorded', 'warn') : badge('recorded', 'ok')}</h3>
+      ${empty ? '<div class="muted sm">Shake-out time, normalising, quenching, tempering, hardness after each treatment and the physical / impact test result.</div>' : `<div class="sm">Shake-out from pouring: <b>${esc(r.shakeout || '–')}</b></div>
+      <details class="ht-d" open><summary><b>Normalising</b> <span class="muted sm">hardness ${esc((r.norm || {}).hard || '–')} HB</span></summary><div class="sm">${sum('norm')}</div></details>
+      <details class="ht-d"><summary><b>Water quenching</b> <span class="muted sm">hardness ${esc((r.quench || {}).hard || '–')} HB</span></summary><div class="sm">${sum('quench')}</div></details>
+      <details class="ht-d"><summary><b>Tempering</b> <span class="muted sm">hardness ${esc((r.temper || {}).hard || '–')} HB</span></summary><div class="sm">${sum('temper')}</div></details>
+      <details class="ht-d"><summary><b>Physical & impact test</b> <span class="muted sm">${esc((r.phys || {}).result || '–')}</span></summary><div class="sm">${sum('phys')}</div></details>
+      ${r.remarks ? `<div class="sm muted">${esc(r.remarks)}</div>` : ''}<div class="muted sm">Recorded by ${esc(r.by || '–')} · ${r.ts ? fdt(r.ts) : ''}</div>`}
+      ${can ? `<div class="row"><button class="btn primary" data-act="ht-rec" data-id="${esc(c.id)}">${empty ? '+ Record heat treatment' : 'Edit record'}</button></div>` : ''}</section>`;
+  }
+  function htRecForm(c) {
+    const r = QI.htRec(c) || {};
+    const grp = (title, k, tip) => `<fieldset class="fs"><legend>${title} ${rtip(tip)}</legend><div class="grid2">${HTR()[k].map(([f, l]) => fld(l, k + '.' + f, (r[k] || {})[f], '')).join('')}</div></fieldset>`;
+    return `${fld('Shake-out time from pouring', 'shakeout', r.shakeout, 'placeholder="e.g. 28 Hrs"')}
+      ${grp('Normalising', 'norm', 'Heat to the normalising temperature, soak, then air cool. Record temperature, ramp hours, soaking time and hardness.')}
+      ${grp('Water quenching', 'quench', 'Record water temperature before and after, furnace and material temperature, immersion time and the agitator details.')}
+      ${grp('Tempering', 'temper', 'Reheat after quenching, soak, then cool. Record temperature, ramp hours, soaking time and hardness.')}
+      <fieldset class="fs"><legend>Physical & impact test ${rtip('Tensile (UTS, YS, %E, %RA) and Charpy impact from the test coupon of this heat.')}</legend><div class="grid2">${HTR().phys.map(([f, l]) => fld(l, 'phys.' + f, (r.phys || {})[f], '')).join('')}${sel('Physical test result', 'phys.result', ['', 'OK', 'Not OK'], (r.phys || {}).result || '')}</div></fieldset>
+      ${fld('Remarks', 'remarks', r.remarks, '')}
+      ${c.heatNo ? `<label class="chk"><input type="checkbox" name="copy"> Copy these cycle settings (not hardness or test results) to the other castings of heat ${esc(c.heatNo)}</label>` : ''}`;
+  }
+  const htRecRead = (f) => { const o = { phys: {}, norm: {}, quench: {}, temper: {} }; [...f.elements].forEach((e) => { if (!e.name || e.name === 'copy') return; const [a, b] = e.name.split('.'); if (b) o[a][b] = e.value.trim(); else o[a] = e.value.trim(); }); return o; };
+  V.tests = () => {
+    const me = QI.dept(); const cur = ui.testDept || QI.TEST_HOME[me && me.id] || 'qa';
+    const g = QI.TESTS.find((x) => x.dept === cur) || QI.TESTS[0];
+    return `<div class="hd"><div><h2>Testing procedures</h2><div class="muted sm">Tap a test to open how it is done. Limits come from the inspection plan and the customer specification.</div></div></div>
+    <div class="chips">${QI.TESTS.map((x) => `<button class="chip ${x.dept === g.dept ? 'on' : ''}" data-act="test-dept" data-d="${x.dept}">${esc(x.name)}</button>`).join('')}</div>
+    <section class="card"><h3>${esc(g.name)}</h3>${g.items.map((i) => `<details class="ht-d"><summary><b>${esc(i.t)}</b> <span class="muted sm">${esc(i.std)}</span></summary>
+      <div class="sm"><p>${esc(i.how)}</p><div><span class="lbl">How often</span> ${esc(i.freq)}</div><div><span class="lbl">Recorded in</span> ${esc(i.rec)}</div></div></details>`).join('')}</section>`;
+  };
+  const HT_ACTS = {
+      'ht-rec': (el) => { const c = QI.casting(el.dataset.id); if (!c) return; if (needInspector()) return; modal('Heat treatment record – ' + c.id, htRecForm(c), (f) => { const rec = htRecRead(f); rec.by = S().settings.inspector || QI.me.name || ''; const r = QI.htRecSave(c, rec, f.elements.copy && f.elements.copy.checked); if (r.error) return r.error; toast('Heat treatment record saved', 'ok'); }); },
+      'test-dept': (el) => { ui.testDept = el.dataset.d; render(); }
+  };
+  V.hts = () => {
+    const cs = S().castings.filter((c) => c.htRec && c.htRec.ts).slice().reverse();
+    const h = (c, k, f) => esc(((c.htRec || {})[k] || {})[f] || '–');
+    return `<div class="hd"><h2>Heat treatment records</h2></div>${cs.length ? table(['Casting', 'Heat', 'Shake-out', 'Normalising (°C / HB)', 'Quench HB', 'Tempering (°C / HB)', 'UTS', 'YS', '%E', '%RA', 'Impact', 'Result'], cs.map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(c.htRec.shakeout || '–')}</td><td>${h(c, 'norm', 'temp')} / ${h(c, 'norm', 'hard')}</td><td>${h(c, 'quench', 'hard')}</td><td>${h(c, 'temper', 'temp')} / ${h(c, 'temper', 'hard')}</td><td>${h(c, 'phys', 'uts')}</td><td>${h(c, 'phys', 'ys')}</td><td>${h(c, 'phys', 'el')}</td><td>${h(c, 'phys', 'ra')}</td><td>${h(c, 'phys', 'impact')}</td><td>${h(c, 'phys', 'result')}</td></tr>`)) : '<section class="card"><div class="muted">No heat treatment records yet. Open a casting and choose “Record heat treatment”.</div></section>'}`;
+  };
+
   /* ---- fettling (stages 5–6) ---- */
   V.fettle = () => {
     const now = stageNowCount([5, 6]);
@@ -3628,7 +3749,7 @@ window.DCL_LOGO = '';
     return `<div class="hd"><h2>Fettling &amp; heat treatment</h2></div>
     <div class="tiles">${tile('fettle', now.length, 'In shot blasting / fettling / heat treatment')}${tile('fettle', done.length, 'Passed on to NDT and later stages', 'ok')}</div>
     <section class="card"><h3>Castings waiting at stages 5–6</h3>${now.length ? castingTable(now) : '<div class="muted">Nothing waiting ✔</div>'}</section>
-    <div class="muted sm">Open a casting to record Stage 5 (Shot blasting &amp; fettling) and Stage 6 (Heat treatment) checks.</div>`;
+    <div class="muted sm">Open a casting to record Stage 5 (Shot blasting &amp; fettling), Stage 6 (Heat treatment) checks and its heat treatment record. ${link('/hts', 'All heat treatment records')} · ${link('/tests', 'Testing procedures')}</div>`;
   };
 
   /* ---- maintenance dashboard ---- */
@@ -3711,6 +3832,7 @@ window.DCL_LOGO = '';
     <section class="card links"><div class="grid2">
       <div><span class="lbl">Heat (melt)</span><div class="row">${c.status === 'active' || !c.heatNo ? `<select data-act="set-heat" data-id="${esc(c.id)}"><option value="">– select heat –</option>${heats.map((h) => `<option ${h.no === c.heatNo ? 'selected' : ''}>${esc(h.no)}</option>`).join('')}</select>` : esc(c.heatNo)}<button class="btn sm" data-act="new-heat" data-for="${esc(c.id)}">+ New heat</button></div></div>
       <div><span class="lbl">Sand & calibration log (mould-making shift)</span><div class="row"><select data-act="set-log" data-id="${esc(c.id)}"><option value="">– select log –</option>${logs.map((l) => `<option value="${esc(l.id)}" ${l.id === c.logId ? 'selected' : ''}>${esc(l.date)} · shift ${esc(l.shift)}</option>`).join('')}</select><button class="btn sm" data-act="new-log" data-for="${esc(c.id)}">+ New log</button></div></div></div></section>
+    ${htRecCard(c)}
     ${t.stages.map((x) => {
       const no = x.stage.no;
       const open = ui.stageOpen[c.id + no] != null ? ui.stageOpen[c.id + no] : (no === t.current || x.status === 'fail');
@@ -4504,7 +4626,7 @@ window.DCL_LOGO = '';
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS);
+  Object.assign(ACT, CHARGE_ACTS, MELT_ACTS, MOULD_ACTS, RM_ACTS, MPL_ACTS, PPC_ACTS, HT_ACTS);
   async function savePdf(name, make) {
     toast('Making the PDF …');
     try { const blob = await make(); download(name, blob, 'application/pdf'); }
@@ -4591,15 +4713,15 @@ window.DCL_LOGO = '';
   const GROUPS = [
     ['home', 'Dashboard', [['dashboard', 'Dashboard']]],
     ['production', 'PRODUCTION', [['ppc', 'Daily plan'], ['wip', 'Monthly plan & WIP']]],
-    ['melting', 'MELTING', [['mplan', 'Melting plan'], ['melt', 'Melting log'], ['heats', 'Heats'], ['rm', 'Raw materials'], ['charge', 'Charge mix']]],
-    ['moulding', 'MOULDING', [['mould', 'Moulding log'], ['logs', 'Sand & calibration']]],
-    ['fettling', 'FETTLING', [['fettle', 'Fettling & heat treatment']]],
-    ['inspection', 'INSPECTION', [['jobs', 'Work orders'], ['castings', 'Castings'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan']]],
+    ['melting', 'MELTING', [['mplan', 'Melting plan'], ['melt', 'Melting log'], ['heats', 'Heats'], ['rm', 'Raw materials'], ['charge', 'Charge mix'], ['tests', 'Testing procedures']]],
+    ['moulding', 'MOULDING', [['mould', 'Moulding log'], ['logs', 'Sand & calibration'], ['tests', 'Testing procedures']]],
+    ['fettling', 'FETTLING', [['fettle', 'Fettling & heat treatment'], ['hts', 'Heat treatment records'], ['tests', 'Testing procedures']]],
+    ['inspection', 'INSPECTION', [['jobs', 'Work orders'], ['castings', 'Castings'], ['approvals', 'Approvals'], ['ncr', 'NCRs'], ['plan', 'Inspection plan'], ['tests', 'Testing procedures']]],
     ['maintenance', 'MAINTENANCE', [['maint', 'Maintenance dashboard']]],
     ['admin', 'Settings', [['settings', 'Settings']]]];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'wip-add': ['ppc'], 'wip-del': ['ppc'], 'wip-save': ['ppc'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'wip-add': ['ppc'], 'wip-del': ['ppc'], 'wip-save': ['ppc'], 'ht-rec': ['ht'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;

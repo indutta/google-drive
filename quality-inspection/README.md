@@ -97,3 +97,7 @@ The app is titled **Daily Production & Inspection** (Datre logo in the header, f
 
 ## Customer PDF reports
 **Download PDF** on a casting's inspection report (or the PDF button on the casting page) makes the casting inspection report; **Customer report (PDF)** on a work order makes a one-to-two page inspection summary (castings, status, heat chemistry / temperature / mechanical results). Built in the browser with jsPDF (`pdfreport.js`, loaded from cdnjs on first use) and offered as a file download; the Datre logo is added when `logo.js` holds it.
+
+## Heat treatment record & testing procedures
+- **Heat treatment record** (casting page, FETTLING → Heat treatment records): shake-out time, normalising, water quenching (furnace, water temperatures, immersion, agitators), tempering, hardness after each, UTS / YS / %E / %RA / impact and result, as in the internal inspection report. Can copy the cycle settings to the other castings of the same heat.
+- **Testing procedures** (menu item in MELTING, MOULDING, FETTLING, INSPECTION): tap a test to open how it is done, standard, frequency and where it is recorded; ⓘ icons show a short hint on hover/tap. Content is in `htrec.js` (`QI.TESTS`) – confirm limits against the Datre QAP.
