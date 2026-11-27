@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inspection Data</title>
+<meta name="theme-color" content="#1f5fbf">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brandrow"><button id="back" class="back" hidden aria-label="Back">←</button><img id="logo" class="logo" alt="Datre" hidden><div class="brand"><b>Inspection Data</b> <span>Datre Corporation Limited</span></div></div>
+  <span id="sync" class="sync"></span>
+  <button id="stale" class="stale" hidden>Updates available – tap to refresh</button>
+  <button id="who" class="who" title="Inspector"></button>
+</header>
+<nav id="nav" class="nav"></nav>
+<main id="main"></main>
+<dialog id="dlg"></dialog>
+<button id="fab" class="fab noprint" type="button">+ New entry</button>
+<div id="fabsheet" class="sheet-bg" hidden><div class="sheet" role="dialog" aria-label="New entry"><div class="sheet-h"><b>What do you want to enter?</b><button class="x" id="fabclose" aria-label="Close">×</button></div><div id="fabbtns" class="fabgrid"></div></div></div>
+<div id="toast" role="status"></div>
+<script src="plan.js"></script>
+<script src="store.js"></script>
+<script src="htrec.js"></script>
+<script src="tests.js"></script>
+<script src="pdfreport.js"></script>
+<script src="logo.js"></script>
+<script src="app.js"></script>
+<script>if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(function(){});</script>
+</body>
+</html>
