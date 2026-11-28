@@ -139,6 +139,10 @@ main{padding-bottom:5.5rem}
 
 .fstep{padding:.3rem 0}.farrow{text-align:center;color:var(--muted,#889);font-size:.8rem;line-height:1}.ftxt.g{color:#1c6b3a}.ftxt.r{color:#a02828}.gate{margin:.5rem 0;padding:.5rem .7rem;border-radius:10px;background:#fff6dd;border:1px solid #e8d18a}
 
+.steps7{display:inline-flex;gap:3px}.steps7 .s{width:.8rem;height:.8rem;border-radius:3px;background:#d9d9d4;display:inline-block}.steps7 .s.done{background:#1f8a4c}.steps7 .s.progress{background:#2a63c4}.steps7 .s.fail{background:#c43a2a}
+details.card>summary{cursor:pointer;display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap}
+.nw{white-space:nowrap}
+
 </style>
 <header class="top">
   <div class="brandrow"><button id="back" class="back" hidden aria-label="Back">←</button><img id="logo" class="logo" alt="Datre" hidden><div class="brand"><b>Inspection Data</b> <span>Datre Corporation Limited</span></div></div>
@@ -2275,7 +2279,7 @@ window.DCL_LOGO = '';
     return `<div class="hello"><div><h2>${GREET()}${name ? ', ' + esc(name.split(' ')[0]) : ''} 👋</h2><div class="muted">${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</div></div></div>${intro}
     ${toApprove.length ? `<section class="card"><h3>Waiting for your approval <span class="badge warn">${toApprove.length}</span></h3>${toApprove.slice(0, 8).map((p) => `<div class="li">${link('/casting/' + (p.castings ? p.castings[0] : ''), (p.castings || [''])[0])} <span class="muted sm">Stage ${p.stageNo}</span></div>`).join('')}<a class="btn sm" href="#/approvals">All approvals</a></section>` : ''}
     ${mine.length ? `<section class="card"><h3>Your department</h3>${mine.map((x) => `<div class="li"><a href="#/flow/${encodeURIComponent(x.name)}"><b>${esc(x.name)}</b></a><span class="badge ${pendingOf(x) ? 'warn' : 'ok'}">${pendingOf(x)} to do</span></div>`).join('')}</section>` : ''}
-    <div class="tiles">${tile('castings', s.active, 'Castings in process')}${tile('approvals', s.awaiting, 'Awaiting approval', s.awaiting ? 'warn' : '')}${tile('ncr', s.openNcr, 'Open NCRs', s.openNcr ? 'warn' : 'ok')}${tile('castings', s.released, 'Released', 'ok')}</div>
+    <div class="tiles">${tile('tracker', st.heats.length, 'Heats tracked')}${tile('castings', s.active, 'Castings in process')}${tile('approvals', s.awaiting, 'Awaiting approval', s.awaiting ? 'warn' : '')}${tile('ncr', s.openNcr, 'Open NCRs', s.openNcr ? 'warn' : 'ok')}${tile('castings', s.released, 'Released', 'ok')}</div>
     <section class="card"><h3>The flow <span class="muted sm">· still to do in each section</span></h3>${SECTIONS().map((x, i) => `<div class="li"><span>${i + 1}. <a href="#/flow/${encodeURIComponent(x.name)}">${esc(x.name)}</a></span><span class="badge ${pendingOf(x) ? 'warn' : 'ok'}">${pendingOf(x)}</span></div>`).join('')}</section>
     <section class="card"><h3>Needs attention</h3>${attention.length ? attention.map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} ${stateBadge(c)}</div>`).join('') : '<div class="muted">No failed checks waiting ✔</div>'}${due.length ? `<div class="li sm"><span>${dot('nok')} ${due.length} calibration / test(s) due</span></div>` : ''}</section>`;
   };
@@ -2320,7 +2324,37 @@ window.DCL_LOGO = '';
     }).join('');
     return chips + dayCard(cur) + body;
   };
-  V.more = () => `<h2>More</h2><div class="menu">${[['jobs', '📋 Work orders'], ['heats', '🔥 Heats'], ['logs', '🧱 Sand shift logs'], ['ncr', '⚠️ NCRs'], ['plan', '📐 Inspection plan'], ['settings', '⚙️ Settings & backup']].map(([k, t]) => `<a class="menurow" href="#/${k}">${t}</a>`).join('')}</div>`;
+  /* ---- Tracker: heat no -> date -> every test recorded against the heat, in flow sequence ---- */
+  const heatOwners = (no) => { const cs = QI.heatCastings(no); return { heat: [no], log: [...new Set(cs.map((c) => c.logId).filter(Boolean))], casting: cs.map((c) => c.id) }; };
+  const heatStageStatus = (no, st) => {
+    const os = heatOwners(no)[st.scope]; if (!os.length) return 'open';
+    const xs = os.map((id) => QI.ownerStage(st.no, st.scope, id, st.scope === 'casting' ? [QI.job((QI.casting(id) || {}).jobNo)].filter(Boolean) : QI.jobsOf(st.scope, id)).status);
+    if (xs.some((x) => x === 'fail')) return 'fail';
+    if (xs.every((x) => x === 'done' || x === 'na')) return 'done';
+    return xs.some((x) => x !== 'open') ? 'progress' : 'open';
+  };
+  const heatEntries = (no) => { const ow = heatOwners(no), out = [];
+    Object.keys(S().results).forEach((k) => { const [scope, owner, id] = k.split('|'); const ch = QI.checks[id]; if (!ch || !(ow[scope] || []).includes(owner)) return;
+      S().results[k].attempts.forEach((a) => out.push({ stage: ch.stageNo, scope, owner, id, param: ch.param, a })); });
+    return out.sort((x, y) => x.stage - y.stage || x.id.localeCompare(y.id, undefined, { numeric: true }) || x.a.ts - y.a.ts); };
+  const heatDate = (h) => h.date || (() => { const e = heatEntries(h.no); return e.length ? dkey(Math.min(...e.map((x) => x.a.ts))) : ''; })();
+  V.tracker = () => {
+    const hs = S().heats.slice().sort((a, b) => (heatDate(b) || '').localeCompare(heatDate(a) || '') || b.no.localeCompare(a.no));
+    return `<div class="hd"><div><h2>Tracker</h2><div class="muted sm">Every heat with its date and all test data recorded against the heat no.</div></div>${QI.can('create', 'heat') ? '<button class="btn primary" data-act="new-heat">+ New heat</button>' : ''}</div>
+    ${hs.length ? table(['Heat no.', 'Date', 'Castings', 'Flow progress', 'Entries'], hs.map((h) => { const n = heatEntries(h.no).length; return `<tr><td><a href="#/track/${encodeURIComponent(h.no)}"><b>${esc(h.no)}</b></a></td><td class="nw">${esc(heatDate(h) ? new Date(heatDate(h) + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) : '–')}</td><td>${QI.heatCastings(h.no).length}</td><td><span class="steps7">${QI.stages.map((st) => `<i class="s ${heatStageStatus(h.no, st)}" title="Stage ${st.no} ${esc(st.name)}"></i>`).join('')}</span></td><td>${n}</td></tr>`; })) : empty('No heats yet – add a heat to start tracking.')}`;
+  };
+  V.track = (no) => {
+    const h = QI.heat(no); if (!h) return empty('Heat not found.');
+    const ent = heatEntries(no), dates = [...new Set(ent.map((e) => dkey(e.a.ts)))].sort().reverse();
+    ui.trackDate = ui.trackDate || {}; const cur = ui.trackDate[no] || 'all'; const shown = cur === 'all' ? ent : ent.filter((e) => dkey(e.a.ts) === cur);
+    const cs = QI.heatCastings(no);
+    return `<div class="hd"><div><h2>Heat ${esc(no)}</h2><div class="muted">${esc(heatDate(h) ? fday(heatDate(h)) : '')} · Grade ${esc(h.grade || '–')} · ${cs.length} casting(s): ${cs.map((c) => link('/casting/' + c.id, c.id)).join(', ') || '–'}</div></div><div class="row"><a class="btn" href="#/heat/${encodeURIComponent(no)}">Enter / edit records</a></div></div>
+    <section class="card"><label class="f"><span>Inspection date</span><select data-act="track-date" data-no="${esc(no)}"><option value="all" ${cur === 'all' ? 'selected' : ''}>All dates (${dates.length})</option>${dates.map((d) => `<option value="${d}" ${cur === d ? 'selected' : ''}>${esc(fday(d))} – ${ent.filter((e) => dkey(e.a.ts) === d).length}</option>`).join('')}</select></label></section>
+    ${QI.stages.map((st) => { const rs = shown.filter((e) => e.stage === st.no), stt = heatStageStatus(no, st);
+      return `<details class="card ht-d" ${rs.length ? 'open' : ''}><summary><b>Stage ${st.no} · ${esc(st.name)}</b> <span class="muted sm">${esc(st.section)}</span> ${stBadge(stt === 'progress' ? 'progress' : stt)}</summary>
+        ${rs.length ? table(['Date', 'Record', 'Check', 'Result', 'Value', 'By'], rs.map((r) => `<tr><td class="sm">${esc(dkey(r.a.ts))}</td><td><a href="#${ownerHref(r)}">${esc(r.owner)}</a></td><td>${esc(r.id)} ${esc(r.param)}</td><td>${r.a.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')}</td><td>${esc(r.a.summary || '')}</td><td>${esc(r.a.by || '')}</td></tr>`)) : '<div class="muted sm pad">Not recorded' + (cur === 'all' ? ' yet' : ' on this date') + '.</div>'}</details>`; }).join('')}`;
+  };
+  V.more = () => `<h2>More</h2><div class="menu">${[['approvals', '✅ Approvals'], ['jobs', '📋 Work orders'], ['heats', '🔥 Heats'], ['logs', '🧱 Sand shift logs'], ['ncr', '⚠️ NCRs'], ['plan', '📐 Inspection plan'], ['settings', '⚙️ Settings & backup']].map(([k, t]) => `<a class="menurow" href="#/${k}">${t}</a>`).join('')}</div>`;
 
   /* ---- jobs ---- */
   V.jobs = () => `<div class="hd"><h2>Work orders</h2><button class="btn primary" data-act="new-job">+ New work order</button></div>
@@ -2392,7 +2426,7 @@ window.DCL_LOGO = '';
     const cs = QI.heatCastings(no);
     const unassigned = S().castings.filter((c) => !c.heatNo && c.status === 'active');
     return `<div class="hd"><div><h2>Heat ${esc(h.no)}</h2><div class="muted">${esc(h.date)} · Furnace ${esc(h.furnace || '–')} · Grade ${esc(h.grade || '–')}</div></div>
-      <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical limits</button></div></div>
+      <div class="row"><a class="btn" href="#/track/${encodeURIComponent(no)}">Tracker</a><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical limits</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
     ${QI.stages.filter((st) => st.scope === 'heat').map((st) => {
@@ -2528,6 +2562,7 @@ window.DCL_LOGO = '';
   const ACT = {
     toggle: (el) => { const k = el.dataset.key; ui.open[k] = !ui.open[k]; render(); },
     'save-check': (el) => saveCheck(el.dataset.key),
+    'track-date': (el) => { ui.trackDate = ui.trackDate || {}; ui.trackDate[el.dataset.no] = el.value; render(); },
     'flow-date': (el) => { ui.flowDate = ui.flowDate || {}; ui.flowDate[el.dataset.sec] = el.value; render(); },
     'stage-toggle': (el) => { const k = el.dataset.k; const cur = ui.stageOpen[k]; const sec = el.closest('.stage'); const isOpen = !!$('.sb', sec); ui.stageOpen[k] = !isOpen; render(); },
     'dim-add': (el) => { el.parentNode.querySelector('tbody').insertAdjacentHTML('beforeend', dimRow({})); },
@@ -2612,7 +2647,7 @@ window.DCL_LOGO = '';
       if (sl.form.classList.contains('chkform')) liveEval(sl.form);
     }
     const el = e.target; if (!el.dataset || !el.dataset.act) return;
-    if (['applic', 'set-heat', 'set-log', 'import-json', 'flow-date'].includes(el.dataset.act)) ACT[el.dataset.act](el);
+    if (['applic', 'set-heat', 'set-log', 'import-json', 'flow-date', 'track-date'].includes(el.dataset.act)) ACT[el.dataset.act](el);
   });
   document.addEventListener('input', (e) => {
     const el = e.target;
@@ -2655,7 +2690,7 @@ window.DCL_LOGO = '';
   }
 
   /* ================= router ================= */
-  const GROUPS = [['dashboard', '🏠', 'Today'], ['flow', '🔀', 'Flow'], ['castings', '🔩', 'Castings'], ['approvals', '✅', 'Approvals'], ['more', '☰', 'More']];
+  const GROUPS = [['dashboard', '🏠', 'Today'], ['tracker', '📈', 'Tracker'], ['flow', '🔀', 'Flow'], ['castings', '🔩', 'Castings'], ['more', '☰', 'More']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
     'ncr-close': ['ncr'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
@@ -2674,7 +2709,7 @@ window.DCL_LOGO = '';
     const view = parts[0]; const arg = decodeURIComponent(parts.slice(1).join('/'));
     const fn = booting || (QI.mode === 'shared' && !QI.ready) ? () => empty('Connecting to shared inspection data…') : (V[view] || V.dashboard);
     const open = $('#dlg').open;
-    const tabOf = { job: 'more', jobs: 'more', heat: 'more', heats: 'more', log: 'more', logs: 'more', ncr: 'more', plan: 'more', settings: 'more', casting: 'castings', report: 'castings' };
+    const tabOf = { job: 'more', jobs: 'more', heat: 'more', heats: 'more', log: 'more', logs: 'more', ncr: 'more', plan: 'more', settings: 'more', casting: 'castings', report: 'castings', track: 'tracker', approvals: 'more' };
     const active = tabOf[view] || view;
     $('#nav').innerHTML = GROUPS.map(([k, ic, t]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}"><i>${ic}</i><span>${t}</span></a>`).join('');
     $('#who').textContent = QI.mode === 'shared' ? (QI.me.dept ? `👤 ${QI.me.name || 'You'} · ${QI.dept().name.split(' ')[0]}` : 'Choose department') : (S().settings.inspector ? '👤 ' + S().settings.inspector : 'Set inspector');
