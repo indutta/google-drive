@@ -251,130 +251,48 @@
   const tile = (href, n, label, cls) => `<a class="tile ${cls || ''}" href="#/${href}"><b>${n}</b><span>${label}</span></a>`;
   const stageNowCount = (nos) => S().castings.filter((c) => { if (c.status !== 'active') return false; const x = QI.castingState(c); return x.stageNo && nos.includes(x.stageNo) && x.label.startsWith('Stage'); });
 
+  const SECTIONS = () => { const out = []; QI.stages.forEach((st) => { let x = out.find((o) => o.name === st.section); if (!x) out.push(x = { name: st.section, stages: [] }); x.stages.push(st); }); return out; };
+  const owners = (st) => st.scope === 'log' ? S().logs.slice().sort((a, b) => b.id.localeCompare(a.id)).map((l) => ({ id: l.id, label: `${l.date} · shift ${l.shift}`, href: '/log/' + l.id }))
+    : st.scope === 'heat' ? S().heats.slice().reverse().map((h) => ({ id: h.no, label: 'Heat ' + h.no, href: '/heat/' + h.no }))
+    : S().castings.filter((c) => c.status === 'active').slice().reverse().map((c) => ({ id: c.id, label: c.id, href: '/casting/' + c.id }));
+  const ownerStatus = (st, id) => QI.ownerStage(st.no, st.scope, id, st.scope === 'casting' ? [QI.job((QI.casting(id) || {}).jobNo)].filter(Boolean) : QI.jobsOf(st.scope, id)).status;
+  const pendingOf = (sec) => { let n = 0; sec.stages.forEach((st) => owners(st).forEach((o) => { const x = ownerStatus(st, o.id); if (x !== 'done' && x !== 'na') n++; })); return n; };
   V.dashboard = () => {
-    const s = QI.stats(), st = S(), t = QI.testTotals(), dp = QI.dept();
+    const s = QI.stats(), st = S(), dp = QI.dept();
     const role = QI.mode === 'shared' && dp && dp.approver;
     const toApprove = role ? QI.pending().filter((p) => p.status === role) : [];
     const attention = st.castings.filter((c) => c.status === 'active' && QI.castingState(c).failing);
     const due = QI.due();
     const name = (QI.mode === 'shared' ? QI.me.name : st.settings.inspector) || '';
-    const waiting = t.sandPending + t.chemPending + t.dimPending + t.physPending;
-    const intro = st.jobs.length ? '' : `<div class="empty intro"><b>Welcome.</b><br>Start with <b>+ New entry → Work order</b>, add castings, then record tests and inspections against each casting.</div>`;
+    const intro = st.jobs.length ? '' : `<div class="empty intro"><b>Welcome.</b><br>Start with <b>+ New entry → Work order</b>, add castings, then follow the flow: Moulding → Melting &amp; pouring → Fettling → Heat treatment → Mechanical tests → Finished casting.</div>`;
+    const mine = QI.mode === 'shared' && dp && dp.stages.length && !dp.all ? SECTIONS().filter((x) => x.stages.some((t) => dp.stages.includes(t.no))) : [];
     return `<div class="hello"><div><h2>${GREET()}${name ? ', ' + esc(name.split(' ')[0]) : ''} 👋</h2><div class="muted">${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</div></div></div>${intro}
     ${toApprove.length ? `<section class="card"><h3>Waiting for your approval <span class="badge warn">${toApprove.length}</span></h3>${toApprove.slice(0, 8).map((p) => `<div class="li">${link('/casting/' + (p.castings ? p.castings[0] : ''), (p.castings || [''])[0])} <span class="muted sm">Stage ${p.stageNo}</span></div>`).join('')}<a class="btn sm" href="#/approvals">All approvals</a></section>` : ''}
-    <div class="tiles">${tile('castings', s.active, 'Castings in process')}${tile('tests/sand', waiting, 'Tests still to record', waiting ? 'warn' : 'ok')}${tile('approvals', s.awaiting, 'Awaiting approval', s.awaiting ? 'warn' : '')}${tile('ncr', s.openNcr, 'Open NCRs', s.openNcr ? 'warn' : 'ok')}</div>
-    <section class="card"><h3>Tests to record</h3>
-      <div class="li"><span>Sand test</span><a href="#/tests/sand">${t.sandPending} casting(s)</a></div>
-      <div class="li"><span>Chemical composition</span><a href="#/tests/chem">${t.chemPending} heat(s)</a></div>
-      <div class="li"><span>Dimensions</span><a href="#/tests/dim">${t.dimPending} casting(s)</a></div>
-      <div class="li"><span>Physical test</span><a href="#/tests/phys">${t.physPending} casting(s)</a></div></section>
+    ${mine.length ? `<section class="card"><h3>Your department</h3>${mine.map((x) => `<div class="li"><a href="#/flow/${encodeURIComponent(x.name)}"><b>${esc(x.name)}</b></a><span class="badge ${pendingOf(x) ? 'warn' : 'ok'}">${pendingOf(x)} to do</span></div>`).join('')}</section>` : ''}
+    <div class="tiles">${tile('castings', s.active, 'Castings in process')}${tile('approvals', s.awaiting, 'Awaiting approval', s.awaiting ? 'warn' : '')}${tile('ncr', s.openNcr, 'Open NCRs', s.openNcr ? 'warn' : 'ok')}${tile('castings', s.released, 'Released', 'ok')}</div>
+    <section class="card"><h3>The flow <span class="muted sm">· still to do in each section</span></h3>${SECTIONS().map((x, i) => `<div class="li"><span>${i + 1}. <a href="#/flow/${encodeURIComponent(x.name)}">${esc(x.name)}</a></span><span class="badge ${pendingOf(x) ? 'warn' : 'ok'}">${pendingOf(x)}</span></div>`).join('')}</section>
     <section class="card"><h3>Needs attention</h3>${attention.length ? attention.map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} ${stateBadge(c)}</div>`).join('') : '<div class="muted">No failed checks waiting ✔</div>'}${due.length ? `<div class="li sm"><span>${dot('nok')} ${due.length} calibration / test(s) due</span></div>` : ''}</section>`;
   };
-  /* ---- Tests: one page, five tabs ---- */
-  const TEST_TABS = [['sand', 'Sand', () => V.sandtests()], ['chem', 'Chemistry', () => V.chemtests()], ['ht', 'Heat treatment', () => V.hts()], ['dim', 'Dimensions', () => V.dimtests()], ['phys', 'Physical', () => V.phystests()], ['how', 'Procedures', () => V.tests()]];
-  const procedures = () => V.procedures();
-  V.tests = (tab) => {
-    const cur = TEST_TABS.find((x) => x[0] === tab) || TEST_TABS[0];
-    const tabs = `<div class="chips">${TEST_TABS.map((x) => `<a class="chip ${x === cur ? 'on' : ''}" href="#/tests/${x[0]}">${x[1]}</a>`).join('')}</div>`;
-    return tabs + (cur[0] === 'how' ? procedures() : cur[2]());
+  /* ---- the flow chart, section by section, with the records to enter in sequence ---- */
+  V.flow = (sec) => {
+    const all = SECTIONS(); const cur = all.find((x) => x.name === sec) || all[0];
+    const chips = `<div class="chips">${all.map((x, i) => `<a class="chip ${x === cur ? 'on' : ''}" href="#/flow/${encodeURIComponent(x.name)}">${i + 1}. ${esc(x.name)}</a>`).join('')}</div>`;
+    const body = cur.stages.map((st) => {
+      const os = owners(st);
+      const steps = st.groups.flatMap((g) => g.steps).map((sp) => `<div class="fstep"><b>${esc(sp.id)} ${esc(sp.name)}</b>${sp.optional ? ' ' + badge('per PO / customer plan', 'mute') : ''}${sp.sampled ? ' ' + badge('sampled', 'mute') : ''}<div class="sm"><span class="ftxt g">Frequency: ${esc(sp.checks[0].sample || '')}</span><br><span class="ftxt r">Accept: ${esc(sp.checks.map((c) => c.criteria).filter((x, i, a) => x && a.indexOf(x) === i).join(' · '))}</span></div></div>`).join('<div class="farrow">▼</div>');
+      const pend = os.filter((o) => { const x = ownerStatus(st, o.id); return x !== 'done' && x !== 'na'; });
+      const done = os.length - pend.length;
+      const what = st.scope === 'log' ? 'shift logs' : st.scope === 'heat' ? 'heats' : 'castings';
+      return `<section class="card"><h3>Stage ${st.no} · ${esc(st.name)} <span class="muted sm">recorded per ${SCOPE_LABEL[st.scope].toLowerCase()}</span></h3>${steps}
+        ${st.gate ? `<div class="gate"><b>◆ ${esc(st.gate.question)}</b> <span class="muted sm">No → ${esc(st.gate.no)}</span></div>` : ''}
+        <h5>Enter records · ${pend.length} of ${os.length} ${what} to do</h5>
+        ${st.scope === 'log' && QI.can('create', 'log') ? '<button class="btn sm primary" data-act="new-log">+ New shift log</button>' : ''}${st.scope === 'heat' && QI.can('create', 'heat') ? '<button class="btn sm primary" data-act="new-heat">+ New heat</button>' : ''}
+        ${pend.slice(0, 12).map((o) => `<div class="li"><a href="#${o.href}"><b>${esc(o.label)}</b></a>${stBadge(ownerStatus(st, o.id))}</div>`).join('') || `<div class="muted sm">${os.length ? 'All done ✔' : 'None yet.'}</div>`}${pend.length > 12 ? `<div class="muted sm">+ ${pend.length - 12} more – open from ${st.scope === 'heat' ? 'More → Heats' : st.scope === 'log' ? 'More → Shift logs' : 'Castings'}</div>` : ''}${done ? `<div class="muted sm">${done} complete</div>` : ''}</section>`;
+    }).join('');
+    return chips + body;
   };
-  V.more = () => `<h2>More</h2><div class="menu">${[['jobs', '📋 Work orders'], ['heats', '🔥 Heats'], ['logs', '🧱 Sand & calibration logs'], ['ncr', '⚠️ NCRs'], ['plan', '📐 Inspection plan'], ['settings', '⚙️ Settings & backup']].map(([k, t]) => `<a class="menurow" href="#/${k}">${t}</a>`).join('')}</div>`;
+  V.more = () => `<h2>More</h2><div class="menu">${[['jobs', '📋 Work orders'], ['heats', '🔥 Heats'], ['logs', '🧱 Sand shift logs'], ['ncr', '⚠️ NCRs'], ['plan', '📐 Inspection plan'], ['settings', '⚙️ Settings & backup']].map(([k, t]) => `<a class="menurow" href="#/${k}">${t}</a>`).join('')}</div>`;
 
-  /* ---- heat treatment record (internal inspection report) + testing procedures ---- */
-  const HTR = () => QI.HT_FIELDS;
-  const rtip = (txt) => `<span class="rtip" tabindex="0" data-tip="${esc(txt)}">ⓘ</span>`;
-  function htRecCard(c) {
-    const r = QI.htRec(c) || {}; const can = QI.can('ht');
-    const row = (lab, k, o) => { const v = r[k] || {}; return `<tr><th>${lab}</th>${HTR()[k].map(([f]) => `<td>${esc(v[f] == null || v[f] === '' ? '–' : v[f])}</td>`).join('')}</tr>`; };
-    const sum = (k) => HTR()[k].map(([f, l]) => `${esc(l)}: <b>${esc((r[k] || {})[f] || '–')}</b>`).join(' · ');
-    const empty = !r.ts;
-    return `<section class="card"><h3>Heat treatment record ${rtip('From the internal inspection report: shake-out time, normalising, water quenching, tempering with hardness after each, then physical and impact test.')} ${empty ? badge('not recorded', 'warn') : badge('recorded', 'ok')}</h3>
-      ${empty ? '<div class="muted sm">Shake-out time, normalising, quenching, tempering and hardness after each treatment.</div>' : `<div class="sm">Shake-out from pouring: <b>${esc(r.shakeout || '–')}</b></div>
-      <details class="ht-d" open><summary><b>Normalising</b> <span class="muted sm">hardness ${esc((r.norm || {}).hard || '–')} HB</span></summary><div class="sm">${sum('norm')}</div></details>
-      <details class="ht-d"><summary><b>Water quenching</b> <span class="muted sm">hardness ${esc((r.quench || {}).hard || '–')} HB</span></summary><div class="sm">${sum('quench')}</div></details>
-      <details class="ht-d"><summary><b>Tempering</b> <span class="muted sm">hardness ${esc((r.temper || {}).hard || '–')} HB</span></summary><div class="sm">${sum('temper')}</div></details>
-      ${r.remarks ? `<div class="sm muted">${esc(r.remarks)}</div>` : ''}<div class="muted sm">Recorded by ${esc(r.by || '–')} · ${r.ts ? fdt(r.ts) : ''}</div>`}
-      ${can ? `<div class="row"><button class="btn primary" data-act="ht-rec" data-id="${esc(c.id)}">${empty ? '+ Record heat treatment' : 'Edit record'}</button></div>` : ''}</section>`;
-  }
-  function htRecForm(c) {
-    const r = QI.htRec(c) || {};
-    const grp = (title, k, tip) => `<fieldset class="fs"><legend>${title} ${rtip(tip)}</legend><div class="grid2">${HTR()[k].map(([f, l]) => fld(l, k + '.' + f, (r[k] || {})[f], '')).join('')}</div></fieldset>`;
-    return `${fld('Shake-out time from pouring', 'shakeout', r.shakeout, 'placeholder="e.g. 28 Hrs"')}
-      ${grp('Normalising', 'norm', 'Heat to the normalising temperature, soak, then air cool. Record temperature, ramp hours, soaking time and hardness.')}
-      ${grp('Water quenching', 'quench', 'Record water temperature before and after, furnace and material temperature, immersion time and the agitator details.')}
-      ${grp('Tempering', 'temper', 'Reheat after quenching, soak, then cool. Record temperature, ramp hours, soaking time and hardness.')}
-      ${fld('Remarks', 'remarks', r.remarks, '')}
-      ${c.heatNo ? `<label class="chk"><input type="checkbox" name="copy"> Copy these cycle settings (not hardness or test results) to the other castings of heat ${esc(c.heatNo)}</label>` : ''}`;
-  }
-  const htRecRead = (f) => { const o = { norm: {}, quench: {}, temper: {} }; [...f.elements].forEach((e) => { if (!e.name || e.name === 'copy') return; const [a, b] = e.name.split('.'); if (b) o[a][b] = e.value.trim(); else o[a] = e.value.trim(); }); return o; };
-  V.procedures = () => {
-    const me = QI.dept(); const cur = ui.testDept || QI.TEST_HOME[me && me.id] || 'qa';
-    const g = QI.TESTS.find((x) => x.dept === cur) || QI.TESTS[0];
-    return `<div class="hd"><div><h2>Testing procedures</h2><div class="muted sm">Tap a test to open how it is done. Limits come from the inspection plan and the customer specification.</div></div></div>
-    <div class="chips">${QI.TESTS.map((x) => `<button class="chip ${x.dept === g.dept ? 'on' : ''}" data-act="test-dept" data-d="${x.dept}">${esc(x.name)}</button>`).join('')}</div>
-    <section class="card"><h3>${esc(g.name)}</h3>${g.items.map((i) => `<details class="ht-d"><summary><b>${esc(i.t)}</b> <span class="muted sm">${esc(i.std)}</span></summary>
-      <div class="sm"><p>${esc(i.how)}</p><div><span class="lbl">How often</span> ${esc(i.freq)}</div><div><span class="lbl">Recorded in</span> ${esc(i.rec)}</div></div></details>`).join('')}</section>`;
-  };
-  const HT_ACTS = {
-      'ht-rec': (el) => { const c = QI.casting(el.dataset.id); if (!c) return; if (needInspector()) return; modal('Heat treatment record – ' + c.id, htRecForm(c), (f) => { const rec = htRecRead(f); rec.by = S().settings.inspector || QI.me.name || ''; const r = QI.htRecSave(c, rec, f.elements.copy && f.elements.copy.checked); if (r.error) return r.error; toast('Heat treatment record saved', 'ok'); }); },
-      'test-dept': (el) => { ui.testDept = el.dataset.d; render(); }
-  };
-  V.hts = () => {
-    const cs = S().castings.filter((c) => c.htRec && c.htRec.ts).slice().reverse();
-    const h = (c, k, f) => k === 'phys' ? esc((QI.physOf(c).slice(-1)[0] || {})[f === 'result' ? 'result' : f] || '–') : esc(((c.htRec || {})[k] || {})[f] || '–');
-    return `<div class="hd"><h2>Heat treatment records</h2></div>${cs.length ? table(['Casting', 'Heat', 'Shake-out', 'Normalising (°C / HB)', 'Quench HB', 'Tempering (°C / HB)', 'UTS', 'YS', '%E', '%RA', 'Impact', 'Result'], cs.map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(c.htRec.shakeout || '–')}</td><td>${h(c, 'norm', 'temp')} / ${h(c, 'norm', 'hard')}</td><td>${h(c, 'quench', 'hard')}</td><td>${h(c, 'temper', 'temp')} / ${h(c, 'temper', 'hard')}</td><td>${h(c, 'phys', 'uts')}</td><td>${h(c, 'phys', 'ys')}</td><td>${h(c, 'phys', 'el')}</td><td>${h(c, 'phys', 'ra')}</td><td>${h(c, 'phys', 'impact')}</td><td>${h(c, 'phys', 'result')}</td></tr>`)) : '<section class="card"><div class="muted">No heat treatment records yet. Open a casting and choose “Record heat treatment”.</div></section>'}`;
-  };
-
-  /* ---- test results: sand (moulding), chemistry (melting), dimensions & physical tests (testing) ---- */
-  const castOpts = (sel0) => S().castings.filter((c) => c.status === 'active' || c.id === sel0).map((c) => [c.id, `${c.id}${c.heatNo ? ' · heat ' + c.heatNo : ''}`]);
-  const nz = (o) => Object.keys(o).forEach((k) => { if (o[k] === '') delete o[k]; });
-  const tby = () => S().settings.inspector || QI.me.name || '';
-  const fl = (f) => f === 'low' ? ' class="bad"' : f === 'high' ? ' class="bad"' : '';
-  const sandForm = (c) => { const t = (c && QI.sandOf(c)) || {}; return `${sel('Casting', 'cid', castOpts(c && c.id), c && c.id)}${fld('Test date', 'date', t.date || today(), 'type="date"')}<div class="grid2">${QI.SAND_F.map(([k, l]) => fld(l, k, t[k], 'inputmode="decimal"')).join('')}</div>`; };
-  const physForm = (c, stage) => { const t = (c ? QI.physOf(c) : []).find((p) => p.stage === stage) || {}; return `${sel('Casting', 'cid', castOpts(c && c.id), c && c.id)}${sel('Stage of heat treatment', 'stage', QI.PHYS_STAGES, stage || QI.PHYS_STAGES[0])}${fld('Test date', 'date', t.date || today(), 'type="date"')}<div class="grid2">${QI.PHYS_F.map(([k, l]) => fld(l, k, t[k], 'inputmode="decimal"')).join('')}</div>${sel('Result', 'result', ['', 'OK', 'Not OK'], t.result || '')}${fld('Remarks', 'remarks', t.remarks, '')}`; };
-  const dimForm = (c) => { const t = (c && QI.dimOf(c)) || { rows: [] }; const rows = (t.rows || []).concat(Array(Math.max(0, 6 - (t.rows || []).length)).fill({})); return `${sel('Casting', 'cid', castOpts(c && c.id), c && c.id)}${fld('Test date', 'date', t.date || today(), 'type="date"')}<div class="muted sm">Dimension, nominal, tolerance ± and the measured value. Result is worked out automatically.</div>${rows.map((r, i) => `<div class="grid4">${fld('Dimension', 'n' + i, r.name, '')}${fld('Nominal', 'v' + i, r.nominal, 'inputmode="decimal"')}${fld('Tol. ±', 't' + i, r.tol, 'inputmode="decimal"')}${fld('Actual', 'a' + i, r.actual, 'inputmode="decimal"')}</div>`).join('')}`; };
-  const readNums = (f, keys) => { const o = {}; keys.forEach(([k]) => { o[k] = val(f, k); }); nz(o); return o; };
-  const tbtn = (kind, label, id) => QI.can('test', kind) ? `<button class="btn primary" data-act="test-${kind}" ${id ? `data-id="${esc(id)}"` : ''}>${label}</button>` : '';
-  V.sandtests = () => {
-    const cs = S().castings; const done = cs.filter((c) => QI.sandOf(c));
-    return `<div class="hd"><div><h2>Sand testing</h2><div class="muted sm">Sand, mould and paint test results for each casting’s mould. ${link('/logs', 'Sand & calibration logs')}</div></div>${tbtn('sand', '+ Record sand test')}</div>
-    <div class="tiles">${tile('sandtests', done.length, 'Castings with sand test', 'ok')}${tile('sandtests', cs.filter((c) => c.status === 'active' && !QI.sandOf(c)).length, 'Active castings without sand test', 'warn')}</div>
-    ${done.length ? table(['Casting', 'Heat', 'Date', 'Resin % / Catalyst %', 'Fines', 'Moisture', 'Tensile / Compressive', 'Gas', 'L.O.I', 'Mould hardness', 'Paint °Bé', ''], done.map((c) => { const t = QI.sandOf(c); const v = (k) => esc(t[k] == null ? '–' : t[k]); return `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(t.date || '–')}</td><td>${v('resinMixed')} / ${v('catalystMixed')}</td><td>${v('fines')}</td><td>${v('moisture')}</td><td>${v('tensile')} / ${v('compressive')}</td><td>${v('gas')}</td><td>${v('loi')}</td><td>${v('mouldHardness')}</td><td>${v('paint')}</td><td>${tbtn('sand', 'Edit', c.id)}</td></tr>`; })) : '<section class="card"><div class="muted">No sand tests recorded yet.</div></section>'}`;
-  };
-  V.chemtests = () => {
-    const hs = S().heats;
-    return `<div class="hd"><div><h2>Chemical composition</h2><div class="muted sm">Ladle sample results (%) for each heat. Values outside the limits set in the heat’s Specification are shown in red.</div></div>${tbtn('chem', '+ Record composition')}</div>
-    <div class="tiles">${tile('chemtests', hs.filter((h) => h.chem).length, 'Heats with composition', 'ok')}${tile('chemtests', hs.filter((h) => !h.chem).length, 'Heats waiting for composition', 'warn')}</div>
-    ${hs.length ? table(['Heat', 'Grade', 'Date'].concat(QI.CHEM_EL.map((e) => '%' + e)).concat(['Castings', '']), hs.slice().reverse().map((h) => { const c = h.chem || {}; return `<tr><td>${link('/heat/' + h.no, h.no)}</td><td>${esc(h.grade || '–')}</td><td>${esc(c.date || '–')}</td>${QI.CHEM_EL.map((e) => `<td${fl(QI.chemFlag(h, e, c[e]))}>${esc(c[e] == null ? '–' : c[e])}</td>`).join('')}<td>${QI.heatCastings(h.no).length}</td><td>${tbtn('chem', h.chem ? 'Edit' : 'Record', h.no)}</td></tr>`; })) : '<section class="card"><div class="muted">No heats yet.</div></section>'}`;
-  };
-  V.dimtests = () => {
-    const done = S().castings.filter((c) => QI.dimOf(c));
-    return `<div class="hd"><div><h2>Dimensions</h2><div class="muted sm">Dimensional inspection of each casting against the drawing.</div></div>${tbtn('dim', '+ Record dimensions')}</div>
-    <div class="tiles">${tile('dimtests', done.length, 'Castings measured', 'ok')}${tile('dimtests', S().castings.filter((c) => c.status === 'active' && !QI.dimOf(c)).length, 'Active castings not measured', 'warn')}</div>
-    ${done.length ? done.map((c) => { const t = QI.dimOf(c); return `<section class="card"><h3>${link('/casting/' + c.id, c.id)} <span class="muted sm">${esc(t.date || '')} · ${esc(t.by || '')}</span> ${tbtn('dim', 'Edit', c.id)}</h3>${table(['Dimension', 'Nominal', 'Tol. ±', 'Actual', 'Result'], (t.rows || []).map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.nominal)}</td><td>${esc(r.tol)}</td><td>${esc(r.actual)}</td><td>${r.ok === true ? badge('OK', 'ok') : r.ok === false ? badge('Not OK', 'bad') : '–'}</td></tr>`))}</section>`; }).join('') : '<section class="card"><div class="muted">No dimensions recorded yet.</div></section>'}`;
-  };
-  V.phystests = () => {
-    const rows = []; S().castings.forEach((c) => QI.physOf(c).forEach((p) => rows.push([c, p])));
-    const byStage = QI.PHYS_STAGES.map((s) => `${esc(s)}: <b>${rows.filter((r) => r[1].stage === s).length}</b>`).join(' · ');
-    return `<div class="hd"><div><h2>Physical testing</h2><div class="muted sm">Tensile, impact and hardness results at each stage of heat treatment. ${byStage}</div></div>${tbtn('phys', '+ Record physical test')}</div>
-    ${rows.length ? table(['Casting', 'Heat', 'Stage', 'Date', 'UTS', 'YS', '%E', '%RA', 'Impact', 'HB', 'Result', ''], rows.map(([c, p]) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${esc(c.heatNo || '–')}</td><td>${esc(p.stage)}</td><td>${esc(p.date || '–')}</td><td>${esc(p.uts || '–')}</td><td>${esc(p.ys || '–')}</td><td>${esc(p.el || '–')}</td><td>${esc(p.ra || '–')}</td><td>${esc(p.impact || '–')}</td><td>${esc(p.hardness || '–')}</td><td>${p.result === 'OK' ? badge('OK', 'ok') : p.result ? badge(p.result, 'bad') : '–'}</td><td>${tbtn('phys', 'Edit', c.id + '|' + p.stage)}</td></tr>`)) : '<section class="card"><div class="muted">No physical tests recorded yet.</div></section>'}`;
-  };
-  function testsCard(c) {
-    const sd = QI.sandOf(c), dm = QI.dimOf(c), ph = QI.physOf(c), h = c.heatNo && QI.heat(c.heatNo);
-    return `<section class="card"><h3>Test results</h3>
-      <div class="li"><span>Sand test ${sd ? badge('recorded', 'ok') : badge('pending', 'warn')}</span>${tbtn('sand', sd ? 'Edit' : 'Record', c.id)}</div>
-      <div class="li"><span>Chemical composition ${h ? (h.chem ? badge('heat ' + h.no, 'ok') : badge('pending', 'warn')) : badge('assign a heat', 'mute')}</span>${h ? tbtn('chem', h.chem ? 'Edit' : 'Record', h.no) : ''}</div>
-      <div class="li"><span>Dimensions ${dm ? badge((dm.rows || []).length + ' measured', 'ok') : badge('pending', 'warn')}</span>${tbtn('dim', dm ? 'Edit' : 'Record', c.id)}</div>
-      ${QI.PHYS_STAGES.map((s) => { const p = ph.find((x) => x.stage === s); return `<div class="li"><span>Physical test – ${esc(s)} ${p ? badge(p.result || 'recorded', p.result === 'Not OK' ? 'bad' : 'ok') + `<span class="muted sm"> UTS ${esc(p.uts || '–')} · YS ${esc(p.ys || '–')} · ${esc(p.hardness || '–')} HB</span>` : ''}</span>${tbtn('phys', p ? 'Edit' : 'Record', c.id + '|' + s)}</div>`; }).join('')}</section>`;
-  }
-  const readCast = (f) => QI.casting(val(f, 'cid'));
-  const TEST_ACTS = {
-    'test-sand': (el) => { const c = QI.casting(el.dataset.id) || null; if (needInspector()) return; modal('Sand test', sandForm(c), (f) => { const k = readCast(f); if (!k) return 'Choose a casting.'; const d = readNums(f, QI.SAND_F); d.date = val(f, 'date'); d.by = tby(); const r = QI.testSave('sand', k, d); if (r.error) return r.error; toast('Sand test saved', 'ok'); }); },
-    'test-chem': (el) => { const h = QI.heat(el.dataset.id) || null; if (needInspector()) return; const cur = (h && h.chem) || {};
-      modal('Chemical composition (%)', `${sel('Heat', 'hno', S().heats.map((x) => x.no), h && h.no)}${fld('Test date', 'date', cur.date || today(), 'type="date"')}<div class="grid2">${QI.CHEM_EL.map((e) => fld('%' + e, e, cur[e], 'inputmode="decimal"')).join('')}</div>`, (f) => { const hh = QI.heat(val(f, 'hno')); if (!hh) return 'Choose a heat.'; const d = readNums(f, QI.CHEM_EL.map((e) => [e])); d.date = val(f, 'date'); d.by = tby(); const r = QI.chemSave(hh, d); if (r.error) return r.error; toast('Composition saved', 'ok'); }); },
-    'test-dim': (el) => { const c = QI.casting(el.dataset.id) || null; if (needInspector()) return; modal('Dimensions', dimForm(c), (f) => { const k = readCast(f); if (!k) return 'Choose a casting.'; const rows = []; for (let i = 0; i < 6; i++) { const name = val(f, 'n' + i); if (!name) continue; const r = { name, nominal: val(f, 'v' + i), tol: val(f, 't' + i), actual: val(f, 'a' + i) }; if (r.nominal !== '' && r.tol !== '' && r.actual !== '') r.ok = Math.abs(+r.actual - +r.nominal) <= +r.tol + 1e-9; rows.push(r); } if (!rows.length) return 'Enter at least one dimension.'; const r = QI.testSave('dim', k, { rows, date: val(f, 'date'), by: tby() }); if (r.error) return r.error; toast('Dimensions saved', 'ok'); }); },
-    'test-phys': (el) => { const [id, stage] = (el.dataset.id || '').split('|'); const c = QI.casting(id) || null; if (needInspector()) return; modal('Physical test', physForm(c, stage), (f) => { const k = readCast(f); if (!k) return 'Choose a casting.'; const d = readNums(f, QI.PHYS_F); Object.assign(d, { stage: val(f, 'stage'), date: val(f, 'date'), result: val(f, 'result'), remarks: val(f, 'remarks'), by: tby() }); const r = QI.testSave('phys', k, d); if (r.error) return r.error; toast('Physical test saved', 'ok'); }); }
-  };
   /* ---- jobs ---- */
   V.jobs = () => `<div class="hd"><h2>Work orders</h2><button class="btn primary" data-act="new-job">+ New work order</button></div>
     ${S().jobs.length ? table(['Work order', 'Customer / PO', 'Part', 'Grade', 'Castings', 'Released', ''], S().jobs.slice().reverse().map((j) => {
@@ -385,15 +303,12 @@
   V.job = (no) => {
     const j = QI.job(no); if (!j) return empty('Work order not found.');
     const cs = QI.jobCastings(no);
-    const st1 = QI.stageOf[1];
-    const s1 = QI.stageOf[1].groups[0].steps.flatMap((s) => s.checks).map((c) => QI.status('job', no, c.id));
     return `<div class="hd"><div><h2>${esc(j.no)} <small>${esc(j.part)}</small></h2><div class="muted">${esc(j.customer)} · PO ${esc(j.po)} · Drawing ${esc(j.drawing)} · Pattern ${esc(j.pattern)} · Grade ${esc(j.grade)}${j.qty ? ' · Order qty ' + esc(j.qty) : ''}</div></div>
       <div class="row"><button class="btn" data-act="edit-job" data-no="${esc(no)}">Edit</button><button class="btn" data-act="pdf-job" data-no="${esc(no)}">Customer report (PDF)</button><button class="btn primary" data-act="add-castings" data-no="${esc(no)}">+ Add castings</button></div></div>
     <section class="card"><h3>Inspection requirements for this order <small class="muted">(per PO / customer QAP)</small></h3>
       <div class="chips">${Object.keys(j.applic).map((id) => `<label class="chip"><input type="checkbox" data-act="applic" data-no="${esc(no)}" data-step="${id}" ${j.applic[id] ? 'checked' : ''}> ${id} ${esc(QI.steps[id].name)}</label>`).join('')}</div>
-      <div class="muted sm">Unticked steps are skipped for every casting of this order. 3.2 and 8.3 are sampled (10 %) and never block a casting.</div></section>
-    <section class="card"><h3>Castings (${cs.length})</h3>${cs.length ? castingTable(cs) : empty('No castings yet – add the first one.')}</section>
-    <section class="card"><h3>Stage ${st1.no} · ${esc(st1.name)} ${stBadge(s1.every((x) => x === 'ok') ? 'done' : s1.some((x) => x === 'ok') ? 'progress' : 'open')}</h3>${stageBlock(st1, 'job', no)}${approvalStrip('job', no, 1, [j])}</section>`;
+      <div class="muted sm">Unticked steps are skipped for every casting of this order. Mould & core making is sampled and never blocks a casting.</div></section>
+    <section class="card"><h3>Castings (${cs.length})</h3>${cs.length ? castingTable(cs) : empty('No castings yet – add the first one.')}</section>`;
   };
   function castingTable(cs) {
     return table(['Serial no.', 'Heat', 'Progress', 'Status', ''], cs.map((c) => `<tr><td>${link('/casting/' + c.id, c.id)}</td><td>${c.heatNo ? link('/heat/' + c.heatNo, c.heatNo) : '<span class="muted">–</span>'}</td><td>${progressBar(c)}</td><td>${stateBadge(c)}</td><td>${link('/casting/' + c.id, 'Open →')}</td></tr>`));
@@ -423,8 +338,6 @@
     <section class="card links"><div class="grid2">
       <div><span class="lbl">Heat (melt)</span><div class="row">${c.status === 'active' || !c.heatNo ? `<select data-act="set-heat" data-id="${esc(c.id)}"><option value="">– select heat –</option>${heats.map((h) => `<option ${h.no === c.heatNo ? 'selected' : ''}>${esc(h.no)}</option>`).join('')}</select>` : esc(c.heatNo)}<button class="btn sm" data-act="new-heat" data-for="${esc(c.id)}">+ New heat</button></div></div>
       <div><span class="lbl">Sand & calibration log (mould-making shift)</span><div class="row"><select data-act="set-log" data-id="${esc(c.id)}"><option value="">– select log –</option>${logs.map((l) => `<option value="${esc(l.id)}" ${l.id === c.logId ? 'selected' : ''}>${esc(l.date)} · shift ${esc(l.shift)}</option>`).join('')}</select><button class="btn sm" data-act="new-log" data-for="${esc(c.id)}">+ New log</button></div></div></div></section>
-    ${htRecCard(c)}
-    ${testsCard(c)}
     ${t.stages.map((x) => {
       const no = x.stage.no;
       const open = ui.stageOpen[c.id + no] != null ? ui.stageOpen[c.id + no] : (no === t.current || x.status === 'fail');
@@ -449,20 +362,13 @@
     const h = QI.heat(no); if (!h) return empty('Heat not found.');
     const cs = QI.heatCastings(no);
     const unassigned = S().castings.filter((c) => !c.heatNo && c.status === 'active');
-    const req = {};
-    cs.forEach((c) => QI.stageOf[8].groups[0].steps.forEach((sp) => { if (QI.required(QI.job(c.jobNo), sp.checks[0])) (req[sp.id] = req[sp.id] || new Set()).add(c.jobNo); }));
-    return `<div class="hd"><div><h2>Heat ${esc(h.no)}</h2><div class="muted">${esc(h.date)} · Furnace ${esc(h.furnace || '–')} · Grade ${esc(h.grade || '–')} · Tapping ${esc(QI.limText(num(h.tapMin), num(h.tapMax), '°C') || 'limits not set')} · Pouring ${esc(QI.limText(num(h.pourMin), num(h.pourMax), '°C') || 'limits not set')}</div></div>
-      <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat & limits</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical spec</button></div></div>
+    return `<div class="hd"><div><h2>Heat ${esc(h.no)}</h2><div class="muted">${esc(h.date)} · Furnace ${esc(h.furnace || '–')} · Grade ${esc(h.grade || '–')}</div></div>
+      <div class="row"><button class="btn" data-act="edit-heat" data-no="${esc(no)}">Edit heat</button><button class="btn" data-act="heat-spec" data-no="${esc(no)}">Chemistry & mechanical limits</button></div></div>
     <section class="card"><h3>Castings poured from this heat (${cs.length})</h3>${cs.length ? castingTable(cs) : '<div class="muted">None yet.</div>'}
       ${unassigned.length ? `<div class="row pad"><select id="addc">${unassigned.map((c) => `<option>${esc(c.id)}</option>`).join('')}</select><button class="btn sm" data-act="heat-add" data-no="${esc(no)}">Add casting to heat</button></div>` : ''}</section>
-    ${h.charge ? `<section class="card"><h3>Charge mix <small class="muted">${esc(h.charge.recipe)} · LM ${esc(h.charge.lm)} kg · saved by ${esc(h.charge.by)}, ${fdt(h.charge.ts)}</small></h3>
-      <div class="sm">${h.charge.rows.map((x) => `${esc(x.name)} <b>${x.kg} kg</b>`).join(' · ')}</div><div class="muted sm pad">Expected: ${Object.keys(h.charge.expected).map((e) => e + ' ' + h.charge.expected[e]).join(' · ')} ${h.charge.ok ? badge('within target', 'ok') : badge('outside target', 'warn')} · Final cost Rs ${h.charge.finalCost}/kg</div>
-      <button class="btn sm" data-act="cm-load" data-no="${esc(no)}">Open in calculator</button></section>` : `<section class="card"><h3>Charge mix</h3><div class="muted sm pad">No charge calculated for this heat yet.</div><button class="btn sm" data-act="cm-plan">Plan charge mix</button></section>`}
-    ${[4, 8].map((n) => {
-      const st = QI.stageOf[n];
-      const sts = st.groups[0].steps.flatMap((s) => s.checks).map((c) => QI.status('heat', no, c.id));
-      return `<section class="card"><h3>Stage ${n} · ${esc(st.name)} ${n === 8 ? '<small class="muted">test bars / samples from this heat – tests required depend on each casting’s PO / QAP</small>' : ''}</h3>
-        ${n === 8 && Object.keys(req).length ? `<div class="muted sm pad">Required by castings on this heat: ${Object.keys(req).map((k) => `${k} (${[...req[k]].join(', ')})`).join(' · ')}</div>` : ''}${stageBlock(st, 'heat', no)}${approvalStrip('heat', no, n, QI.jobsOf('heat', no))}</section>`;
+    ${QI.stages.filter((st) => st.scope === 'heat').map((st) => {
+      const sts = st.groups.flatMap((g) => g.steps).flatMap((sp) => sp.checks).map((c) => QI.status('heat', no, c.id));
+      return `<section class="card"><h3>Stage ${st.no} · ${esc(st.name)} <small class="muted">${esc(st.section)}</small> ${stBadge(sts.every((x) => x === 'ok') ? 'done' : sts.some((x) => x === 'ok') ? 'progress' : 'open')}</h3>${st.gate ? `<div class="gate"><b>◆ ${esc(st.gate.question)}</b> <span class="muted sm">No → ${esc(st.gate.no)}</span></div>` : ''}${stageBlock(st, 'heat', no)}${approvalStrip('heat', no, st.no, QI.jobsOf('heat', no))}</section>`;
     }).join('')}`;
   };
 
@@ -479,8 +385,8 @@
   };
   V.log = (id) => {
     const l = QI.log(id); if (!l) return empty('Log not found.');
-    return `<div class="hd"><div><h2>Sand & calibration log – ${esc(l.date)}, shift ${esc(l.shift)}</h2><div class="muted">${QI.logCastings(id).length} casting(s) linked · opened by ${esc(l.by || '–')}</div></div></div>
-      <section class="card">${stageBlock(QI.stageOf[2], 'log', id)}${approvalStrip('log', id, 2, QI.jobsOf('log', id))}</section>`;
+    return `<div class="hd"><div><h2>Sand shift log – ${esc(l.date)}, shift ${esc(l.shift)}</h2><div class="muted">${QI.logCastings(id).length} casting(s) linked · opened by ${esc(l.by || '–')}</div></div></div>
+      <section class="card">${QI.stages.filter((st) => st.scope === 'log').map((st) => `<h3>Stage ${st.no} · ${esc(st.name)}</h3>${stageBlock(st, 'log', id)}${approvalStrip('log', id, st.no, QI.jobsOf('log', id))}`).join('')}</section>`;
   };
 
 
@@ -530,7 +436,7 @@
     <section class="card"><h3>Dropdown lists</h3><div class="muted sm pad">Values typed under “Other (specify)…” are added to the dropdowns automatically. Tap × to remove a wrong entry.</div>${listsHtml()}</section>
     <section class="card"><h3>Data</h3><div class="muted sm pad">Data is stored in this browser (works offline). ${QI.persistent ? '' : '<b class="badT">Browser storage is unavailable – export your data before closing!</b>'} Export a backup regularly, and import it to move data to another device.</div>
       <div class="row"><button class="btn" data-act="export-json">Backup (JSON)</button><label class="btn">Restore backup<input type="file" accept="application/json" hidden data-act="import-json"></label><button class="btn" data-act="export-csv">Export all results (CSV)</button></div></section>
-    <section class="card"><h3>Demo</h3><div class="row"><button class="btn" data-act="demo">Load demo data</button><button class="btn danger" data-act="wipe">Erase everything</button></div></section>`;
+    <section class="card"><h3>Demo</h3><div class="row"><button class="btn" data-act="demo">Enter Sona knuckle data</button><button class="btn danger" data-act="wipe">Erase everything</button></div></section>`;
 
   const LIST_NAMES = { signNote: 'Sign-off remarks', returnReason: 'Return / reopen reasons', inspector: 'Inspectors', customer: 'Customers', part: 'Parts', grade: 'Material grades', furnace: 'Furnaces', remarks: 'Inspection remarks', rejectReason: 'Rejection reasons', closeNote: 'NCR closure notes', releaseRemarks: 'Release remarks' };
   function listsHtml() {
@@ -644,7 +550,7 @@
     demo: () => ask('Add sample records (a work order, heat, sand log and four castings)?' + (QI.mode === 'shared' ? ' Everyone using the app will see them.' : ''), () => { demoData(); go('/dashboard'); toast('Demo data loaded', 'ok'); }, 'Add samples'),
     wipe: () => modal('Erase everything', `<p>This deletes every work order, casting, heat, log, result and NCR${QI.mode === 'shared' ? ' for ALL departments' : ''}. Download a backup first.</p>${fld('Type ERASE to confirm', 't', '')}`, (f) => { if (val(f, 't') !== 'ERASE') return 'Type ERASE to confirm.'; QI.reset(); go('/dashboard'); }, 'Erase all'),
   };
-  Object.assign(ACT, HT_ACTS, TEST_ACTS, { 'pdf-casting': (el) => savePdf(`Inspection-report-${el.dataset.id}.pdf`, () => PDFREPORT.casting(el.dataset.id)), 'pdf-job': (el) => savePdf(`Inspection-summary-${el.dataset.no}.pdf`, () => PDFREPORT.job(el.dataset.no)) });
+  Object.assign(ACT, { 'pdf-casting': (el) => savePdf(`Inspection-report-${el.dataset.id}.pdf`, () => PDFREPORT.casting(el.dataset.id)), 'pdf-job': (el) => savePdf(`Inspection-summary-${el.dataset.no}.pdf`, () => PDFREPORT.job(el.dataset.no)) });
   async function savePdf(name, make) {
     toast('Making the PDF …');
     try { const blob = await make(); download(name, blob, 'application/pdf'); }
@@ -685,53 +591,44 @@
   });
 
   /* ================= demo data ================= */
-  function demoData() {
-    const st = S();
-    st.settings.inspector = st.settings.inspector || 'Demo Inspector';
-    const suffix = String(Date.now()).slice(-4);
-    const no = 'WO-' + suffix;
-    QI.addJob({ no, customer: 'Sample Engineering Ltd', po: 'PO-' + suffix, qty: '6', part: 'Pump Casing', drawing: 'DWG-1042', pattern: 'PTN-77', grade: 'ASTM A216 WCB', dims: 'Bore Ø, 100, 0.5, 0.5\nFlange thickness, 25, 0.3, 0.3' });
-    const j = QI.job(no); j.applic['7.1'] = true; j.applic['7.2'] = false; j.applic['7.3'] = false; j.applic['8.4'] = false;
+  /* ---- Knuckle (Sona) heat-wise sheet: heats H430, H447, H450 ---- */
+  const KN_CHEM = 'C, 0.29, 0.31\nSi, 0.43, 0.62\nMn, 1.16, 1.50\nP, 0.022, 0.031\nS, 0.010, 0.020\nCr, 0.03, 0.30\nMo, 0.12, 0.13\nNi, 0.18, 0.23\nAl, 0.031, 0.048\nSn, 0.003, 0.004';
+  const KN = [
+    { no: 'H430', shift: 'A', sand: { '1.1.1': 1.9, '1.1.2': 20, '1.1.3': 1.9, '1.1.4': 18, '1.2.1': 6.2, '1.3.1': 3.2, '1.3.2': 0.34, '1.3.3': 6.9, '1.3.4': 5.75, '1.3.5': 9.1, '1.3.6': 3.7 }, paint: 55, hard: 59, chem: { C: 0.29, Si: 0.43, Mn: 1.16, P: 0.022, S: 0.010, Cr: 0.03, Mo: 0.12, Ni: 0.23, Al: 0.048, Sn: 0.004 }, shake: 28 },
+    { no: 'H447', shift: 'B', sand: { '1.1.1': 1.8, '1.1.2': 19, '1.1.3': 1.8, '1.1.4': 18, '1.2.1': 6.47, '1.3.1': 3.65, '1.3.2': 0.39, '1.3.3': 6.57, '1.3.4': 4.97, '1.3.5': 9.3, '1.3.6': 2.7 }, paint: 55, hard: 57, chem: { C: 0.31, Si: 0.62, Mn: 1.49, P: 0.031, S: 0.018, Cr: 0.30, Mo: 0.13, Ni: 0.19, Al: 0.031, Sn: 0.003 }, shake: 30 },
+    { no: 'H450', shift: 'C', sand: { '1.1.1': 2.0, '1.1.2': 20, '1.1.3': 1.8, '1.1.4': 19, '1.2.1': 6.27, '1.3.1': 3.32, '1.3.2': 0.41, '1.3.3': 6.9, '1.3.4': 5.35, '1.3.5': 9.1 }, paint: 56, hard: 60, chem: { C: 0.29, Si: 0.62, Mn: 1.50, P: 0.030, S: 0.020, Cr: 0.30, Mo: 0.13, Ni: 0.18, Al: 0.036, Sn: 0.003 }, shake: 30 }];
+  function knuckleData() {
+    const st = S(); st.settings.inspector = st.settings.inspector || 'Data entry';
+    const jobNo = 'SONA-KNUCKLE';
+    if (!QI.job(jobNo)) QI.addJob({ no: jobNo, customer: 'Sona', po: '', qty: String(KN.length), part: 'Knuckle', drawing: '', pattern: '', grade: '', dims: '' });
+    const j = QI.job(jobNo); Object.keys(j.applic || {}).forEach((k) => { j.applic[k] = false; });
     const ok = (scope, owner, id, input) => QI.record(scope, owner, id, Object.assign({ action: '' }, input));
-    const ynOk = { result: 'ok' };
-    ['1.1.1', '1.3.1', '1.4.1'].forEach((id) => ok('job', no, id, { rows: [{ name: 'Overall length', nominal: 450, tm: 1, tp: 1, actual: 450.4 }] }));
-    ['1.2.1', '1.3.2'].forEach((id) => ok('job', no, id, ynOk));
-    const log = QI.addLog(today(), 'A').id;
-    const logVals = { '2.1.1': ynOk, '2.2.1': { value: 3.1 }, '2.2.2': { value: 0.6 }, '2.3.1': { value: 3.8 }, '2.3.2': { value: 0.7 }, '2.4.1': { value: 1.9 }, '2.5.1': { value: 19.5 }, '2.10.1': { value: 8.2 }, '2.10.2': { value: 4.1 }, '2.10.3': { value: 2.2 } };
-    Object.keys(logVals).forEach((id) => ok('log', log, id, logVals[id]));
-    ok('log', log, '2.3.3', { value: 2.8 });
-    QI.addHeat({ no: 'H-' + suffix, date: today(), furnace: 'IF-1', grade: 'WCB', tapMin: '1620', tapMax: '1660', pourMin: '1560', pourMax: '1600' });
-    const h = QI.heat('H-' + suffix);
-    h.chemSpec = parseSpec('C, 0.18, 0.25\nSi, , 0.6\nMn, 0.6, 1.0\nP, , 0.035\nS, , 0.035');
-    h.mechSpec = parseSpec('UTS (MPa), 485, 655\nYS (MPa), 250,\nElongation (%), 22,\nRA (%), 35,');
-    const ch = { C: 0.21, Si: 0.45, Mn: 0.82, P: 0.02, S: 0.015 };
-    ok('heat', h.no, '4.1.1', { vals: ch }); ok('heat', h.no, '4.2.1', { vals: ch });
-    ok('heat', h.no, '4.3.1', { value: 1645, min: '1620', max: '1660' }); ok('heat', h.no, '4.4.1', { value: 1585, min: '1560', max: '1600' });
-    const cs = QI.addCastings(no, 4);
-    cs.forEach((c) => { c.logId = log; c.heatNo = h.no; });
-    const casting = (c, ids) => ids.forEach((id) => {
-      const ch0 = QI.checks[id];
-      const inp = ch0.kind === 'dim' ? { rows: [{ name: 'Bore Ø', nominal: 100, tm: 0.5, tp: 0.5, actual: 100.1 }] } : ch0.kind === 'range' ? { value: (ch0.min + ch0.max) / 2 } : ch0.kind === 'min' ? { value: ch0.min + 5 } : ynOk;
-      ok('casting', c.id, id, inp);
+    const results = [];
+    KN.forEach((r) => {
+      if (!QI.heat(r.no)) QI.addHeat({ no: r.no, date: today(), furnace: '', grade: 'Knuckle' });
+      const h = QI.heat(r.no); h.chemSpec = parseSpec(KN_CHEM);
+      const log = QI.addLog(today(), r.shift).id;
+      let c = QI.jobCastings(jobNo).find((x) => x.heatNo === r.no);
+      if (!c) { c = QI.addCastings(jobNo, 1)[0]; }
+      c.heatNo = r.no; c.logId = log;
+      Object.keys(r.sand).forEach((id) => results.push([id, ok('log', log, id, { value: r.sand[id] })]));
+      results.push(['1.4.1', ok('log', log, '1.4.1', { value: r.paint })]);
+      results.push(['2.2.1', ok('casting', c.id, '2.2.1', { value: r.hard })]);
+      results.push(['3.3.1', ok('heat', r.no, '3.3.1', { vals: r.chem })]);
+      results.push(['3.5.1', ok('heat', r.no, '3.5.1', { value: r.shake })]);
+      results.push(['5.2.1', ok('heat', r.no, '5.2.1', { value: 920 })]);
+      results.push(['5.2.2', ok('heat', r.no, '5.2.2', { value: 100, result: 'ok' })]);
+      results.push(['5.2.3', ok('heat', r.no, '5.2.3', { value: 4 })]);
     });
-    casting(cs[0], ['3.1.1', '3.1.2', '3.2.1', '3.3.1', '3.4.1', '5.1.1', '5.2.1', '5.2.2', '6.1.1', '7.1.1', '9.1.1', '10.1.1', '10.1.2', '10.2.1'].filter((x) => x !== '9.1.1'));
-    casting(cs[1], ['3.1.1', '3.1.2', '3.3.1', '3.4.1', '5.1.1']);
-    casting(cs[2], ['3.1.1']);
-    QI.record('casting', cs[2].id, '3.1.2', { result: 'nok', action: 'Repainting' });
-    ok('heat', h.no, '8.1.1', { vals: { 'UTS (MPa)': 520, 'YS (MPa)': 290, 'Elongation (%)': 26, 'RA (%)': 45 } });
-    ok('heat', h.no, '8.2.1', ynOk); ok('heat', h.no, '8.3.1', { value: 165, min: '137', max: '207' });
-    if (QI.mode === 'local') {
-      const sg = (scope, owner, no, jobNo) => [['review', 'Demo Inspector'], ['qc', 'Demo QC Manager'], ['head', 'Demo Factory Head']].forEach(([r, n]) => QI.signoff(scope, owner, no, r, n, '', jobNo));
-      sg('job', no, 1, no); sg('log', log, 2, no); sg('casting', cs[0].id, 3, no); sg('heat', h.no, 4, no);
-    }
     QI.save();
+    return results.filter((x) => x[1] && x[1].error).map((x) => x[0] + ': ' + x[1].error);
   }
 
   /* ================= router ================= */
-  const GROUPS = [['dashboard', '🏠', 'Today'], ['castings', '🔩', 'Castings'], ['tests', '🧪', 'Tests'], ['approvals', '✅', 'Approvals'], ['more', '☰', 'More']];
+  const GROUPS = [['dashboard', '🏠', 'Today'], ['flow', '🔀', 'Flow'], ['castings', '🔩', 'Castings'], ['approvals', '✅', 'Approvals'], ['more', '☰', 'More']];
   const PERM = { 'new-job': ['create', 'job'], 'edit-job': ['create', 'job'], applic: ['create', 'job'], 'add-castings': ['create', 'casting'], 'new-heat': ['create', 'heat'], 'edit-heat': ['create', 'heat'],
     'new-log': ['create', 'log'], 'heat-spec': ['spec'], 'heat-add': ['link', 'heat'], 'set-heat': ['link', 'heat'], 'set-log': ['link', 'log'], release: ['release'], 'reject-casting': ['reject'],
-    'ncr-close': ['ncr'], 'ht-rec': ['ht'], 'test-sand': ['test', 'sand'], 'test-chem': ['test', 'chem'], 'test-dim': ['test', 'dim'], 'test-phys': ['test', 'phys'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
+    'ncr-close': ['ncr'], 'ht-add': ['ht'], 'ht-del': ['ht'], 'ht-save': ['ht'], 'ht-delplan': ['ht'], 'mpl-new': ['mplan'], 'mpl-save': ['mplan'], 'mpl-addrow': ['mplan'], 'mpl-delrow': ['mplan'], 'mpl-additem': ['mplan'], 'mpl-delitem': ['mplan'], 'rm-new': ['rm'], 'rm-save': ['rm'], 'rm-addcheck': ['rm'], 'rm-delcheck': ['rm'], 'cm-lots': ['charge'], 'mp-new': ['mould'], 'mp-save': ['mould'], 'mp-post': ['mould'], 'mp-addline': ['mould'], 'mp-delline': ['mould'], 'mp-additem': ['mould'], 'mp-delitem': ['mould'], 'ml-new': ['melt'], 'ml-save': ['melt'], 'ml-post': ['melt'], 'ml-sign': ['melt'], 'ml-addscrap': ['melt'], 'ml-addalloc': ['melt'], 'cm-save': ['charge'], 'cm-dup': ['charge'], 'cm-del': ['charge'], 'cm-toheat': ['charge'], 'cm-plan': ['charge'], 'edit-items': ['master'], 'add-customer': ['master'], 'edit-check': ['plan'], 'export-json': ['admin'], 'import-json': ['admin'], demo: ['admin'], wipe: ['admin'] };
   function applyPerms(root) {
     root.querySelectorAll('[data-act]').forEach((el) => {
       const p = PERM[el.dataset.act]; if (!p || QI.can(p[0], p[1])) return;
@@ -764,7 +661,7 @@
   }
   if (window.DCL_LOGO) { const lg = $('#logo'); lg.src = window.DCL_LOGO; lg.hidden = false; }
   /* ---- "+ New entry" button: one tap to the entry forms ---- */
-  const FAB = [['Work order', ['create', 'job'], 'new-job'], ['Inspect a casting', null, '#castings'], ['Sand test', ['test', 'sand'], 'test-sand'], ['Chemical composition', ['test', 'chem'], 'test-chem'], ['Heat treatment record', 'ht', '#tests/ht'], ['Dimensions', ['test', 'dim'], 'test-dim'], ['Physical test', ['test', 'phys'], 'test-phys'], ['Sand / calibration log', ['create', 'log'], 'new-log'], ['New heat', ['create', 'heat'], 'new-heat']];
+  const FAB = [['Work order', ['create', 'job'], 'new-job'], ['Inspect a casting', null, '#castings'], ['Sand shift log', ['create', 'log'], 'new-log'], ['New heat', ['create', 'heat'], 'new-heat'], ['Follow the flow', null, '#flow']];
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('[data-home]'); if (!b) return;
     const k = b.dataset.home;
@@ -803,5 +700,5 @@
     })();
   }
   if (!QI.persistent) toast('Browser storage unavailable – data will not be saved. Use Settings → Backup.', 'bad');
-  window.QIApp = { render, demoData };
+  window.QIApp = { render, knuckleData };
 })();

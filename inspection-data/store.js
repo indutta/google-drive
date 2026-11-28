@@ -47,18 +47,17 @@
 
   /* ---------- departments & permissions (shared mode only; local mode = everything allowed) ---------- */
   QI.DEPTS = [
-    { id: 'planning', name: 'Planning / PPC', stages: [], create: ['job', 'casting'], about: 'Creates work orders and castings' },
-    { id: 'pattern', name: 'Pattern shop', stages: [1], about: 'Stage 1' },
-    { id: 'sand', name: 'Sand lab & moulding', stages: [2, 3], create: ['log'], link: ['log'], about: 'Stages 2–3, sand logs' },
-    { id: 'melt', name: 'Melting & pouring', stages: [4], create: ['heat'], link: ['heat'], about: 'Stage 4, heats' },
-    { id: 'fettle', name: 'Shot blasting, fettling & heat treatment', stages: [5, 6], about: 'Stages 5–6' },
-    { id: 'lab', name: 'NDT & mechanical / metallurgical lab', stages: [7, 8], about: 'Stages 7–8' },
-    { id: 'mach', name: 'Machining', stages: [9], about: 'Stage 9' },
-    { id: 'qa', name: 'Quality assurance & final inspection', stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], all: true, about: 'Stage 10, release, rejection, NCR closure, everything else' },
-    { id: 'qcm', name: 'QC Manager', stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], all: true, approver: 'qc', about: 'Second approval on every stage, plus release / reject / NCR closure' },
+    { id: 'planning', name: 'Planning', stages: [], create: ['job', 'casting'], about: 'Creates work orders and castings' },
+    { id: 'sand', name: 'Moulding & sand lab', stages: [1, 2], create: ['log'], link: ['log'], about: 'Moulding: sand plant, sand tests, mould & core' },
+    { id: 'melt', name: 'Melting & pouring', stages: [3], create: ['heat'], link: ['heat'], about: 'Charge, melt log, ladle chemistry, pouring, shake-out' },
+    { id: 'fettle', name: 'Fettling & heat treatment', stages: [4, 5], about: 'Fettling, normalising, quenching, tempering' },
+    { id: 'lab', name: 'Mechanical test lab', stages: [6], about: 'Tensile and impact tests' },
+    { id: 'qa', name: 'Quality assurance & final inspection', stages: [1, 2, 3, 4, 5, 6, 7], all: true, about: 'Finished casting, release, rejection, NCR closure, everything else' },
+    { id: 'qcm', name: 'QC Manager', stages: [1, 2, 3, 4, 5, 6, 7], all: true, approver: 'qc', about: 'Second approval on every stage, plus release / reject / NCR closure' },
     { id: 'head', name: 'Factory Head', stages: [], approver: 'head', extra: ['release', 'reject'], about: 'Final approval on every stage' },
     { id: 'mgmt', name: 'Management (view only)', stages: [], about: 'Dashboards and reports' },
   ];
+
   QI.me = { uid: null, name: '', dept: null, canWrite: true };
   QI.people = {};
   QI.dept = () => QI.DEPTS.find((d) => d.id === QI.me.dept) || null;
@@ -271,7 +270,7 @@
   QI.jobCastings = (no) => S.castings.filter((c) => c.jobNo === no);
 
   QI.ownerOf = (c, scope) => scope === 'job' ? c.jobNo : scope === 'log' ? c.logId : scope === 'heat' ? c.heatNo : c.id;
-  const dflt = { '9.1': false, '7.4': false };
+  const dflt = { '7.2': false, '7.3': false };
   QI.defaultApplic = () => { const o = {}; Object.keys(QI.steps).forEach((id) => { if (QI.steps[id].optional) o[id] = dflt[id] !== undefined ? dflt[id] : true; }); return o; };
   QI.required = (job, check) => {
     const sp = QI.steps[check.step];
@@ -412,7 +411,7 @@
   QI.closeNcr = (id, note) => { const n = S.ncrs.find((x) => x.id === id); if (n) { n.status = 'closed'; n.closedTs = Date.now(); n.closeNote = note || 'Closed manually'; QI.save(); } };
 
   /* ---------- casting traveller ---------- */
-  const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const ORDER = PLAN.stages.map((x) => x.no);
   const ROLE_LABEL = { review: 'inspector sign-off', qc: 'QC Manager approval', head: 'Factory Head approval' };
   QI.ROLE_LABEL = ROLE_LABEL;
 
@@ -435,7 +434,7 @@
     return items;
   };
   const checkStatus = (no, items, owner) => {
-    if (no === 2) {
+    if (QI.stageOf[no].scope === 'log') {
       if (!owner) return 'open';
       if (items.some((i) => i.status === 'nok')) return 'fail';
       return items.some((i) => i.status === 'ok') ? 'done' : 'open';
@@ -570,7 +569,7 @@
     const active = cs.filter((c) => c.status === 'active');
     const wip = {};
     QI.stages.forEach((s) => (wip[s.no] = 0));
-    active.forEach((c) => { const st = QI.castingState(c); if (st.stageNo && st.label !== 'Ready for release') wip[st.stageNo]++; else wip[10]++; });
+    active.forEach((c) => { const st = QI.castingState(c); if (st.stageNo && st.label !== 'Ready for release') wip[st.stageNo]++; else wip[QI.stages.length]++; });
     const ncrByStage = {}; QI.stages.forEach((s) => (ncrByStage[s.no] = 0));
     S.ncrs.forEach((n) => { if (n.stageNo) ncrByStage[n.stageNo]++; });
     let first = 0, total = 0;

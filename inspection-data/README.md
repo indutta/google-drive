@@ -1,13 +1,21 @@
 # Inspection Data (Datre)
 
-A simple phone-first app for inspection and test data: the 10-stage casting inspection flow with approvals, plus test records.
-Rebuilt from "Daily Production & Inspection" – production planning (daily plan, PPC/WIP, melting/moulding plans, charge mix, raw materials, maintenance) is not part of this app.
+Phone-first inspection app built on the **KNUCKLE (Sona) casting inspection flow chart**. Production planning is not part of it.
 
-**Five tabs:** Today · Castings · Tests · Approvals · More (Work orders, Heats, Sand & calibration logs, NCRs, Inspection plan, Settings & backup).
+**Tabs:** Today · Flow · Castings · Approvals · More.
 
-- **Castings** – open a casting to follow the 10 stages; each stage has inspector → QC Manager → Factory Head approval. Release / reject, PDF inspection report.
-- **Tests** (one page, tabs): Sand · Chemistry (per heat, limits from the heat Specification flag red) · Heat treatment (shake-out, normalising, quenching, tempering with hardness) · Dimensions (auto OK / Not OK) · Physical (UTS, YS, %E, %RA, impact, hardness at each heat-treatment stage) · Procedures (how each test is done, by department).
-- **+ New entry** – one button for work order, tests, logs and heats.
+**Flow** follows the chart, section by section, with each test in sequence, its frequency (green) and acceptance (red):
+1. Moulding – sand plant calibration, new sand check, mixed sand test, paint Baumé (per shift log); mould & core, mould hardness (per casting) – gate *Moulding OK?*
+2. Melting & pouring – charge check, melt log, ladle spectro chemistry, pouring, shake-out (per heat) – gate *Chemistry in spec?*
+3. Fettling – cut-off / grinding / shot blast, visual & dimensional (per casting)
+4. Heat treatment – furnace load check, normalising, hardness, quenching, tempering (per heat/load) – gate *Hardness in spec?*
+5. Mechanical tests – tensile, impact (per heat) – gate *Tests pass?*
+6. Finished casting – final visual & dimensions, MPT, RT/UT (per casting) – gate *All OK?* → ACCEPTED, release
+
+Values marked * in the chart are ranges recorded on the Sona heat-wise sheet (heats H430, H447, H450); they are used as limits and flagged "criteria assumed – confirm". A failed check raises an NCR with the actions from the chart (rework / reject).
+Approvals (Inspector → QC Manager → Factory Head) apply to each stage; release / reject by QA.
+
+**Settings → Enter Sona knuckle data** enters the sheet's values for the three heats as real records.
 
 ## Build
-`python3 tools/bundle.py` writes `inspection-data.html` (standalone, works offline on any Android phone), `artifact.html` (Claude Artifact) and `gas/app.html` (Google Sheet / Apps Script version, see `gas/SETUP.md`). Inspection plan comes from `source/INS_Inspection_Flow.xlsx` via `tools/build_plan.py`.
+`python3 -I tools/build_flow.py` writes `plan.js` from the flow data; `python3 tools/bundle.py` writes `inspection-data.html`, `artifact.html` and `gas/app.html` (Google Sheet version, see `gas/SETUP.md`).

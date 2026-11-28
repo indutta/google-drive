@@ -3,7 +3,7 @@
 import os, re
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 rd = lambda n: open(os.path.join(root, n), encoding='utf-8').read()
-JS = ('plan.js', 'store.js', 'htrec.js', 'tests.js', 'pdfreport.js', 'logo.js', 'app.js')
+JS = ('plan.js', 'store.js', 'pdfreport.js', 'logo.js', 'app.js')
 h = rd('index.html')
 h = re.sub(r'<link rel="(manifest|icon|apple-touch-icon)"[^>]*>\n', '', h)
 h = h.replace('<link rel="stylesheet" href="styles.css">', '<style>\n' + rd('styles.css') + '\n</style>')
