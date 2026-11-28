@@ -2288,6 +2288,29 @@ window.DCL_LOGO = '';
     <section class="card"><h3>Needs attention</h3>${attention.length ? attention.map((c) => `<div class="li">${link('/casting/' + c.id, c.id)} ${stateBadge(c)}</div>`).join('') : '<div class="muted">No failed checks waiting ✔</div>'}${due.length ? `<div class="li sm"><span>${dot('nok')} ${due.length} calibration / test(s) due</span></div>` : ''}</section>`;
   };
   /* ---- the flow chart, section by section, with the records to enter in sequence ---- */
+  /* ---- day-wise inspection data of a department (section): every recorded attempt, grouped by inspection date ---- */
+  const dkey = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const dayData = (sec) => {
+    const nos = sec.stages.map((x) => x.no), days = {};
+    Object.keys(S().results).forEach((k) => {
+      const [scope, owner, id] = k.split('|'); const ch = QI.checks[id]; if (!ch || !nos.includes(ch.stageNo)) return;
+      S().results[k].attempts.forEach((a) => { (days[dkey(a.ts)] = days[dkey(a.ts)] || []).push({ stage: ch.stageNo, scope, owner, id, param: ch.param, step: (QI.steps[ch.step] || {}).name || '', unit: ch.unit || '', a }); });
+    });
+    return Object.keys(days).sort().reverse().map((d) => ({ date: d, rows: days[d].sort((x, y) => x.stage - y.stage || x.id.localeCompare(y.id, undefined, { numeric: true }) || x.a.ts - y.a.ts) }));
+  };
+  const ownerHref = (r) => r.scope === 'log' ? '/log/' + r.owner : r.scope === 'heat' ? '/heat/' + r.owner : '/casting/' + r.owner;
+  const ent = (n) => n + (n === 1 ? ' entry' : ' entries');
+  const fday = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  function dayCard(sec) {
+    const days = dayData(sec); ui.flowDate = ui.flowDate || {};
+    const sel0 = ui.flowDate[sec.name] || 'all'; const shown = sel0 === 'all' ? days : days.filter((d) => d.date === sel0);
+    if (!days.length) return `<section class="card"><h3>Inspection data by date</h3><div class="muted sm">No inspections recorded yet for ${esc(sec.name)}.</div></section>`;
+    const tot = (d) => ({ ok: d.rows.filter((r) => r.a.result === 'ok').length, bad: d.rows.filter((r) => r.a.result !== 'ok').length });
+    return `<section class="card"><h3>Inspection data by date <span class="muted sm">· ${esc(sec.name)}</span></h3>
+      <label class="f"><span>Inspection date</span><select data-act="flow-date" data-sec="${esc(sec.name)}"><option value="all" ${sel0 === 'all' ? 'selected' : ''}>All dates (${days.length})</option>${days.map((d) => `<option value="${d.date}" ${sel0 === d.date ? 'selected' : ''}>${esc(fday(d.date))} – ${ent(d.rows.length)}</option>`).join('')}</select></label>
+      ${shown.map((d, i) => { const t = tot(d); return `<details class="ht-d day" ${shown.length === 1 || i === 0 ? 'open' : ''}><summary><b>${esc(fday(d.date))}</b> <span class="badge ok">${t.ok} OK</span>${t.bad ? ` <span class="badge bad">${t.bad} not OK</span>` : ''} <span class="muted sm">${ent(d.rows.length)}</span></summary>
+        ${sec.stages.map((st) => { const rs = d.rows.filter((r) => r.stage === st.no); return rs.length ? `<details class="ht-d sub" open><summary><b>Stage ${st.no} · ${esc(st.name)}</b> <span class="muted sm">${rs.length}</span></summary>${table(['Record', 'Check', 'Result', 'Value', 'By', 'Time'], rs.map((r) => `<tr><td><a href="#${ownerHref(r)}">${esc(r.owner)}</a></td><td title="${esc(r.step)}">${esc(r.id)} ${esc(r.param)}</td><td>${r.a.result === 'ok' ? badge('OK', 'ok') : badge('Not OK', 'bad')}</td><td>${esc(r.a.summary || '')}</td><td>${esc(r.a.by || '')}</td><td class="sm">${new Date(r.a.ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</td></tr>`))}</details>` : ''; }).join('')}</details>`; }).join('')}</section>`;
+  }
   V.flow = (sec) => {
     const all = SECTIONS(); const cur = all.find((x) => x.name === sec) || all[0];
     const chips = `<div class="chips">${all.map((x, i) => `<a class="chip ${x === cur ? 'on' : ''}" href="#/flow/${encodeURIComponent(x.name)}">${i + 1}. ${esc(x.name)}</a>`).join('')}</div>`;
@@ -2303,7 +2326,7 @@ window.DCL_LOGO = '';
         ${st.scope === 'log' && QI.can('create', 'log') ? '<button class="btn sm primary" data-act="new-log">+ New shift log</button>' : ''}${st.scope === 'heat' && QI.can('create', 'heat') ? '<button class="btn sm primary" data-act="new-heat">+ New heat</button>' : ''}
         ${pend.slice(0, 12).map((o) => `<div class="li"><a href="#${o.href}"><b>${esc(o.label)}</b></a>${stBadge(ownerStatus(st, o.id))}</div>`).join('') || `<div class="muted sm">${os.length ? 'All done ✔' : 'None yet.'}</div>`}${pend.length > 12 ? `<div class="muted sm">+ ${pend.length - 12} more – open from ${st.scope === 'heat' ? 'More → Heats' : st.scope === 'log' ? 'More → Shift logs' : 'Castings'}</div>` : ''}${done ? `<div class="muted sm">${done} complete</div>` : ''}</section>`;
     }).join('');
-    return chips + body;
+    return chips + dayCard(cur) + body;
   };
   V.more = () => `<h2>More</h2><div class="menu">${[['jobs', '📋 Work orders'], ['heats', '🔥 Heats'], ['logs', '🧱 Sand shift logs'], ['ncr', '⚠️ NCRs'], ['plan', '📐 Inspection plan'], ['settings', '⚙️ Settings & backup']].map(([k, t]) => `<a class="menurow" href="#/${k}">${t}</a>`).join('')}</div>`;
 
@@ -2513,6 +2536,7 @@ window.DCL_LOGO = '';
   const ACT = {
     toggle: (el) => { const k = el.dataset.key; ui.open[k] = !ui.open[k]; render(); },
     'save-check': (el) => saveCheck(el.dataset.key),
+    'flow-date': (el) => { ui.flowDate = ui.flowDate || {}; ui.flowDate[el.dataset.sec] = el.value; render(); },
     'stage-toggle': (el) => { const k = el.dataset.k; const cur = ui.stageOpen[k]; const sec = el.closest('.stage'); const isOpen = !!$('.sb', sec); ui.stageOpen[k] = !isOpen; render(); },
     'dim-add': (el) => { el.parentNode.querySelector('tbody').insertAdjacentHTML('beforeend', dimRow({})); },
     'dim-del': (el) => { const tb = el.closest('tbody'); if (tb.rows.length > 1) el.closest('tr').remove(); liveEval(el.closest('form')); },
@@ -2596,7 +2620,7 @@ window.DCL_LOGO = '';
       if (sl.form.classList.contains('chkform')) liveEval(sl.form);
     }
     const el = e.target; if (!el.dataset || !el.dataset.act) return;
-    if (['applic', 'set-heat', 'set-log', 'import-json', 'ppc-date'].includes(el.dataset.act)) ACT[el.dataset.act](el);
+    if (['applic', 'set-heat', 'set-log', 'import-json', 'flow-date'].includes(el.dataset.act)) ACT[el.dataset.act](el);
   });
   document.addEventListener('input', (e) => {
     const el = e.target;
